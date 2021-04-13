@@ -7,8 +7,8 @@ EXPOSE 443
 
 FROM mcr.microsoft.com/dotnet/core/sdk:3.1-buster AS build
 WORKDIR /src
-COPY ["Compressarr/Compressarr.csproj", "Compressarr/"]
-RUN dotnet restore "Compressarr/Compressarr.csproj"
+COPY ["Compressarr.csproj", "Compressarr/"]
+RUN dotnet restore "Compressarr.csproj"
 COPY . .
 WORKDIR "/src/Compressarr"
 RUN dotnet build "Compressarr.csproj" -c Release -o /app/build
