@@ -1,0 +1,30 @@
+﻿@using Compressarr.Helpers
+<tr class="movie">
+    <td class="title">@movie.title</td>
+    @if (movie.movieFile != null && movie.movieFile.mediaInfo != null)
+    {
+        <td><span class="badge">@movie.movieFile.mediaInfo.width</span></td>
+        <td><span class="badge">@movie.movieFile.mediaInfo.height</span></td>
+        <td><span class="badge badge-primary" title="@movie.movieFile.mediaInfo.videoCodecLibrary">@movie.movieFile.mediaInfo.videoCodec</span></td>
+        <td><span class="badge badge-info" title="@movie.movieFile.mediaInfo.videoCodecID">@movie.movieFile.mediaInfo.videoFormat</span></td>
+        <td><span class="badge badge-secondary">@movie.movieFile.mediaInfo.containerFormat</span></td>
+        <td><span class="badge">@movie.movieFile.mediaInfo.videoBitDepth</span></td>
+        <td><span class="badge badge-secondary">@movie.movieFile.mediaInfo.videoColourPrimaries</span></td>
+        <td><span class="badge">@movie.movieFile.mediaInfo.videoBitrate.ToBitRate()</span></td>
+        <td><span class="badge">@movie.movieFile.mediaInfo.videoFps</span></td>
+        <td><span class="badge">@movie.movieFile.mediaInfo.audioFormat</span></td>
+        <td><span class="badge">@movie.movieFile.mediaInfo.audioCodecID</span></td>
+        <td><span class="badge">@movie.movieFile.mediaInfo.runTimeNice</span></td>
+        <td><span class="badge" title="Bits per Pixel">@(movie.movieFile.mediaInfo.videoDataRate)bpp</span></td>
+        <td><span class="badge">@movie.movieFile.size.ToFileSize()</span></td>
+    }
+    else
+    {
+        <td colspan="3">Media Info missing</td>
+    }
+</tr>
+
+@code {
+    [Parameter]
+    public Compressarr.Services.Models.Movie movie { get; set; }
+}

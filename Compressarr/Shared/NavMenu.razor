@@ -1,0 +1,41 @@
+﻿<div class="top-row pl-4 navbar navbar-dark">
+    <button class="navbar-toggler" @onclick="ToggleNavMenu">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+</div>
+
+<div class="@NavMenuCssClass" @onclick="ToggleNavMenu">
+    <ul class="nav">
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span aria-hidden="true"><i class="fas fa-cogs"></i></span> Jobs
+            </NavLink>
+        </li>
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="radarr">
+                <span aria-hidden="true"><img src="https://raw.githubusercontent.com/Radarr/radarr.github.io/master/logo/radarr.svg" /></span> Radarr
+            </NavLink>
+        </li>
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="sonarr">
+                <span aria-hidden="true"><img src="https://raw.githubusercontent.com/Sonarr/sonarr.github.io/master/logo/sonarr.svg" /></span> Sonarr
+            </NavLink>
+        </li>
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="ffmpeg">
+                <span aria-hidden="true"><img src="https://upload.wikimedia.org/wikipedia/commons/7/76/FFmpeg_icon.svg" /></span> FFmpeg
+            </NavLink>
+        </li>
+    </ul>
+</div>
+
+@code {
+    private bool collapseNavMenu = true;
+
+    private string NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+}

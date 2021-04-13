@@ -1,0 +1,22 @@
+[
+  {
+    "crf": 23.0,
+    "preset": 6,
+    "tune": "fastdecode",
+    "AudioCodec": "copy",
+    "Container": "matroska",
+    "ContainerExtension": "mkv",
+    "Name": "x265 Re-Encode",
+    "OptionalArguments": "-x265-params \"colorprim=5:transfer=1:colormatrix=6:refine-mv=1:pools='none'\"",
+    "VideoCodec": "libx265"
+  },
+  {
+    "crf": 28.0,
+    "preset": 6,
+    "AudioCodec": "copy",
+    "Container": "m4v",
+    "Name": "Constant Bitrate",
+    "VideoBitRate": 1000,
+    "VideoCodec": "libx265"
+  }
+]

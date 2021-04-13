@@ -1,0 +1,18 @@
+[
+  {
+    "Name": "Magic",
+    "FilterType": 0,
+    "Filters": [
+      {
+        "IsFirst": true,
+        "Property": {
+          "Value": "movieFile.mediaInfo.videoCodec"
+        },
+        "Comparitor": {
+          "Value": "=="
+        },
+        "Value": "Magic0432"
+      }
+    ]
+  }
+]

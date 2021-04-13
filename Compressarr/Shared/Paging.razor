@@ -1,0 +1,59 @@
+﻿<button @onclick="FirstPage"><i class="fas fa-fast-backward"></i></button>
+<button @onclick="PreviousPage"><i class="fas fa-backward"></i></button>
+<span>@(pageNumber+1)</span>
+        /
+<span>@pageCount</span>
+<button @onclick="NextPage"><i class="fas fa-forward"></i></button>
+<button @onclick="LastPage"><i class="fas fa-fast-forward"></i></button>
+
+@code {
+    [Parameter]
+    public int pageNumber { get; set; }
+
+    [Parameter]
+    public int pageCount { get; set; }
+
+    [Parameter]
+    public EventCallback OnFirstPage { get; set; }
+
+    [Parameter]
+    public EventCallback OnPreviousPage { get; set; }
+
+    [Parameter]
+    public EventCallback OnNextPage { get; set; }
+
+    [Parameter]
+    public EventCallback OnLastPage { get; set; }
+
+    private void FirstPage()
+    {
+        if (OnFirstPage.HasDelegate)
+        {
+            OnFirstPage.InvokeAsync(null);
+        }
+    }
+
+    private void PreviousPage()
+    {
+        if (OnPreviousPage.HasDelegate)
+        {
+            OnPreviousPage.InvokeAsync(null);
+        }
+    }
+
+    private void NextPage()
+    {
+        if (OnNextPage.HasDelegate)
+        {
+            OnNextPage.InvokeAsync(null);
+        }
+    }
+
+    private void LastPage()
+    {
+        if (OnLastPage.HasDelegate)
+        {
+            OnLastPage.InvokeAsync(null);
+        }
+    }
+}

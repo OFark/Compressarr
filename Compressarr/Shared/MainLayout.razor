@@ -1,0 +1,41 @@
+﻿@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+
+<div class="topbar">
+    <NavMenu />
+</div>
+
+<div class="main">
+    <div class="content px-4">
+        <div class="@(blurred ? "blurred" : "")">
+            <CascadingValue Value=ToggleBlurred>
+                @Body
+            </CascadingValue>
+        </div>
+        @if (blurred)
+        {
+        <div class="loadingBlur">
+            <div class="notice"></div>
+        </div>
+        }
+    </div>
+</div>
+
+@code {
+    public EventCallback<bool?> ToggleBlurred => EventCallback.Factory.Create<bool?>(this, toggleBlurred);
+
+    private bool blurred { get; set; }
+
+    public void toggleBlurred(bool? force)
+    {
+        if (force.HasValue)
+        {
+            blurred = force.Value;
+        }
+        else
+        {
+            blurred = !blurred;
+        }
+    }
+}

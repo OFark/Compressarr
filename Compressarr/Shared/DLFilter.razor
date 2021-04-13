@@ -1,0 +1,88 @@
+﻿@using Compressarr.Filtering.Models;
+
+@if (!IsInGroup || !string.IsNullOrEmpty(filter.LogicalOperator))
+{
+    <td>
+        @if (!string.IsNullOrWhiteSpace(filter.LogicalOperator))
+        {
+            <button @onclick="SwapLogicalOperator">@filter.LogicalOperator</button>
+        }
+    </td>
+}
+@if (filter.IsGroup)
+{
+    @foreach (var dlf in filter.SubFilters)
+    {
+        <DLFilter filter="dlf" OnDeleteFilter="deleteFilter" OnFilterUpdate="filterUpdate" IsInGroup="true" />
+    }
+}
+else
+{
+    <td>
+        <span>@filter.Property.Key</span>
+    </td>
+    <td>
+        <span>@filter.Comparitor.Key</span>
+    </td>
+    <td>
+        <span>@filter.Value</span>
+    </td>
+    <td class="text-right">
+        <button class="icon" @onclick="DeleteThisFilter"><i class="fas fa-trash-alt"></i></button>
+    </td>
+}
+
+@code {
+    [Parameter]
+    public Filtering.Models.DynamicLinqFilter filter { get; set; }
+
+    [Parameter]
+    public EventCallback<Compressarr.Filtering.Models.DynamicLinqFilter> OnDeleteFilter { get; set; }
+
+    [Parameter]
+    public EventCallback OnFilterUpdate { get; set; }
+
+    [Parameter]
+    public bool IsInGroup { get; set; }
+
+    private void deleteFilter(DynamicLinqFilter subfilter)
+    {
+        if (OnDeleteFilter.HasDelegate)
+        {
+            OnDeleteFilter.InvokeAsync(subfilter);
+        }
+    }
+
+    private void filterUpdate()
+    {
+        if (OnFilterUpdate.HasDelegate)
+        {
+            OnFilterUpdate.InvokeAsync(null);
+        }
+    }
+
+    private void DeleteThisFilter()
+    {
+        if (OnDeleteFilter.HasDelegate)
+        {
+            OnDeleteFilter.InvokeAsync(filter);
+        }
+    }
+
+    private void SwapLogicalOperator()
+    {
+        if (filter.LogicalOperator == "and")
+        {
+            filter.LogicalOperator = "or";
+        }
+        else if (filter.LogicalOperator == "or")
+        {
+            filter.LogicalOperator = "and";
+        }
+
+        if (OnFilterUpdate.HasDelegate)
+        {
+            OnFilterUpdate.InvokeAsync(null);
+        }
+    }
+}

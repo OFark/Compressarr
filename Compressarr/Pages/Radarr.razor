@@ -1,0 +1,434 @@
+﻿@page "/radarr"
+@using Compressarr.Filtering;
+@using Compressarr.Filtering.Models;
+@using Compressarr.Helpers;
+
+@inject Compressarr.Services.Interfaces.IRadarrService radarrService
+@inject FilterManager filterManager
+
+@if (!string.IsNullOrWhiteSpace(AlertMessage))
+{
+<div class="alert alert-danger">@AlertMessage</div>
+}
+<div class="my-2 filterList">
+    <table class="filterTableWrapper">
+        <thead>
+            <tr>
+                <th class="hide">
+                </th>
+                <th>
+                    <select @bind="filterPropertyStr" required>
+                        @foreach (var fp in FilterManager.FilterProperties)
+                        {
+                        <option value="@fp.Value">@fp.Key</option>
+                        }
+                    </select>
+                </th>
+                <th>
+                    <select @bind="filterComparitorStr" required>
+                        <option value="" disabled selected hidden>is...</option>
+                        @foreach (var fc in FilterProperty.Comparitors)
+                        {
+                        <option value="@fc.Value">@fc.Key</option>
+                        }
+                    </select>
+                </th>
+                <th colspan="2">
+                    @switch (FilterProperty.PropertyType)
+                    {
+                        case FilterPropertyType.String:
+                            {
+                    <input type="text" @bind="filterValue" placeholder="something" />
+                            }
+                            break;
+                        case FilterPropertyType.Number:
+                            {
+                    <input type="number" @bind="filterValue" placeholder="something" />
+                            }
+                            break;
+                        case FilterPropertyType.Enum:
+                            {
+                                var filterValueResults = radarrService.GetValuesForProperty(filterPropertyStr).Result;
+
+                                if (filterValueResults.Success)
+                                {
+                    <select @bind="filterValue" required>
+                        <option value="" disabled selected hidden>something...</option>
+                        @foreach (var key in filterValueResults.Results)
+                                        {
+                        <option>@key</option>
+                                        }
+                    </select>
+                                }
+                                else
+                                {
+                    <span>@filterValueResults.ErrorString</span>
+                                }
+
+                                break;
+                            }
+                    }
+                </th>
+                <th class="hide">
+                    <button @onclick="addFilter">@newFilterTextButton</button>
+                </th>
+                @if (!dlFilters.Any())
+                {
+                <th class="hide" width="99%">&nbsp;</th>
+                <th>
+                    <select @bind="filterName">
+                        <option value="">Load Filter</option>
+                        @foreach (var filter in filterManager.GetFilters(MediaSource.Radarr))
+                            {
+                        <option value="@filter.Name">@filter.Name</option>
+                            }
+                    </select>
+                </th>
+                <th class="hide">
+                    <button @onclick="loadFilter"><i class="fas fa-filter"></i></button>
+                </th>
+                }
+            </tr>
+        </thead>
+        @foreach (var dlf in dlFilters)
+        {
+        <tr>
+            <DLFilter filter="dlf" OnDeleteFilter="deleteFilter" OnFilterUpdate="filterUpdate" />
+            <td>
+                <button @onclick="(() => groupFilter(dlf))">or</button>
+            </td>
+        </tr>
+        }
+    </table>
+</div>
+@if (dlFilters.Any())
+{
+<div class="my-2">
+    <button @onclick="(() => showFilterText = !showFilterText)" class="mx-1"><i class="fas fa-edit"></i></button>
+
+    @if (showFilterText)
+        {
+    <span class="mx-1">@filterStr</span>
+        }
+    @if (showSaveDialog)
+        {
+    <input type="text" @bind="filterName" placeholder="Filter Name"  class="mx-1"/>
+        }
+    <button @onclick="saveFilter" class="mx-1"><i class="fas fa-save"></i></button>
+    <button @onclick="clearFilters" class="mx-1"><i class="fas fa-trash-alt"></i></button>
+</div>
+}
+<div class="row small">
+    <div class="col-4">
+    </div>
+    <div class="col-4 text-center">
+        <Paging pageCount="pageCount" pageNumber="pageNumber" OnFirstPage="FirstPage" OnPreviousPage="PreviousPage" OnNextPage="NextPage" OnLastPage="LastPage" />
+    </div>
+    <div class="col-4 text-right">
+        <span>Total records: @movieCount</span>
+    </div>
+</div>
+<table class="table-responsive-sm table my-2">
+    <thead>
+        <tr>
+            <td>Name</td>
+            <td>Width</td>
+            <td>Height</td>
+            <td>Codec</td>
+            <td>Format</td>
+            <td>Container</td>
+            <td>Bit Depth</td>
+            <td>Colour Primaries</td>
+            <td>Bit Rate</td>
+            <td>FPS</td>
+            <td>Audio</td>
+            <td>Codec</td>
+            <td>Duration</td>
+            <td>Data Rate</td>
+            <td>File Size</td>
+        </tr>
+    </thead>
+    <tbody>
+        @if (Movies != null)
+        {
+            foreach (var movie in Movies)
+            {
+        <Movie movie="@movie" />
+            }
+        }
+    </tbody>
+</table>
+<div class="row small">
+    <div class="col-4">
+    </div>
+    <div class="col-4 text-center">
+        <Paging pageCount="pageCount" pageNumber="pageNumber" OnFirstPage="FirstPage" OnPreviousPage="PreviousPage" OnNextPage="NextPage" OnLastPage="LastPage" />
+    </div>
+    <div class="col-4 text-right">
+        <span>Total records: @movieCount</span>
+    </div>
+</div>
+
+@code {
+    private IEnumerable<Compressarr.Services.Models.Movie> Movies { get; set; }
+    private int pageSize = 20;
+    private int pageNumber = 0;
+    private int pageCount = 0;
+
+    private bool showFilterText = false;
+    private bool showSaveDialog = false;
+
+    private long movieCount = 0;
+
+    private string AlertMessage = null;
+
+    private string filter = "";
+    private string[] filterValues;
+
+    private string newFilterTextButton = "Add";
+
+    private string filterPropertyStr = "title";
+    private string filterComparitorStr = "==";
+    private string filterValue;
+    private string filterName = "";
+    private string filterStr = "";
+
+    private FilterProperty FilterProperty => FilterManager.FilterProperties.FirstOrDefault(x => x.Value == filterPropertyStr);
+    private FilterComparitor FilterComparitor => FilterProperty?.Comparitors.FirstOrDefault(x => x.Value == filterComparitorStr);
+
+    private List<DynamicLinqFilter> dlFilters { get; set; }
+
+    [CascadingParameter]
+    public EventCallback<bool?> ToggleBlurred { get; set; }
+
+    protected override void OnInitialized()
+    {
+        dlFilters = new List<DynamicLinqFilter>();
+
+        base.OnInitialized();
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            LoadMovies();
+        }
+        this.StateHasChanged();
+
+        return base.OnAfterRenderAsync(firstRender);
+    }
+
+    private void addFilter()
+    {
+
+        if (FilterProperty != null && FilterComparitor != null && !string.IsNullOrWhiteSpace(filterValue))
+        {
+            var dlFilter = new DynamicLinqFilter(FilterProperty, FilterComparitor, filterValue);
+
+            if (dlFilters.Count == 0)
+            {
+                dlFilter.IsFirst = true;
+            }
+            else
+            {
+                dlFilter.LogicalOperator = "and";
+            }
+
+            dlFilters.Add(dlFilter);
+            resetFilterInputs();
+
+            LoadMovies();
+        }
+
+    }
+
+    private void clearFilters()
+    {
+        dlFilters = new List<DynamicLinqFilter>();
+        filterName = null;
+        LoadMovies();
+    }
+
+    private void groupFilter(DynamicLinqFilter filter)
+    {
+
+        if (FilterProperty != null && FilterComparitor != null && !string.IsNullOrWhiteSpace(filterValue))
+        {
+            var dlFilter = new DynamicLinqFilter(FilterProperty, FilterComparitor, filterValue);
+            dlFilter.LogicalOperator = "or";
+
+            if (filter.IsGroup)
+            {
+                filter.SubFilters.Add(dlFilter);
+            }
+            else
+            {
+                var cloneFilter = new DynamicLinqFilter(filter.Property, filter.Comparitor, filter.Value);
+                cloneFilter.IsFirst = true;
+
+                filter.SubFilters = new List<DynamicLinqFilter>();
+                filter.SubFilters.Add(cloneFilter);
+                filter.SubFilters.Add(dlFilter);
+                filter.Comparitor = null;
+                filter.Property = null;
+                filter.Value = null;
+            }
+
+            resetFilterInputs();
+            LoadMovies();
+        }
+    }
+
+    private void deleteFilter(DynamicLinqFilter filter)
+    {
+        if (dlFilters.Contains(filter))
+        {
+            dlFilters.Remove(filter);
+            var firstFilter = dlFilters.FirstOrDefault();
+            if (firstFilter != null)
+            {
+                firstFilter.LogicalOperator = null;
+            }
+        }
+        else
+        {
+            foreach (var dlFilter in dlFilters)
+            {
+                if (dlFilter.SubFilters.Contains(filter))
+                {
+                    dlFilter.SubFilters.Remove(filter);
+                    if (dlFilter.SubFilters.Count == 1)
+                    {
+                        dlFilter.SubFilters.First().LogicalOperator = dlFilter.LogicalOperator;
+                        dlFilters.Insert(dlFilters.IndexOf(dlFilter), dlFilter.SubFilters.First());
+                        dlFilters.Remove(dlFilter);
+                    }
+                    break;
+                }
+            }
+        }
+
+        LoadMovies();
+    }
+
+    private void loadFilter()
+    {
+        var filter = filterManager.GetFilter(filterName);
+        if (filter != null)
+        {
+            dlFilters = filter.Filters.Clone();
+            showSaveDialog = true;
+            LoadMovies();
+        }
+    }
+
+    private void saveFilter()
+    {
+        if (string.IsNullOrWhiteSpace(filterName))
+        {
+            showSaveDialog = !showSaveDialog;
+        }
+        else
+        {
+            filterManager.AddFilter(dlFilters, filterName, MediaSource.Radarr);
+            filterName = null;
+            showSaveDialog = false;
+        }
+    }
+
+    private void resetFilterInputs()
+    {
+        filterPropertyStr = "title";
+        filterComparitorStr = "==";
+        filterValue = null;
+
+        pageNumber = 0;
+    }
+
+    private void filterUpdate()
+    {
+        LoadMovies();
+    }
+
+    private async void LoadMovies()
+    {
+        toggleLoading(true);
+
+        if (dlFilters.Any())
+        {
+            filter = filterManager.ConstructFilterQuery(dlFilters, out filterValues);
+            var formatStr = System.Text.RegularExpressions.Regex.Replace(filter, @"@(\d)", "\"{$1}\"");
+            filterStr = string.Format(formatStr, filterValues);
+            newFilterTextButton = "And";
+        }
+        else
+        {
+            filter = string.Empty;
+            newFilterTextButton = "Add";
+        }
+
+        Compressarr.Services.Models.ServiceResult<HashSet<Compressarr.Services.Models.Movie>> _result;
+        HashSet<Compressarr.Services.Models.Movie> _movies;
+
+        if (string.IsNullOrWhiteSpace(filter))
+        {
+            _result = await radarrService.GetMovies();
+        }
+        else
+        {
+            _result = await radarrService.GetMoviesFiltered(filter, filterValues);
+        }
+
+        if (_result.Success)
+        {
+            _movies = _result.Results;
+            movieCount = _movies.Count();
+            pageCount = (int)Math.Ceiling((decimal)movieCount / pageSize);
+
+            Movies = _movies.Skip(pageNumber * pageSize).Take(pageSize);
+        }
+        else
+        {
+            AlertMessage = _result.ErrorString;
+        }
+
+        toggleLoading(false);
+    }
+
+    private void toggleLoading(bool? force)
+    {
+        if (ToggleBlurred.HasDelegate)
+        {
+            ToggleBlurred.InvokeAsync(force);
+        }
+    }
+
+    private void FirstPage()
+    {
+        pageNumber = 0;
+        LoadMovies();
+        this.StateHasChanged();
+    }
+
+    private void PreviousPage()
+    {
+        pageNumber = Math.Max(0, --pageNumber);
+        LoadMovies();
+        this.StateHasChanged();
+    }
+
+    private void NextPage()
+    {
+        pageNumber = Math.Min(pageCount - 1, ++pageNumber);
+        LoadMovies();
+        this.StateHasChanged();
+    }
+
+    private void LastPage()
+    {
+        pageNumber = pageCount - 1;
+        LoadMovies();
+        this.StateHasChanged();
+    }
+}

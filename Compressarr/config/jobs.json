@@ -1,0 +1,9 @@
+[
+  {
+    "AutoImport": true,
+    "BaseFolder": "m:\\",
+    "DestinationFolder": "C:\\Compressarr",
+    "FilterName": "Magic",
+    "PresetName": "x265 Re-Encode"
+  }
+]

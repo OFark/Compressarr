@@ -1,0 +1,206 @@
+﻿@using Compressarr.JobProcessing;
+
+@inject JobManager jobManager
+<div class="job">
+    <div class="jobTitle">
+        <h3 @onclick="() => { expand = !expand; }">
+            <img src="@FilterImageSrc" />@job.FilterName
+            <i class="fas fa-arrow-right"></i>
+            @job.PresetName
+            <i class="fas fa-sign-out-alt" aria-hidden="true"></i>
+            @job.BaseFolder
+            <i class="fas fa-sign-in-alt" aria-hidden="true"></i>
+            @job.WriteFolder
+            @if (!expand)
+            {
+                @: -
+                @buttonText
+            }
+        </h3>
+        <div class="commands">
+            @if (expand)
+            {
+                @if (editJob)
+                {
+                    <button @onclick="saveJob"><i class="fas fa-save"></i></button>
+                }
+                <button @onclick="() => { editJob = !editJob; }"><i class="fas fa-edit"></i></button>
+            }
+        </div>
+    </div>
+    @if (expand)
+    {
+        if (editJob)
+        {
+            <div class="editJob">
+                <h3>Edit</h3>
+                <div class="editJobWrapper">
+                    <h4>File Base Folder:</h4>
+                    <input type="text" @bind="job.BaseFolder" />
+
+
+                    <h4>Output Base Folder:</h4>
+                    <input type="text" @bind="job.DestinationFolder" />
+
+                    <h4>Auto Import:</h4>
+                    <input type="checkbox" @bind="job.AutoImport" />
+                </div>
+            </div>
+        }
+        else
+        {
+            @if (job.WorkLoad != null)
+            {
+                <div class="workLoad">
+                    <h4>Workload</h4>
+                    <div class="workLoadItems">
+                        @foreach (var wi in job.WorkLoad)
+                        {
+                            <div class="workitem">
+                                <span class="fileName">@wi.SourceFileName</span>
+                                @if (wi.Running)
+                                {
+                                    <span class="badge-pill badge-secondary">@wi.Percent%</span>
+                                    <span class="badge-pill badge-secondary">Frame: @wi.Frame</span>
+                                    <span class="badge-pill badge-secondary">FPS: @wi.FPS</span>
+                                    <span class="badge-pill badge-secondary">Q: @wi.Q</span>
+                                    <span class="badge-pill badge-secondary">Size: @wi.Size</span>
+                                    <span class="badge-pill badge-secondary">Time: @wi.Duration</span>
+                                    <span class="badge-pill badge-secondary">Length: @wi.TotalLength</span>
+                                    <span class="badge-pill badge-secondary">Bitrate: @wi.Bitrate</span>
+                                    <span class="badge-pill badge-secondary">Speed: @wi.Speed</span>
+                                }
+                                <span class="badge-pill badge-secondary">Finished: @wi.Finished</span>
+                                @if (wi.Finished)
+                                {
+                                    <span class="badge-pill badge-secondary">Success: @wi.Success</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            <div class="jobLog">
+                <h4>Log</h4>
+                <div class="jobEventsScrollWrapper">
+                    <div class="jobEvents">
+                        @foreach (var e in job.Events)
+                        {
+                            <div class="event">
+                                @e.Key.ToString("HH:mm:ss") - @e.Value
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+            <button class="btn btn-block @buttonClass" @onclick="startJob" @onmouseover="() => { mouseOnButton = true;  }" @onmouseout="() => { mouseOnButton = false;  }">@buttonText</button>
+        }
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Compressarr.JobProcessing.Models.Job job { get; set; }
+
+    private bool expand;
+    private bool editJob;
+    private bool mouseOnButton;
+
+    private string fileCount;
+
+    private string testingStatus;
+
+    private string FilterImageSrc => $"https://raw.githubusercontent.com/{FilterType}/{FilterType}.github.io/master/logo/{FilterType}.svg";
+
+    private string FilterType => job.Filter.MediaSource == Filtering.MediaSource.Radarr ? "radarr" : "sonarr";
+
+    private string buttonText
+    {
+        get
+        {
+            switch (job.JobStatus)
+            {
+                case JobStatus.Added:
+                    return "Initialising";
+                case JobStatus.Running:
+                    return mouseOnButton ? "Stop" : "Running";
+                case JobStatus.Finished:
+                    return mouseOnButton ? "Re-Initialised" : "Finished";
+                case JobStatus.TestedFail:
+                    return mouseOnButton ? "Re-Initialised" : "Test Failed";
+                case JobStatus.TestedOK:
+                case JobStatus.Waiting:
+                    return mouseOnButton ? "GO!" : "Ready";
+            }
+
+            return "";
+        }
+    }
+
+    private string buttonClass
+    {
+        get
+        {
+            switch (job.JobStatus)
+            {
+                case JobStatus.Added:
+                case JobStatus.Running:
+                case JobStatus.TestedFail:
+                    return "btn-warning";
+
+            }
+
+            return "btn-success";
+        }
+    }
+
+    private bool running => job.JobStatus == JobStatus.Running;
+
+    private bool? Ok;
+
+    protected override void OnInitialized()
+    {
+        job.StatusUpdate += jobStatusUpdate;
+
+        if (job.JobStatus == JobStatus.Added)
+        {
+            jobManager.InitialiseJob(job);
+        }
+    }
+
+    private void jobStatusUpdate(object caller, EventArgs args)
+    {
+        InvokeAsync(() => StateHasChanged());
+    }
+
+    private void saveJob()
+    {
+        jobManager.AddJob(job);
+        editJob = false;
+        StateHasChanged();
+    }
+
+    private void startJob()
+    {
+        switch (job.JobStatus)
+        {
+            case JobStatus.TestedOK:
+            case JobStatus.Waiting:
+                {
+                    jobManager.RunJob(job);
+                }
+                break;
+            case JobStatus.TestedFail:
+            case JobStatus.Finished:
+                {
+                    jobManager.InitialiseJob(job, true);
+                }
+                break;
+            case JobStatus.Running:
+                {
+                    jobManager.CancelJob(job);
+                }
+                break;
+        }
+    }
+}
