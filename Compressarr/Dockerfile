@@ -2,8 +2,6 @@
 
 FROM mcr.microsoft.com/dotnet/sdk:5.0 AS build
 WORKDIR /src
-COPY *.csproj ./Compressarr/
-
 COPY . ./Compressarr/
 WORKDIR "/src/Compressarr"
 RUN dotnet publish -c Release -o /app/publish
