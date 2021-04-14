@@ -2,7 +2,7 @@
 
 FROM mcr.microsoft.com/dotnet/sdk:5.0 AS build
 WORKDIR /src
-COPY *.sln .
+COPY /*.sln .
 COPY Compressarr/*.csproj ./Compressarr/
 RUN dotnet restore
 
