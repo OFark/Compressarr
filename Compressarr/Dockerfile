@@ -2,13 +2,11 @@
 
 FROM mcr.microsoft.com/dotnet/sdk:5.0 AS build
 WORKDIR /src
-COPY *.sln .
-COPY Compressarr/*.csproj ./Compressarr/
-RUN dotnet restore
+COPY *.csproj ./Compressarr/
 
-COPY Compressarr/. ./Compressarr/
+COPY . ./Compressarr/
 WORKDIR "/src/Compressarr"
-RUN dotnet publish -c Release -o /app/publish --no-restore
+RUN dotnet publish -c Release -o /app/publish
 
 FROM mcr.microsoft.com/dotnet/aspnet:5.0
 WORKDIR /app
