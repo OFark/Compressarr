@@ -1,14 +1,9 @@
 ﻿using Compressarr.JobProcessing.Models;
-using Compressarr.Services;
 using Compressarr.Services.Interfaces;
 using Compressarr.Settings;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 
 namespace Compressarr.JobProcessing
 {

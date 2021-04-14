@@ -1,10 +1,6 @@
 ﻿using Compressarr.JobProcessing;
-using Compressarr.JobProcessing.Models;
-using Microsoft.Extensions.DependencyInjection;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;

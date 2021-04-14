@@ -1,9 +1,5 @@
 ﻿using Compressarr.FFmpegFactory.Interfaces;
-using Compressarr.Helpers;
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace Compressarr.FFmpegFactory.Models
 {

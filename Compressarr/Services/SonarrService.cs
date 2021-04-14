@@ -1,14 +1,9 @@
 ﻿using Compressarr.Services.Interfaces;
 using Compressarr.Services.Models;
+using Compressarr.Settings;
 using Newtonsoft.Json;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http;
-using System.Threading.Tasks;
-using System.Linq.Dynamic.Core;
-using System.Security.Cryptography.X509Certificates;
-using Compressarr.Settings;
 
 namespace Compressarr.Services
 {

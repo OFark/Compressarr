@@ -1,17 +1,10 @@
 ﻿using Compressarr.FFmpegFactory;
 using Compressarr.FFmpegFactory.Interfaces;
-using Compressarr.FFmpegFactory.Models;
-using Compressarr.Filtering;
 using Compressarr.Filtering.Models;
-using Microsoft.AspNetCore.SignalR;
 using Newtonsoft.Json;
 using System;
-using System.Collections;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 
 namespace Compressarr.JobProcessing.Models
 {
