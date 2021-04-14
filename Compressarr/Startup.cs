@@ -1,4 +1,5 @@
 using Compressarr.FFmpegFactory;
+using Compressarr.FFmpegFactory.Interfaces;
 using Compressarr.Filtering;
 using Compressarr.JobProcessing;
 using Compressarr.Services;
@@ -31,7 +32,7 @@ namespace Compressarr
             services.AddSingleton<ISonarrService, SonarrService>();
             services.AddSingleton<FilterManager>();
             services.AddSingleton<SettingsManager>();
-            services.AddSingleton<FFmpegManager>();
+            services.AddSingleton<IFFmpegManager, FFmpegManager>();
             services.AddSingleton<JobManager>();
         }
 

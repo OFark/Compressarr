@@ -13,6 +13,14 @@
         Video
     }
 
+    public enum CodecOptionType
+    {
+        Number,
+        Range,
+        Select, 
+        String
+    }
+
     public enum h26xPreset
     {
         ultrafast,

@@ -1,216 +1,226 @@
 ﻿@page "/FFmpeg"
 @using Compressarr.Helpers
+@using Compressarr.FFmpegFactory.Models
 
-@inject Compressarr.FFmpegFactory.FFmpegManager FFmpegManager
+@inject Compressarr.FFmpegFactory.Interfaces.IFFmpegManager FFmpegManager
+<h1>Presets</h1>
+@if (FFmpegManager.Presets.Any())
+{
+    @foreach (var preset in FFmpegManager.Presets)
+    {
+        <div class="preset">
+            <h4>@preset.Name</h4>
+            <div class="commands">
+                <button @onclick="@(() => loadPreset(@preset))"><i class="fas fa-edit"></i></button>
+                <button @onclick="@(() => deletePreset(@preset))"><i class="fas fa-trash-alt"></i></button>
+            </div>
+        </div>
+    }
+}
 
-<h3>New Preset</h3>
-<div class="input-group ">
-    <label class="col-form-label">Name:</label>
-    <div class="col-sm">
-        <input type="text" @bind="newPresetName" class="form-control" placeholder="New Preset" />
-    </div>
-</div>
-<div class="row">
-    <div class="col-md-6">
+<div id="divNewPreset">
+    @if (showNew)
+    {
+        <h3>@(newIsEdit ? "Edit" : "New") Preset</h3>
         <div class="input-group">
-            <label class="col-form-label">Video Codec:</label>
+            <label class="col-form-label">Name:</label>
             <div class="col-sm">
-                <select @bind="newPresetVideoCodec" class="form-control">
-                    <option value="copy">Copy - No change</option>
-                    @foreach (var c in FFmpegManager.VideoCodecs)
+                <input type="text" @bind="newPresetName" class="form-control" placeholder="New Preset" />
+            </div>
+        </div>
+        <div class="input-group">
+            <label class="col-form-label">Container:</label>
+            <div class="col-sm">
+                <select @bind="newPresetContainer" class="form-control">
+                    @foreach (var c in FFmpegManager.Containers)
                     {
                         <option value="@c.Key">@c.Key - @c.Value</option>
                     }
                 </select>
             </div>
         </div>
-    </div>
-    <div class="col-md-6">
-        <div class="input-group">
-            <label class="col-form-label">Audio Codec:</label>
-            <div class="col-sm">
-                <select @bind="newPresetAudioCodec" class="form-control">
-                    <option value="copy">Copy - No change</option>
-                    @foreach (var c in FFmpegManager.AudioCodecs)
-                    {
-                        <option value="@c.Key">@c.Key - @c.Value</option>
-                    }
-                </select>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <label class="col-form-label">Video Codec:</label>
+                    <div class="col-sm">
+                        <select @bind="newPresetVideoCodec" class="form-control">
+                            <option value="copy">Copy - No change</option>
+                            @foreach (var c in FFmpegManager.VideoCodecs)
+                            {
+                                <option value="@c.Key">@c.Key - @c.Value</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="input-group">
+                    <label class="col-form-label">Audio Codec:</label>
+                    <div class="col-sm">
+                        <select @bind="newPresetAudioCodec" class="form-control">
+                            <option value="copy">Copy - No change</option>
+                            @foreach (var c in FFmpegManager.AudioCodecs)
+                            {
+                                <option value="@c.Key">@c.Key - @c.Value</option>
+                            }
+                        </select>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-</div>
-<h4>Optional arguments:</h4>
-<div class="row">
-    <div class="col-md-6 pl-4">
-        <div class="input-group" data-affix="kbps">
-            <label class="col-form-label">Video Bitrate:</label>
-            <div class="col-sm">
-                <input type="text" @bind="newPresetVideoBitrate" class="form-control" disabled=@disabledNoVideo />
+        <h4>Optional arguments:</h4>
+        <div class="row">
+            <div class="col-md-6 pl-4">
+                <div class="input-group" data-affix="kbps">
+                    <label class="col-form-label">Video Bitrate:</label>
+                    <div class="col-sm">
+                        <input type="text" @bind="newPresetVideoBitrate" class="form-control" disabled=@disabledNoVideo />
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label class="col-form-label">Framerate:</label>
+                    <div class="col-sm">
+                        <input type="number" @bind="newPresetFrameRate" class="form-control" placeholder="Same as source" disabled=@disabledNoVideo />
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="input-group" data-affix="kbps">
+                    <label class="col-form-label">Audio Bitrate:</label>
+                    <div class="col-sm">
+                        <input type="text" @bind="newPresetAudioBitrate" class="form-control" disabled=@disabledNoAudio />
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="input-group">
-            <label class="col-form-label">Framerate:</label>
-            <div class="col-sm">
-                <input type="number" @bind="newPresetFrameRate" class="form-control" placeholder="Same as source" disabled=@disabledNoVideo />
+
+        @if (newPresetVideoCodec != "copy")
+        {
+            <div class="codecOptions">
+                <p>Additional codec based options</p>
+                <div class="row">
+                    <div class="col-md-6 pl-5">
+                        @if (codecOptions != null)
+                        {
+                            foreach (var option in codecOptions)
+                            {
+                                switch (option.Type)
+                                {
+                                    case FFmpegFactory.CodecOptionType.Number:
+                                        {
+                                            <div class="form-group">
+                                                <label>@option.Name:</label>
+                                                <input type="number" @bind="option.Value" class="form-control" />
+                                            </div>
+                                        }
+                                        break;
+                                    case FFmpegFactory.CodecOptionType.Range:
+                                        {
+                                            <div class="form-group">
+                                                <label>@option.Name: @option.Value</label>
+                                                <input type="range" max="51" min="0" @bind="option.Value" @oninput="@(args => { option.Value = args.Value as string; StateHasChanged(); })" class="form-control" disabled="@(option.DisabledByVideoBitRate && disabledVideoBitrate)" />
+                                            </div>
+                                        }
+                                        break;
+                                    case FFmpegFactory.CodecOptionType.Select:
+                                        {
+
+                                            <div class="form-group">
+                                                <label>@option.Name:</label>
+                                                <select @bind="option.Value" class="form-control">
+                                                    <option value=""></option>
+                                                    @foreach (var c in option.Values)
+                                                    {
+                                                        <option value="@c">@c</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                        }
+                                        break;
+                                    case FFmpegFactory.CodecOptionType.String:
+                                        {
+                                            <div class="form-group">
+                                                <label>@option.Name:</label>
+                                                <input type="text" @bind="option.Value" class="form-control" />
+                                            </div>
+                                        }
+                                        break;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            <p>... err nope. We, err, have nothing for you.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="row">
+            <div class="form-group col pl-4">
+                <label>Additional arguments</label>
+                <input type="text" @bind="newPresetOptionalArguments" class="form-control" />
             </div>
         </div>
-    </div>
-    <div class="col-md-6">
-        <div class="input-group" data-affix="kbps">
-            <label class="col-form-label">Audio Bitrate:</label>
-            <div class="col-sm">
-                <input type="text" @bind="newPresetAudioBitrate" class="form-control" disabled=@disabledNoAudio />
-            </div>
+
+        <div class="ffmpegPreview">
+            <h4>FFMPEG Preview:</h4>
+            <pre>
+                @foreach (var str in ffmpegExecutionString)
+                { @((MarkupString)str)<br /> }
+            </pre>
         </div>
-    </div>
-</div>
 
-@if (newPresetVideoCodec != "copy")
-{
-    <p>Additional codec based options</p>
-    <div class="row">
-
-        <div class="col-md-6 pl-5">
-            @if (newPresetVideoCodec == "libx265")
-            {
-
-                <div class="form-group">
-                    <label>Constant Rate Factor: @newX265.crf</label>
-                    <input type="range" max="51" min="0" @bind="newX265.crf" @oninput="rangeInputlibx265" class="form-control" />
-                </div>
-                <div class="form-group">
-                    <label>Preset</label>
-                    <select @bind="newX265.preset" class="form-control">
-                        <option value=""></option>
-                        @foreach (var c in Enum.GetNames(typeof(Compressarr.FFmpegFactory.h26xPreset)))
-                        {
-                            <option value="@c">@c</option>
-                        }
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>tune</label>
-                    <select @bind="newX265.tune" class="form-control">
-                        <option value=""></option>
-                        @foreach (var c in Enum.GetNames(typeof(Compressarr.FFmpegFactory.h265tune)))
-                        {
-                            <option value="@c">@c</option>
-                        }
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Parameters</label>
-                    <input type="text" @bind="newX265.parameters" class="form-control" />
-                </div>
-            }
-            else if (newPresetVideoCodec == "libx264")
-            {
-                <div class="form-group">
-                    <label>Constant Rate Factor: @newX264.crf</label>
-                    <input type="range" max="51" min="0" @bind="newX264.crf" @oninput="rangeInputlibx264" class="form-control" />
-                </div>
-                <div class="form-group">
-                    <label>Preset</label>
-                    <select @bind="newX264.preset" class="form-control">
-                        <option value=""></option>
-                        @foreach (var c in Enum.GetNames(typeof(Compressarr.FFmpegFactory.h26xPreset)))
-                        {
-                            <option value="@c">@c</option>
-                        }
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Tune</label>
-                    <select @bind="newX264.tune" class="form-control">
-                        <option value=""></option>
-                        @foreach (var c in Enum.GetNames(typeof(Compressarr.FFmpegFactory.h264tune)))
-                        {
-                            <option value="@c">@c</option>
-                        }
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Parameters</label>
-                    <input type="text" @bind="newX264.parameters" class="form-control" />
-                </div>
-            }
-            else
-            {
-                <p>... err nope. We, err, have nothing for you.</p>
-            }
+        <button @onclick="addPreset"><i class="fas fa-save"></i> Save</button>
+    }
+    else
+    {
+        <div id="divAddPresetWrapper">
+            <i @onclick="() => { showNew = true; }" class="fas fa-plus fa-7x"></i>
         </div>
-    </div>
-}
-
-<div class="row">
-    <div class="form-group col pl-4">
-        <label>Additional arguments</label>
-        <input type="text" @bind="newPresetOptionalArguments" class="form-control" />
-    </div>
+    }
 </div>
-<div class="input-group ">
-    <label class="col-form-label">Container:</label>
-    <div class="col-sm">
-        <select @bind="newPresetContainer" class="form-control">
-            @foreach (var c in FFmpegManager.Containers)
-            {
-                <option value="@c.Key">@c.Key - @c.Value</option>
-            }
-        </select>
-    </div>
-</div>
-
-@*<button @onclick="generateFFmpegArguments">Check Arguments</button>*@
-<button @onclick="addPreset"><i class="fas fa-save"></i></button>
-
-<pre>
-    @foreach (var str in ffmpegExecutionString) { @((MarkupString)str)<br /> }
-</pre>
-
-<h3>Existing Presets</h3>
-@foreach (var preset in FFmpegManager.Presets)
-{
-    <span>@preset.Name</span>
-    <button @onclick="@(() => loadPreset(@preset))"><i class="fas fa-edit"></i></button>
-    <button @onclick="@(() => deletePreset(@preset))"><i class="fas fa-trash-alt"></i></button>
-}
 
 @code {
+
+    private bool showNew;
+    private bool newIsEdit;
+
     private string newPresetName { get; set; }
     private string newPresetAudioCodec { get; set; } = "copy";
     private string newPresetContainer { get; set; } = "mkv";
     private int? newPresetAudioBitrate { get; set; }
-    private string newPresetVideoCodec { get; set; } = "copy";
+
+    private string _newPresetVideoCodec;
+    private string newPresetVideoCodec
+    {
+        get
+        {
+            return _newPresetVideoCodec ?? "copy";
+        }
+        set
+        {
+            _newPresetVideoCodec = value;
+            codecOptions = FFmpegManager.GetOptions(value);
+        }
+    }
     private int? newPresetVideoBitrate { get; set; }
     private double? newPresetFrameRate { get; set; }
     private string newPresetOptionalArguments { get; set; }
 
     private bool disabledNoAudio => string.IsNullOrWhiteSpace(newPresetAudioCodec) || newPresetAudioCodec == "copy";
     private bool disabledNoVideo => string.IsNullOrWhiteSpace(newPresetVideoCodec) || newPresetVideoCodec == "copy";
+    private bool disabledVideoBitrate => newPresetVideoBitrate != null;
+
+    private HashSet<CodecOptionValue> codecOptions;
 
     private List<string> ffmpegExecutionString => generateFFmpegArguments();
-
-    private FFmpegFactory.Models.Libx264 newX264 { get; set; } = new FFmpegFactory.Models.Libx264();
-    private FFmpegFactory.Models.Libx265 newX265 { get; set; } = new FFmpegFactory.Models.Libx265();
 
     private Compressarr.FFmpegFactory.Interfaces.IFFmpegPreset presetBuilder()
     {
         FFmpegFactory.Interfaces.IFFmpegPreset preset = new FFmpegFactory.Models.FFmpegPreset();
-        switch (newPresetVideoCodec)
-        {
-            case "libx264":
-                {
-                    preset = newX264;
-
-                }
-                break;
-            case "libx265":
-                {
-                    preset = newX265;
-                }
-                break;
-        }
 
         preset.AudioBitRate = newPresetAudioBitrate;
         preset.AudioCodec = newPresetAudioCodec;
@@ -220,6 +230,11 @@
         preset.OptionalArguments = newPresetOptionalArguments.NullIfEmpty();
         preset.VideoBitRate = newPresetVideoBitrate;
         preset.VideoCodec = newPresetVideoCodec;
+
+        if (codecOptions != null)
+        {
+            preset.VideoCodecOptions = codecOptions;
+        }
 
         return preset;
     }
@@ -236,6 +251,7 @@
         if (!string.IsNullOrWhiteSpace(newPresetName))
         {
             FFmpegManager.AddPreset(presetBuilder());
+            resetPresetInputs();
         }
     }
 
@@ -246,15 +262,6 @@
 
     private void loadPreset(Compressarr.FFmpegFactory.Interfaces.IFFmpegPreset preset)
     {
-        if (preset is Compressarr.FFmpegFactory.Models.Libx264)
-        {
-            newX264 = preset as Compressarr.FFmpegFactory.Models.Libx264;
-        }
-        else if (preset is Compressarr.FFmpegFactory.Models.Libx265)
-        {
-            newX265 = preset as Compressarr.FFmpegFactory.Models.Libx265;
-        }
-
         newPresetAudioBitrate = preset.AudioBitRate;
         newPresetAudioCodec = preset.AudioCodec;
         newPresetContainer = preset.Container;
@@ -264,30 +271,16 @@
         newPresetVideoBitrate = preset.VideoBitRate;
         newPresetVideoCodec = preset.VideoCodec;
 
+        codecOptions = preset.VideoCodecOptions;
+
+
+        newIsEdit = true;
+        showNew = true;
     }
 
-    private void rangeInputlibx265(ChangeEventArgs args)
-    {
-        if (int.TryParse(args.Value as string, out var fval))
-        {
-            newX265.crf = fval;
-            this.StateHasChanged();
-        }
-    }
-
-    private void rangeInputlibx264(ChangeEventArgs args)
-    {
-        if (int.TryParse(args.Value as string, out var fval))
-        {
-            newX264.crf = fval;
-            this.StateHasChanged();
-        }
-    }
 
     private void resetPresetInputs()
     {
-        newX264 = new FFmpegFactory.Models.Libx264();
-        newX265 = new FFmpegFactory.Models.Libx265();
         newPresetName = null;
         newPresetAudioCodec = "copy";
         newPresetAudioBitrate = null;
@@ -296,7 +289,16 @@
         newPresetVideoBitrate = null;
         newPresetFrameRate = null;
         newPresetOptionalArguments = null;
+        codecOptions = null;
+
+        newIsEdit = false;
+        showNew = false;
 
         //ffmpegExecutionString = null;
+    }
+
+    private void videoCodecChanged()
+    {
+        codecOptions = FFmpegManager.GetOptions(newPresetVideoCodec);
     }
 }

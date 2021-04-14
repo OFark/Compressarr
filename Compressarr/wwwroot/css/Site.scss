@@ -11,6 +11,17 @@ $overBackground: rgba(0, 0, 0, 0.2);
     border-radius: 8px;
 }
 
+@mixin commandsBlock {
+    display: flex;
+    grid-gap: .2em;
+
+    button {
+        background: none;
+        color: white;
+        font-size: 1.8em;
+    }
+}
+
 $font-red: rgba(240,0,0, 0.75);
 
 html, body {
@@ -92,19 +103,13 @@ div {
                 }
 
                 .commands {
-                    display: flex;
-                    grid-gap: .2em;
-
-                    button {
-                        background: none;
-                        color: white;
-                        font-size: 1.8em;
-                    }
+                    @include commandsBlock;
                 }
             }
 
             .editJob {
                 @include embedPanel;
+
                 .editJobWrapper {
                     @include embedPanel;
                 }
@@ -178,11 +183,32 @@ div {
         }
     }
 
-    &#divAddJobWrapper {
+    &#divAddJobWrapper, &#divAddPresetWrapper {
         text-align: center;
 
         i {
             cursor: pointer;
+        }
+    }
+
+    &#divNewPreset {
+        @include embedPanel;
+        margin-bottom: 1em;
+
+        .codecOptions {
+            @include embedPanel;
+            margin-bottom: 1em;
+        }
+    }
+
+    &.preset {
+        @include embedPanel;
+        margin-bottom: 1em;
+        display: grid;
+        grid-template-columns: auto max-content;
+
+        .commands {
+            @include commandsBlock;
         }
     }
 }

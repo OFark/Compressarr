@@ -15,7 +15,7 @@ using Xabe.FFmpeg.Downloader;
 
 namespace Compressarr.FFmpegFactory
 {
-    public class FFmpegManager
+    public class FFmpegManager : IFFmpegManager
     {
         private readonly IServiceProvider services;
         private readonly IWebHostEnvironment env;
@@ -92,7 +92,7 @@ namespace Compressarr.FFmpegFactory
             Status = FFmpegStatus.Ready;
         }
 
-        internal IFFmpegPreset GetPreset(string presetName) => Presets.FirstOrDefault(p => p.Name == presetName);
+        public IFFmpegPreset GetPreset(string presetName) => Presets.FirstOrDefault(p => p.Name == presetName);
 
         public void AddPreset(IFFmpegPreset newPreset)
         {
@@ -106,7 +106,8 @@ namespace Compressarr.FFmpegFactory
             }
             else
             {
-                preset = newPreset;
+                Presets.Remove(preset);
+                Presets.Add(newPreset);
             }
 
             SavePresets();
@@ -186,35 +187,25 @@ namespace Compressarr.FFmpegFactory
                 var json = File.ReadAllText(PresetsFilePath);
                 if (!string.IsNullOrWhiteSpace(json))
                 {
-                    var dynamicpresets = JsonConvert.DeserializeObject<HashSet<dynamic>>(json);
+                    var presets = JsonConvert.DeserializeObject<HashSet<FFmpegPreset>>(json);
 
-                    foreach (var dp in dynamicpresets)
+                    foreach(var preset in presets)
                     {
-                        var j = JsonConvert.SerializeObject(dp);
-
-                        switch (dp.VideoCodec.Value)
+                        if(preset.VideoCodecOptions != null && preset.VideoCodecOptions.Any())
                         {
-                            case "libx264":
+                            var codecOptions = GetOptions(preset.VideoCodec);
+                            foreach(var co in codecOptions)
+                            {
+                                var val = preset.VideoCodecOptions.FirstOrDefault(x => x.Name == co.Name);
+                                if(val != null)
                                 {
-                                    var preset = JsonConvert.DeserializeObject<Libx264>(j);
-                                    _presets.Add(preset);
+                                    co.Value = val.Value;
                                 }
-                                break;
+                            }
 
-                            case "libx265":
-                                {
-                                    var preset = JsonConvert.DeserializeObject<Libx265>(j);
-                                    _presets.Add(preset);
-                                }
-                                break;
-
-                            default:
-                                {
-                                    var preset = JsonConvert.DeserializeObject<FFmpegPreset>(j);
-                                    _presets.Add(preset);
-                                }
-                                break;
+                            preset.VideoCodecOptions = codecOptions;
                         }
+                        _presets.Add(preset);
                     }
                 }
             }
@@ -316,6 +307,23 @@ namespace Compressarr.FFmpegFactory
             }
 
             return formats;
+        }
+
+        public HashSet<CodecOptionValue> GetOptions(string codec)
+        {
+            var optionsFile = Path.Combine(env.ContentRootPath, "codecoptions", $"{codec}.json");
+
+            if (File.Exists(optionsFile))
+            {
+                var json = File.ReadAllText(optionsFile);
+                if (!string.IsNullOrWhiteSpace(json))
+                {
+                    var cov = new HashSet<CodecOptionValue>();
+                    var options = JsonConvert.DeserializeObject<HashSet<CodecOptionValue>>(json);
+                    return options;
+                }
+            }
+            return null;
         }
     }
 }

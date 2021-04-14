@@ -1,4 +1,5 @@
 ﻿using Compressarr.FFmpegFactory;
+using Compressarr.FFmpegFactory.Interfaces;
 using Compressarr.Filtering;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Services.Interfaces;
@@ -26,9 +27,9 @@ namespace Compressarr.JobProcessing
         internal ISonarrService sonarrService;
         internal FilterManager filterManager;
         internal SettingsManager settingsManager;
-        internal FFmpegManager fFmpegManager;
+        internal IFFmpegManager fFmpegManager;
 
-        public JobManager(IWebHostEnvironment env, SettingsManager settingsManager, IRadarrService radarrService, ISonarrService sonarrService, FilterManager filterManager, FFmpegManager fFmpegManager)
+        public JobManager(IWebHostEnvironment env, SettingsManager settingsManager, IRadarrService radarrService, ISonarrService sonarrService, FilterManager filterManager, IFFmpegManager fFmpegManager)
         {
             _env = env;
             this.settingsManager = settingsManager;
@@ -89,100 +90,107 @@ namespace Compressarr.JobProcessing
                 job.JobStatus = JobStatus.Initialising;
                 job.Filter = filterManager.GetFilter(job.FilterName);
                 job.Preset = fFmpegManager.GetPreset(job.PresetName);
-                job.Preset.ContainerExtension = fFmpegManager.ConvertContainerToExtension(job.Preset.Container);
-                job.JobStatus = JobStatus.Added;
-                job.Cancel = false;
-
-                job.UpdateStatus("Begin Testing");
-
-                if (job.Filter.MediaSource == Filtering.MediaSource.Radarr)
+                if (job.Preset != null)
                 {
-                    job.UpdateStatus("Job is for Movies, Connecting to Radarr");
-                    var radarrURL = settingsManager.GetSetting(SettingType.RadarrURL);
-                    var radarrAPIKey = settingsManager.GetSetting(SettingType.RadarrAPIKey);
+                    job.Preset.ContainerExtension = fFmpegManager.ConvertContainerToExtension(job.Preset.Container);
+                    job.JobStatus = JobStatus.Added;
+                    job.Cancel = false;
 
-                    var systemStatus = radarrService.TestConnection(radarrURL, radarrAPIKey);
+                    job.UpdateStatus("Begin Testing");
 
-                    if (!systemStatus.Success)
+                    if (job.Filter.MediaSource == Filtering.MediaSource.Radarr)
                     {
-                        job.UpdateStatus("Failed to connect to Radarr.");
-                        Fail(job);
-                        return;
-                    }
+                        job.UpdateStatus("Job is for Movies, Connecting to Radarr");
+                        var radarrURL = settingsManager.GetSetting(SettingType.RadarrURL);
+                        var radarrAPIKey = settingsManager.GetSetting(SettingType.RadarrAPIKey);
 
-                    job.UpdateStatus("Connected to Radarr", "Fetching List of files from Radarr");
+                        var systemStatus = radarrService.TestConnection(radarrURL, radarrAPIKey);
 
-                    GetFiles(job).ContinueWith(t =>
-                    {
-                        var getFilesResults = t.Result;
-                        if (!getFilesResults.Success)
+                        if (!systemStatus.Success)
                         {
-                            job.UpdateStatus("Failed to list files from Radarr.");
+                            job.UpdateStatus("Failed to connect to Radarr.");
                             Fail(job);
                             return;
                         }
 
-                        job.UpdateStatus("Files Returned", "Building Workload");
+                        job.UpdateStatus("Connected to Radarr", "Fetching List of files from Radarr");
 
-                        job.WorkLoad = getFilesResults.Results;
-                        foreach (var wi in job.WorkLoad)
+                        GetFiles(job).ContinueWith(t =>
                         {
-                            var file = new FileInfo(wi.SourceFile);
-                            if (!file.Exists)
+                            var getFilesResults = t.Result;
+                            if (!getFilesResults.Success)
                             {
-                                job.UpdateStatus($"This file was not found: {file.FullName}");
+                                job.UpdateStatus("Failed to list files from Radarr.");
                                 Fail(job);
                                 return;
                             }
 
-                            var destinationpath = job.DestinationFolder;
+                            job.UpdateStatus("Files Returned", "Building Workload");
 
-                            if (string.IsNullOrWhiteSpace(destinationpath))
+                            job.WorkLoad = getFilesResults.Results;
+                            foreach (var wi in job.WorkLoad)
                             {
-                                destinationpath = file.Directory.FullName;
-                            }
-                            else
-                            {
-                                destinationpath = Path.Combine(destinationpath, file.Directory.Name);
-                            }
-
-                            if (!Directory.Exists(destinationpath))
-                            {
-                                try
+                                var file = new FileInfo(wi.SourceFile);
+                                if (!file.Exists)
                                 {
-                                    Directory.CreateDirectory(destinationpath);
-                                }
-                                catch (Exception ex)
-                                {
-                                    job.UpdateStatus(ex.Message);
+                                    job.UpdateStatus($"This file was not found: {file.FullName}");
                                     Fail(job);
                                     return;
                                 }
+
+                                var destinationpath = job.DestinationFolder;
+
+                                if (string.IsNullOrWhiteSpace(destinationpath))
+                                {
+                                    destinationpath = file.Directory.FullName;
+                                }
+                                else
+                                {
+                                    destinationpath = Path.Combine(destinationpath, file.Directory.Name);
+                                }
+
+                                if (!Directory.Exists(destinationpath))
+                                {
+                                    try
+                                    {
+                                        Directory.CreateDirectory(destinationpath);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        job.UpdateStatus(ex.Message);
+                                        Fail(job);
+                                        return;
+                                    }
+                                }
+
+                                wi.DestinationFile = Path.ChangeExtension(Path.Combine(destinationpath, file.Name), job.Preset.ContainerExtension);
+                                wi.Arguments = job.Preset.GetArgumentString();
                             }
+                        });
 
-                            wi.DestinationFile = Path.ChangeExtension(Path.Combine(destinationpath, file.Name), job.Preset.ContainerExtension);
-                            wi.Arguments = job.Preset.GetArgumentString();
+                        job.UpdateStatus("Workload complied", "Checking Destination Folder", "Writing Test.txt file");
+
+                        var testFilePath = Path.Combine(job.WriteFolder, "Test.txt");
+
+                        try
+                        {
+                            File.WriteAllText(testFilePath, "This is a write test");
+                            File.Delete(testFilePath);
                         }
-                    });
+                        catch (Exception ex)
+                        {
+                            job.UpdateStatus(ex.Message);
+                            Fail(job);
+                            return;
+                        }
 
-                    job.UpdateStatus("Workload complied", "Checking Destination Folder", "Writing Test.txt file");
-
-                    var testFilePath = Path.Combine(job.WriteFolder, "Test.txt");
-
-                    try
-                    {
-                        File.WriteAllText(testFilePath, "This is a write test");
-                        File.Delete(testFilePath);
-                    }
-                    catch (Exception ex)
-                    {
-                        job.UpdateStatus(ex.Message);
-                        Fail(job);
+                        Succeed(job);
                         return;
                     }
-
-                    Succeed(job);
-                    return;
+                }
+                else
+                {
+                    job.UpdateStatus($"Preset {job.PresetName} does not exist");
                 }
 
                 Fail(job);

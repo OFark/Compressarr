@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using Compressarr.FFmpegFactory.Models;
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 namespace Compressarr.FFmpegFactory.Interfaces
@@ -17,6 +18,7 @@ namespace Compressarr.FFmpegFactory.Interfaces
         public string OptionalArguments { get; set; }
         public int? VideoBitRate { get; set; }
         public string VideoCodec { get; set; }
+        HashSet<CodecOptionValue> VideoCodecOptions { get; set; }
 
         public List<string> GetArgumentString();
     }

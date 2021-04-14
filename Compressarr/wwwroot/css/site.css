@@ -131,10 +131,36 @@ div#divNewJob {
       display: block;
       padding: .3em .5em; }
 
-div#divAddJobWrapper {
+div#divAddJobWrapper, div#divAddPresetWrapper {
   text-align: center; }
-  div#divAddJobWrapper i {
+  div#divAddJobWrapper i, div#divAddPresetWrapper i {
     cursor: pointer; }
+
+div#divNewPreset {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 1em;
+  border-radius: 8px;
+  margin-bottom: 1em; }
+  div#divNewPreset .codecOptions {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 1em;
+    border-radius: 8px;
+    margin-bottom: 1em; }
+
+div.preset {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 1em;
+  border-radius: 8px;
+  margin-bottom: 1em;
+  display: grid;
+  grid-template-columns: auto max-content; }
+  div.preset .commands {
+    display: flex;
+    grid-gap: .2em; }
+    div.preset .commands button {
+      background: none;
+      color: white;
+      font-size: 1.8em; }
 
 .input-group {
   background: rgba(0, 0, 0, 0.2);

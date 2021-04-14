@@ -1,0 +1,45 @@
+[
+
+  {
+    "Name": "Constant Rate Factor",
+    "Type": "Range",
+    "Min": 0,
+    "Max": 51,
+    "Arg": "-crf <val>",
+    "DisabledByVideoBitRate": true
+  },
+  {
+    "Name": "Preset",
+    "Type": "Select",
+    "Values": [
+      "ultrafast",
+      "superfast",
+      "veryfast",
+      "faster",
+      "fast",
+      "medium",
+      "slow",
+      "slower",
+      "veryslow",
+      "placebo"
+    ],
+    "Arg": "-preset <val>"
+  },
+  {
+    "Name": "Tune",
+    "Type": "Select",
+    "Values": [
+      "animation",
+      "fastdecode",
+      "grain",
+      "zerolatency"
+    ],
+    "Arg": "-tune <val>"
+  },
+  {
+    "Name": "Parameters",
+    "Type": "String",
+    "Arg": "-x265-params <val>",
+    "IncludePass":  true
+  }
+]
