@@ -9,6 +9,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using Xabe.FFmpeg;
 using Xabe.FFmpeg.Downloader;
 
@@ -22,6 +23,15 @@ namespace Compressarr.FFmpegFactory
         private string ExecutablesPath => Path.Combine(env.ContentRootPath, "config", "FFmpeg");
         private string PresetsFilePath => Path.Combine(env.ContentRootPath, "config", "presets.json");
 
+        private string FFMPEG => RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? Path.Combine(ExecutablesPath, "ffmpeg.exe")
+                               : RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? Path.Combine(ExecutablesPath, "ffmpeg")
+                               : throw new NotSupportedException("Cannot Identify OS");
+
+        private string FFPROBE => RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? Path.Combine(ExecutablesPath, "ffprobe.exe")
+                               : RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? Path.Combine(ExecutablesPath, "ffprobe")
+                               : throw new NotSupportedException("Cannot Identify OS");
+
+
         private HashSet<IFFmpegPreset> _presets { get; set; }
         public HashSet<IFFmpegPreset> Presets => _presets ?? LoadPresets();
 
@@ -34,6 +44,8 @@ namespace Compressarr.FFmpegFactory
 
         private Dictionary<CodecType, SortedDictionary<string, string>> Codecs { get; set; }
 
+        private Task initTask = null;
+
         public FFmpegManager(IServiceProvider services, IWebHostEnvironment env)
         {
             this.services = services;
@@ -41,30 +53,39 @@ namespace Compressarr.FFmpegFactory
 
             Status = FFmpegStatus.Initialising;
             FFmpeg.SetExecutablesPath(ExecutablesPath);
-            FFmpegDownloader.GetLatestVersion(FFmpegVersion.Official, ExecutablesPath);
+        }
 
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        public void Init()
+        {
+            initTask = Task.Run(async () =>
             {
-                foreach (var exe in new string[] { "ffmpeg", "ffprobe" })
+                await FFmpegDownloader.GetLatestVersion(FFmpegVersion.Official, ExecutablesPath);
+
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 {
-                    using (var process = new Process())
+                    foreach (var exe in new string[] { FFMPEG, FFPROBE })
                     {
-                        process.StartInfo = new ProcessStartInfo()
+                        using (var process = new Process())
                         {
-                            RedirectStandardOutput = true,
-                            UseShellExecute = false,
-                            CreateNoWindow = true,
-                            WindowStyle = ProcessWindowStyle.Hidden,
-                            FileName = "/bin/bash",
-                            Arguments = $"-c \"chmod +x {Path.Combine(ExecutablesPath, exe)}\""
+                            process.StartInfo = new ProcessStartInfo()
+                            {
+                                RedirectStandardOutput = true,
+                                UseShellExecute = false,
+                                CreateNoWindow = true,
+                                WindowStyle = ProcessWindowStyle.Hidden,
+                                FileName = "/bin/bash",
+                                Arguments = $"-c \"chmod +x {exe}\""
+                            };
+                            process.StartInfo.RedirectStandardOutput = true;
+                            process.OutputDataReceived += (sender, args) => Console.WriteLine(args.Data);
+                            process.Start();
+                            process.WaitForExit();
                         };
-                        process.StartInfo.RedirectStandardOutput = true;
-                        process.OutputDataReceived += (sender, args) => Console.WriteLine(args.Data);
-                        process.Start();
-                        process.WaitForExit();
-                    };
+                    }
                 }
-            }
+            });
+
+            initTask.Wait();
 
             Codecs = GetAvailableCodecs();
             Containers = GetAvailableContainers();
@@ -75,6 +96,8 @@ namespace Compressarr.FFmpegFactory
 
         public void AddPreset(IFFmpegPreset newPreset)
         {
+            initTask.Wait();
+
             var preset = Presets.FirstOrDefault(x => x.Name == newPreset.Name);
 
             if (preset == null)
@@ -91,6 +114,8 @@ namespace Compressarr.FFmpegFactory
 
         public void DeletePreset(string presetName)
         {
+            initTask.Wait();
+
             var preset = Presets.FirstOrDefault(x => x.Name == presetName);
 
             if (preset != null)
@@ -103,6 +128,8 @@ namespace Compressarr.FFmpegFactory
 
         public bool CheckResult(WorkItem workitem)
         {
+            initTask.Wait();
+
             var mediaInfoTask = FFmpeg.GetMediaInfo(workitem.DestinationFile);
             mediaInfoTask.Wait();
             var mediaInfo = mediaInfoTask.Result;
@@ -112,18 +139,12 @@ namespace Compressarr.FFmpegFactory
 
         public string ConvertContainerToExtension(string container)
         {
+            initTask.Wait();
+
             var p = new Process();
             p.StartInfo.UseShellExecute = false;
             p.StartInfo.RedirectStandardOutput = true;
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                p.StartInfo.FileName = Path.Combine(ExecutablesPath, "ffmpeg.exe");
-            }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                p.StartInfo.FileName = Path.Combine(ExecutablesPath, "ffmpeg");
-            }
-
+            p.StartInfo.FileName = FFMPEG;
             p.StartInfo.Arguments = $"-v 1 -h muxer={container}";
 
             p.Start();
@@ -156,6 +177,8 @@ namespace Compressarr.FFmpegFactory
 
         private HashSet<IFFmpegPreset> LoadPresets()
         {
+            initTask.Wait();
+
             _presets = new HashSet<IFFmpegPreset>();
 
             if (File.Exists(PresetsFilePath))
@@ -201,6 +224,8 @@ namespace Compressarr.FFmpegFactory
 
         private void SavePresets()
         {
+            initTask.Wait();
+
             var json = JsonConvert.SerializeObject(Presets, new JsonSerializerSettings() { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
 
             if (!Directory.Exists(Path.GetDirectoryName(PresetsFilePath)))
@@ -213,19 +238,13 @@ namespace Compressarr.FFmpegFactory
 
         private Dictionary<CodecType, SortedDictionary<string, string>> GetAvailableCodecs()
         {
+            initTask.Wait();
+
             var codecs = new Dictionary<CodecType, SortedDictionary<string, string>>();
             var p = new Process();
             p.StartInfo.UseShellExecute = false;
             p.StartInfo.RedirectStandardOutput = true;
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                p.StartInfo.FileName = Path.Combine(ExecutablesPath, "ffmpeg.exe");
-            }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                p.StartInfo.FileName = Path.Combine(ExecutablesPath, "ffmpeg");
-            }
-
+            p.StartInfo.FileName = FFMPEG;
             p.StartInfo.Arguments = "-encoders";
 
             p.Start();
@@ -267,19 +286,13 @@ namespace Compressarr.FFmpegFactory
 
         private SortedDictionary<string, string> GetAvailableContainers()
         {
+            initTask.Wait();
+
             var formats = new SortedDictionary<string, string>();
             var p = new Process();
             p.StartInfo.UseShellExecute = false;
             p.StartInfo.RedirectStandardOutput = true;
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                p.StartInfo.FileName = Path.Combine(ExecutablesPath, "ffmpeg.exe");
-            }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                p.StartInfo.FileName = Path.Combine(ExecutablesPath, "ffmpeg");
-            }
-
+            p.StartInfo.FileName = FFMPEG;
             p.StartInfo.Arguments = "-formats -v 1";
 
             p.Start();

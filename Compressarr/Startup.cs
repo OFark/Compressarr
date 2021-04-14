@@ -1,20 +1,14 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using Compressarr.FFmpegFactory;
+using Compressarr.Filtering;
+using Compressarr.JobProcessing;
+using Compressarr.Services;
+using Compressarr.Services.Interfaces;
+using Compressarr.Settings;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Compressarr.Services.Interfaces;
-using Compressarr.Services;
-using Compressarr.Filtering;
-using Compressarr.Settings;
-using Compressarr.FFmpegFactory;
-using Compressarr.JobProcessing;
 
 namespace Compressarr
 {
