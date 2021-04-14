@@ -43,6 +43,29 @@ namespace Compressarr.FFmpegFactory
             FFmpeg.SetExecutablesPath(ExecutablesPath);
             FFmpegDownloader.GetLatestVersion(FFmpegVersion.Official, ExecutablesPath);
 
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                foreach (var exe in new string[] { "ffmpeg", "ffprobe" })
+                {
+                    using (var process = new Process())
+                    {
+                        process.StartInfo = new ProcessStartInfo()
+                        {
+                            RedirectStandardOutput = true,
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                            WindowStyle = ProcessWindowStyle.Hidden,
+                            FileName = "/bin/bash",
+                            Arguments = $"-c \"chmod +x {Path.Combine(ExecutablesPath, exe)}\""
+                        };
+                        process.StartInfo.RedirectStandardOutput = true;
+                        process.OutputDataReceived += (sender, args) => Console.WriteLine(args.Data);
+                        process.Start();
+                        process.WaitForExit();
+                    };
+                }
+            }
+
             Codecs = GetAvailableCodecs();
             Containers = GetAvailableContainers();
             Status = FFmpegStatus.Ready;
