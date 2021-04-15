@@ -24,6 +24,9 @@ $overBackground: rgba(0, 0, 0, 0.2);
 
 $font-red: rgba(240,0,0, 0.75);
 
+$loading-width: 600px;
+$loading-height: 200px;
+
 html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     color: $font-color;
@@ -35,371 +38,431 @@ body {
     background: url(https://raw.githubusercontent.com/Burry/Organizr-Plex-Theme/master/images/background/noise.png) center center fixed,-webkit-linear-gradient(-45deg, $background-Start 0%,$background-End 100%); /* Chrome10-25,Safari5.1-6 */
     background: url(https://raw.githubusercontent.com/Burry/Organizr-Plex-Theme/master/images/background/noise.png) center center fixed,linear-gradient(135deg, $background-Start 0%,$background-End 100%); /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
     filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='$background-Start', endColorstr='$background-End',GradientType=1 ); /* IE6-9 fallback on horizontal gradient */
-    min-height: 100vh;
-}
+    height: 100vh;
 
-a, .btn-link {
-    color: $font-red;
-}
-
-table {
-    color: $font-color !important;
-}
-
-div {
-    &.content {
+    app {
         position: relative;
-
-        > div {
-            -webkit-transition: 1s -webkit-filter linear;
-            -moz-transition: 1s -moz-filter linear;
-            -moz-transition: 1s filter linear;
-            -ms-transition: 1s -ms-filter linear;
-            -o-transition: 1s -o-filter linear;
-            transition: 1s filter linear, 1s -webkit-filter linear;
-        }
-    }
-
-    &.blurred {
-        filter: blur(10px);
-    }
-
-    &.loadingBlur {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
+        display: grid;
+        grid-template-rows: max-content auto;
         height: 100vh;
-        display: flex;
-        justify-content: center;
-        align-content: center;
-        align-items: center;
 
-        .notice {
-            font-size: 5vw;
-            background: rgba(0,0,0,0.4);
-            padding: 1.8em 2.5em;
-            border: 12px solid white;
-            text-shadow: 0 0 4px #000000;
-            -webkit-text-stroke: 2px black;
-        }
-    }
 
-    &#divJobList {
-        .job {
-            @include embedPanel;
+        > .topbar {
+            width: 100%;
+            height: auto;
 
-            .jobTitle {
-                display: grid;
-                grid-template-columns: auto max-content;
+            .nav {
+                flex-direction: row;
+                justify-content: center;
 
-                h3 {
-                    cursor: pointer;
+                .nav-item {
+                    padding-top: 1rem;
 
-                    img {
-                        max-width: 20px;
-                        margin-right: .3em;
-                    }
-                }
-
-                .commands {
-                    @include commandsBlock;
-                }
-            }
-
-            .editJob {
-                @include embedPanel;
-
-                .editJobWrapper {
-                    @include embedPanel;
-                }
-            }
-
-            .workLoad {
-                @include embedPanel;
-                margin-bottom: 1em;
-
-                .workLoadItems {
-                    overflow: auto;
-                    max-height: 220px;
-
-                    .workitem {
-                        padding: .5em;
-                        background: $overBackground;
-                        border-radius: 2px;
-                        margin-bottom: 1px;
+                    .nav-link {
+                        display: block;
+                        height: auto;
+                        text-align: center;
+                        line-height: normal;
+                        color: $font-color;
 
                         span {
-                            white-space: nowrap;
-                            margin-right: 0.5em;
-                        }
-                    }
-                }
-            }
-
-            .jobLog {
-                @include embedPanel;
-                margin-bottom: 1em;
-
-                .jobEventsScrollWrapper {
-                    display: flex;
-                    flex-direction: column-reverse;
-                    overflow: auto;
-                    max-height: 195px;
-                    position: relative;
-                    margin-bottom: 1em;
-
-                    .jobEvents {
-                        cursor: pointer;
-                        background: $overBackground;
-                        border-radius: 4px;
-                        padding: .5em .3em;
-
-                        .event {
                             display: block;
-                            font-family: SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+                            width: auto;
+                            height: 3rem;
+                            margin-bottom: .5rem;
+
+                            img {
+                                max-width: 3rem;
+                            }
+
+                            i {
+                                font-size: 3rem;
+                                width: auto;
+                            }
                         }
                     }
                 }
             }
         }
 
-        margin-bottom: 1em;
-    }
-
-    &#divNewJob {
-        @include embedPanel;
-        margin-bottom: 1em;
-
-        .testEvents {
-            background: $overBackground;
-            font-family: SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
-            margin: 1em 0;
-
-            .testEvent {
-                display: block;
-                padding: .3em .5em;
-            }
-        }
-    }
-
-    &#divAddJobWrapper, &#divAddPresetWrapper {
-        text-align: center;
-
-        i {
-            cursor: pointer;
-        }
-    }
-
-    &#divNewPreset {
-        @include embedPanel;
-        margin-bottom: 1em;
-
-        .codecOptions {
+        > .main {
             @include embedPanel;
-            margin-bottom: 1em;
-        }
-    }
+            margin: 0 1em 1em;
+            position: relative;
+            min-height: 0; //in grids this stops the grid item from growing
 
-    &.preset {
-        @include embedPanel;
-        margin-bottom: 1em;
-        display: grid;
-        grid-template-columns: auto max-content;
-
-        .commands {
-            @include commandsBlock;
-        }
-    }
-}
-
-.input-group {
-    background: $overBackground;
-    border-radius: 3px;
-    margin-bottom: .5em;
-    display: flex;
-
-    &:hover, &:focus, &:active {
-        background: opacify($overBackground, .1);
-    }
-
-    div {
-        flex: 1 1 auto;
-    }
-
-    .form-control {
-        color: $font-color;
-        border: none;
-        background: transparent;
-
-        &:focus {
-            border: none;
-            color: $font-color;
-            outline: none;
-            box-shadow: none;
-        }
-    }
-
-    input {
-        &.form-control {
-            &::placeholder {
-                color: #ccc;
-            }
-
-            &[data-affix] {
+            #content {
                 position: relative;
+                padding-top: 1.1rem;
+                padding-left: 2rem !important;
+                padding-right: 1.5rem !important;
+                height: 100%;
+                overflow: auto;
 
-                &::before {
-                    content: 'brrr'; //attr(data-affix);
+                > div {
+                    -webkit-transition: 1s -webkit-filter linear;
+                    -moz-transition: 1s -moz-filter linear;
+                    -moz-transition: 1s filter linear;
+                    -ms-transition: 1s -ms-filter linear;
+                    -o-transition: 1s -o-filter linear;
+                    transition: 1s filter linear, 1s -webkit-filter linear;
+
+                    &.blurred {
+                        filter: blur(10px);
+                    }
+
+                    &.loadingBlur {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        height: 100vh;
+                        display: flex;
+                        justify-content: center;
+                        align-content: center;
+                        align-items: center;
+
+                        .notice {
+                            font-size: 5vw;
+                            text-shadow: 0 0 4px #000000;
+                            -webkit-text-stroke: 2px black;
+
+                            ul {
+                                position: absolute;
+                                top: 50%;
+                                left: 50%;
+                                transform: translate(-50%,-50%);
+                                width: $loading-width;
+                                height: $loading-height;
+                                text-align: center;
+                                line-height: $loading-height;
+                                color: #fff;
+                                font-size: 100px;
+                                text-transform: uppercase;
+                                overflow: hidden;
+
+
+                                li {
+                                    list-style: none;
+                                    position: absolute;
+                                    background: #fff;
+
+                                    &:nth-of-type(1) {
+                                        height: 10px;
+                                        width: $loading-width;
+                                        animation: animateLI1 2s infinite linear;
+                                    }
+
+                                    &:nth-of-type(2) {
+                                        height: $loading-height;
+                                        width: 10px;
+                                        animation: animateLI2 2s infinite linear;
+                                    }
+
+                                    &:nth-of-type(3) {
+                                        height: 10px;
+                                        width: $loading-width;
+                                        animation: animateLI3 2s infinite linear;
+                                    }
+
+                                    &:nth-of-type(4) {
+                                        height: $loading-height;
+                                        width: 10px;
+                                        animation: animateLI4 2s infinite linear;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+
+                    div {
+                        &.filterList {
+                            .filterTableWrapper {
+                                border-collapse: separate;
+
+                                thead {
+                                    th:not(.hide) {
+                                        border: 2px solid #666;
+                                        border-radius: 4px;
+                                        background: white;
+
+                                        select, input[type=text] {
+                                            padding: 3px;
+                                            border: none;
+                                            background: transparent;
+                                            color: #333;
+                                        }
+
+                                        option {
+                                            /*                    background-color: $overBackground*/
+                                        }
+                                    }
+                                }
+
+                                td:not(:first-child) {
+                                    padding: 5px 10px;
+                                }
+
+                                td:first-child {
+                                    text-align: center;
+                                }
+                            }
+                        }
+
+                        &#divJobList {
+                            .job {
+                                @include embedPanel;
+
+                                .jobTitle {
+                                    display: grid;
+                                    grid-template-columns: auto max-content;
+
+                                    h3 {
+                                        cursor: pointer;
+
+                                        img {
+                                            max-width: 20px;
+                                            margin-right: .3em;
+                                        }
+                                    }
+
+                                    .commands {
+                                        @include commandsBlock;
+                                    }
+                                }
+
+                                .editJob {
+                                    @include embedPanel;
+
+                                    .editJobWrapper {
+                                        @include embedPanel;
+                                    }
+                                }
+
+                                .workLoad {
+                                    @include embedPanel;
+                                    margin-bottom: 1em;
+
+                                    .workLoadItems {
+                                        overflow: auto;
+                                        max-height: 220px;
+
+                                        .workitem {
+                                            padding: .5em;
+                                            background: $overBackground;
+                                            border-radius: 2px;
+                                            margin-bottom: 1px;
+
+                                            span {
+                                                white-space: nowrap;
+                                                margin-right: 0.5em;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                .jobLog {
+                                    @include embedPanel;
+                                    margin-bottom: 1em;
+
+                                    .jobEventsScrollWrapper {
+                                        display: flex;
+                                        flex-direction: column-reverse;
+                                        overflow: auto;
+                                        max-height: 195px;
+                                        position: relative;
+                                        margin-bottom: 1em;
+
+                                        .jobEvents {
+                                            cursor: pointer;
+                                            background: $overBackground;
+                                            border-radius: 4px;
+                                            padding: .5em .3em;
+
+                                            .event {
+                                                display: block;
+                                                font-family: SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            margin-bottom: 1em;
+                        }
+
+                        &#divNewJob {
+                            @include embedPanel;
+                            margin-bottom: 1em;
+
+                            .testEvents {
+                                background: $overBackground;
+                                font-family: SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+                                margin: 1em 0;
+
+                                .testEvent {
+                                    display: block;
+                                    padding: .3em .5em;
+                                }
+                            }
+                        }
+
+                        &#divAddJobWrapper, &#divAddPresetWrapper {
+                            text-align: center;
+
+                            i {
+                                cursor: pointer;
+                            }
+                        }
+
+                        &#divNewPreset {
+                            @include embedPanel;
+                            margin-bottom: 1em;
+
+                            .codecOptions {
+                                @include embedPanel;
+                                margin-bottom: 1em;
+                            }
+                        }
+
+                        &.preset {
+                            @include embedPanel;
+                            margin-bottom: 1em;
+                            display: grid;
+                            grid-template-columns: auto max-content;
+
+                            .commands {
+                                @include commandsBlock;
+                            }
+                        }
+
+                        &#divRadarrOptions, &#divSonarrOptions {
+                            @include embedPanel;
+                            margin-bottom: 1em;
+                        }
+                    }
+
+                    .input-group {
+                        background: $overBackground;
+                        border-radius: 3px;
+                        margin-bottom: .5em;
+                        display: flex;
+
+                        &:hover, &:focus, &:active {
+                            background: opacify($overBackground, .1);
+                        }
+
+                        div {
+                            flex: 1 1 auto;
+                        }
+
+                        .form-control {
+                            color: $font-color;
+                            border: none;
+                            background: transparent;
+
+                            &:focus {
+                                border: none;
+                                color: $font-color;
+                                outline: none;
+                                box-shadow: none;
+                            }
+                        }
+
+                        button {
+                            margin: .3em;
+                        }
+
+
+                        input {
+                            &.form-control {
+                                &::placeholder {
+                                    color: #ccc;
+                                }
+
+                                &[data-affix] {
+                                    position: relative;
+
+                                    &::before {
+                                        content: 'brrr'; //attr(data-affix);
+                                    }
+                                }
+
+                                &[type=checkbox] {
+                                    background: red;
+                                    width: 1.3em;
+                                    border-radius: 5px;
+                                    margin-left: .3em;
+                                }
+                            }
+                        }
+
+                        label {
+                            padding-left: .8em;
+                        }
+
+                        select {
+                            &.form-control {
+                                option {
+                                    background: #444;
+                                    color: $font-color;
+                                    overflow: hidden;
+                                }
+                            }
+                        }
+                    }
+
+                    a {
+                        color: $font-red;
+                    }
+
+                    button {
+                        background: rgba(0,0,0,0.2);
+                        border: none;
+                        border-radius: 3px;
+                        color: white;
+                        padding: .2em 0.6em;
+
+                        &:active, &:visited, &:focus {
+                            border: none;
+                            outline: none;
+                        }
+
+                        &:hover:not(:disabled) {
+                            background: white;
+                            color: #555;
+                        }
+
+                        &:disabled {
+                            color: #888;
+                        }
+
+                        &.icon {
+                        }
+
+                        i {
+                            color: $font-red;
+                        }
+                    }
+
+                    table {
+                        color: $font-color !important;
+
+                        &#tableMovies {
+                            thead {
+                                font-weight: bold;
+
+                                tr {
+                                    background: rgba(0,0,0,0.2);
+                                }
+                            }
+                        }
+                    }
                 }
-            }
-
-            &[type=checkbox] {
-                background: red;
-                width: 1.3em;
-                border-radius: 5px;
-                margin-left: .3em;
             }
         }
     }
-
-    label {
-        padding-left: .8em;
-    }
-
-    select {
-        &.form-control {
-            option {
-                background: #444;
-                color: $font-color;
-                overflow: hidden;
-            }
-        }
-    }
-}
-
-fieldset {
-    border: 2px solid #333;
-    border-radius: 10px;
-    padding: 0.4em 1em;
-
-    legend {
-        width: auto;
-        padding: 0 .4em;
-    }
-}
-
-.btn-primary {
-    color: #fff;
-    background-color: #1b6ec2;
-    border-color: #1861ac;
-}
-
-app {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-}
-
-.top-row {
-    height: 3.5rem;
-    display: flex;
-    align-items: center;
-}
-
-.main {
-    flex: 1;
-
-    .top-row {
-        background-color: $overBackground;
-        justify-content: flex-end;
-
-        > a, .btn-link {
-            white-space: nowrap;
-            margin-left: 1.5rem;
-        }
-
-        a:first-child {
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-    }
-}
-
-.topbar {
-    .top-row {
-        background-color: $overBackground;
-    }
-
-    .navbar-brand {
-        font-size: 1.6rem;
-        color: $font-red;
-    }
-
-    .fas {
-        width: 2rem;
-        font-size: 1.1rem;
-        vertical-align: text-top;
-        top: -2px;
-    }
-
-    .nav {
-        flex-direction: column;
-
-        .nav-item {
-            font-size: 0.9rem;
-            padding-bottom: 0.5rem;
-
-            &:first-of-type {
-                padding-top: 1rem;
-            }
-
-            &:last-of-type {
-                padding-bottom: 1rem;
-            }
-
-            a {
-                color: white;
-                border-radius: 4px;
-                height: 3rem;
-                display: flex;
-                align-items: center;
-                line-height: 3rem;
-
-                &.active {
-                    background-color: $overBackground;
-                    color: white;
-                }
-
-                &:hover {
-                    background-color: rgba(255, 255, 255, 0.1);
-                    color: #333;
-                }
-            }
-
-            .nav-link {
-                .fas {
-                    color: white;
-                }
-
-                span {
-                    width: 2rem;
-                }
-
-                img {
-                    max-width: 20px;
-                }
-            }
-        }
-    }
-}
-
-.content {
-    padding-top: 1.1rem;
-}
-
-.navbar-toggler {
-    background-color: rgba(255, 255, 255, 0.1);
 }
 
 .valid.modified:not([type=checkbox]) {
@@ -434,145 +497,130 @@ app {
     }
 }
 
-.filterList {
-    .filterTableWrapper {
-        border-collapse: separate;
+@keyframes animateLI1 {
+    0% {
+        top: 0;
+        left: -$loading-width;
+    }
 
-        thead {
-            th:not(.hide) {
-                border: 2px solid #666;
-                border-radius: 4px;
-                background: white;
+    20% {
+        top: 0;
+        left: 0;
+    }
 
-                select, input[type=text] {
-                    padding: 3px;
-                    border: none;
-                    background: transparent;
-                    color: #333;
-                }
+    40% {
+        top: 0;
+        left: $loading-width;
+    }
 
-                option {
-                    /*                    background-color: $overBackground*/
-                }
-            }
-        }
+    60% {
+        top: 0;
+        left: $loading-width;
+    }
 
-        td:not(:first-child) {
-            padding: 5px 10px;
-        }
+    80% {
+        top: 0;
+        left: $loading-width;
+    }
 
-        td:first-child {
-            text-align: center;
-        }
+    100% {
+        top: 0;
+        left: $loading-width;
     }
 }
 
-button {
-    background: rgba(255,255,255,0.5);
-    border: none;
-    border-radius: 3px;
-    color: $font-red;
-
-    &:active, &:visited, &:focus {
-        border: none;
-        outline: none;
+@keyframes animateLI2 {
+    0% {
+        top: -$loading-height;
+        left: $loading-width - 10;
     }
 
-    &:hover {
-        background: white;
+    20% {
+        top: -$loading-height;
+        left: $loading-width - 10;
     }
 
-    &:disabled {
-        color: #888;
+    40% {
+        top: 0;
+        left: $loading-width - 10;
     }
 
-    &.icon {
-        background: transparent;
-        border: none;
-        color: $font-color;
+    60% {
+        top: $loading-height;
+        left: $loading-width - 10;
     }
-}
 
-@media (max-width: 767.98px) {
-    .main .top-row {
-        &:not(.auth) {
-            display: none;
-        }
+    80% {
+        top: $loading-height;
+        left: $loading-width - 10;
+    }
 
-        &.auth {
-            justify-content: space-between;
-        }
-
-        a, .btn-link {
-            margin-left: 0;
-        }
+    100% {
+        top: $loading-height;
+        left: $loading-width - 10;
     }
 }
 
-@media (min-width: 768px) {
-    app {
-        /*flex-direction: row;*/
-        padding: 0 1rem;
+@keyframes animateLI3 {
+    0% {
+        top: calc(100% - 10px);
+        left: $loading-width;
     }
 
-    .topbar {
-        width: 100%;
-        height: auto;
-        /*position: sticky;*/
-        /*        top: 0;*/
-        .nav {
-            flex-direction: row;
-            justify-content: center;
-
-            .nav-item {
-                padding-top: 1rem;
-
-                .nav-link {
-                    display: block;
-                    height: auto;
-                    text-align: center;
-                    line-height: normal;
-
-                    span {
-                        display: block;
-                        width: auto;
-                        height: 3rem;
-                        margin-bottom: .5rem;
-
-                        img {
-                            max-width: 3rem;
-                        }
-
-                        i {
-                            font-size: 3rem;
-                            width: auto;
-                        }
-                    }
-                }
-            }
-        }
+    20% {
+        top: calc(100% - 10px);
+        left: $loading-width;
     }
 
-    .top-row {
-        display: none;
+    40% {
+        top: calc(100% - 10px);
+        left: $loading-width;
     }
 
-    .main {
-        background: $overBackground;
-        border-radius: 4px;
-
-        > div {
-            padding-left: 2rem !important;
-            padding-right: 1.5rem !important;
-        }
+    60% {
+        top: calc(100% - 10px);
+        left: 0;
     }
 
-    .navbar-toggler {
-        display: none;
+    80% {
+        top: calc(100% - 10px);
+        left: -$loading-width;
     }
 
-    .topbar .collapse {
-        /* Never collapse the sidebar for wide screens */
-        display: block;
+    100% {
+        top: calc(100% - 10px);
+        left: -$loading-width;
+    }
+}
+
+@keyframes animateLI4 {
+    0% {
+        top: 100%;
+        left: 0;
+    }
+
+    20% {
+        top: 100%;
+        left: 0;
+    }
+
+    40% {
+        top: 100%;
+        left: 0;
+    }
+
+    60% {
+        top: 100%;
+        left: 0;
+    }
+
+    80% {
+        top: 0;
+        left: 0;
+    }
+
+    100% {
+        top: -100%;
+        left: 0;
     }
 }

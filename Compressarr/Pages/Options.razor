@@ -1,0 +1,179 @@
+﻿@page "/options"
+@using Compressarr.Filtering;
+@using Compressarr.JobProcessing;
+@using Newtonsoft.Json;
+
+@inject Compressarr.Settings.SettingsManager settingsManager
+@inject Compressarr.Services.Interfaces.IRadarrService radarrService
+@inject Compressarr.Services.Interfaces.ISonarrService sonarrService
+@inject Compressarr.FFmpegFactory.Interfaces.IFFmpegManager FFmpegManager
+@inject FilterManager filterManager
+@inject JobManager jobManager
+
+<div class="col-md-6 offset-md-3">
+    <h1 title="It's easy to make good decisions when there are no bad options">Options</h1>
+    <div id="divRadarrOptions">
+        <h2>Radarr</h2>
+        @if (settingsManager.HasSetting(Settings.SettingType.RadarrURL))
+        {
+            <span>Radarr: @settingsManager.GetSetting(Settings.SettingType.RadarrURL)</span>
+            <button @onclick="toggleRadarrStatus"><i class="fas @(string.IsNullOrWhiteSpace(radarrTestResponse) ? "fa-spinner fa-spin" : "fa-check")"></i></button>
+            <button @onclick="@(() => deleteSetting(Settings.SettingType.RadarrURL))"><i class="fas fa-trash-alt"></i></button>
+        }
+        else
+        {
+            <div class="input-group">
+                <input @bind="radarrURL" placeholder="Radarr URL" class="form-control" />
+            </div>
+            <div class="input-group">
+                <input @bind="radarrAPIKey" placeholder="Radarr API key" class="form-control" />
+            </div>
+            <button @onclick="saveRadarrSettings" disabled="@(string.IsNullOrWhiteSpace(radarrURL) || string.IsNullOrWhiteSpace(radarrAPIKey))"><i class="fas fa-save"></i> Save</button>
+        }
+
+        @if (showRadarrStatus)
+        {
+            <pre>@radarrTestResponse</pre>
+        }
+    </div>
+
+    <div id="divSonarrOptions">
+        <h2>Sonarr</h2>
+        @if (settingsManager.HasSetting(Settings.SettingType.SonarrURL))
+        {
+            <span>Sonarr: @settingsManager.GetSetting(Settings.SettingType.SonarrURL)</span>
+            <button @onclick="toggleSonarrStatus"><i class="fas @(string.IsNullOrWhiteSpace(sonarrTestResponse) ? "fa-spinner fa-spin" : "fa-check")"></i></button>
+            <button @onclick="@(() => deleteSetting(Settings.SettingType.SonarrURL))"><i class="fas fa-trash-alt"></i></button>
+        }
+        else
+        {
+            <div class="input-group">
+                <input @bind="sonarrURL" placeholder="Sonarr URL" class="form-control" />
+            </div>
+            <div class="input-group">
+                <input @bind="sonarrAPIKey" placeholder="Sonarr API key" class="form-control" />
+            </div>
+            <button @onclick="saveSonarrSettings" disabled="@(string.IsNullOrWhiteSpace(sonarrURL) || string.IsNullOrWhiteSpace(sonarrAPIKey))"><i class="fas fa-save"></i> Save</button>
+        }
+
+        @if (showSonarrStatus)
+        {
+            <pre>@sonarrTestResponse</pre>
+        }
+    </div>
+</div>
+
+@code {
+    private string AlertMessage = null;
+
+    private string radarrURL { get; set; }
+    private string radarrAPIKey { get; set; }
+    private string radarrTestResponse { get; set; }
+    private bool radarrConnected { get; set; }
+    private bool showRadarrStatus { get; set; }
+
+    private string sonarrURL { get; set; }
+    private string sonarrAPIKey { get; set; }
+    private string sonarrTestResponse { get; set; }
+    private bool sonarrConnected { get; set; }
+    private bool showSonarrStatus { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (settingsManager.HasSetting(Settings.SettingType.RadarrURL))
+        {
+            radarrTestResponse = null;
+            var ss = radarrService.TestConnection(settingsManager.GetSetting(Settings.SettingType.RadarrURL), settingsManager.GetSetting(Settings.SettingType.RadarrAPIKey));
+
+            radarrConnected = ss.Success;
+
+            radarrTestResponse = JsonConvert.SerializeObject(ss, new JsonSerializerSettings() { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
+        }
+
+        if (settingsManager.HasSetting(Settings.SettingType.SonarrURL))
+        {
+            sonarrTestResponse = null;
+            var ss = sonarrService.TestConnection(settingsManager.GetSetting(Settings.SettingType.SonarrURL), settingsManager.GetSetting(Settings.SettingType.SonarrAPIKey));
+
+            sonarrConnected = ss.Success;
+
+            sonarrTestResponse = JsonConvert.SerializeObject(ss, new JsonSerializerSettings() { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
+        }
+
+        if (!sonarrConnected && !radarrConnected)
+        {
+            AlertMessage = "Need at least one service connected to get started.";
+        }
+
+        base.OnInitialized();
+    }
+
+    private void deleteSetting(Compressarr.Settings.SettingType setting)
+    {
+        settingsManager.DeleteSetting(setting);
+    }
+
+    private void saveRadarrSettings()
+    {
+        if (!string.IsNullOrWhiteSpace(radarrURL) && !string.IsNullOrWhiteSpace(radarrAPIKey))
+        {
+            radarrURL = radarrURL.TrimEnd('/');
+            radarrTestResponse = null;
+            var ss = radarrService.TestConnection(radarrURL, radarrAPIKey);
+
+            if (ss.Success)
+            {
+                settingsManager.AddSetting(Settings.SettingType.RadarrURL, radarrURL);
+                settingsManager.AddSetting(Settings.SettingType.RadarrAPIKey, radarrAPIKey);
+
+                radarrConnected = ss.Success;
+
+                radarrTestResponse = JsonConvert.SerializeObject(ss, new JsonSerializerSettings() { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
+
+                showRadarrStatus = false;
+            }
+            else
+            {
+                radarrTestResponse = ss.ErrorMessage;
+                showRadarrStatus = true;
+            }
+        }
+    }
+
+    private void saveSonarrSettings()
+    {
+        if (!string.IsNullOrWhiteSpace(sonarrURL) && !string.IsNullOrWhiteSpace(sonarrAPIKey))
+        {
+            sonarrURL = sonarrURL.TrimEnd('/');
+            sonarrTestResponse = null;
+            var ss = sonarrService.TestConnection(sonarrURL, sonarrAPIKey);
+
+            if (ss.Success)
+            {
+                settingsManager.AddSetting(Settings.SettingType.SonarrURL, sonarrURL);
+                settingsManager.AddSetting(Settings.SettingType.SonarrAPIKey, sonarrAPIKey);
+
+                sonarrConnected = ss.Success;
+
+                sonarrTestResponse = JsonConvert.SerializeObject(ss, new JsonSerializerSettings() { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
+
+                showSonarrStatus = false;
+            }
+            else
+            {
+                sonarrTestResponse = ss.ErrorMessage;
+                showSonarrStatus = true;
+            }
+        }
+    }
+
+    private void toggleRadarrStatus()
+    {
+        showRadarrStatus = !showRadarrStatus;
+    }
+
+    private void toggleSonarrStatus()
+    {
+        showSonarrStatus = !showSonarrStatus;
+    }
+}

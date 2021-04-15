@@ -162,10 +162,11 @@
     {
         job.StatusUpdate += jobStatusUpdate;
 
-        if (job.JobStatus == JobStatus.Added)
-        {
-            jobManager.InitialiseJob(job);
-        }
+        //This should be done on startup
+        //if (job.JobStatus == JobStatus.Added)
+        //{
+        //    jobManager.InitialiseJob(job);
+        //}
     }
 
     private void jobStatusUpdate(object caller, EventArgs args)

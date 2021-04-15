@@ -7,17 +7,27 @@
 </div>
 
 <div class="main">
-    <div class="content px-4">
+    <div id="content" @ref="divContent">
         <div class="@(blurred ? "blurred" : "")">
             <CascadingValue Value=ToggleBlurred>
-                @Body
+                <CascadingValue Value=divContent>
+                    @Body
+                </CascadingValue>
             </CascadingValue>
         </div>
         @if (blurred)
         {
-        <div class="loadingBlur">
-            <div class="notice"></div>
-        </div>
+            <div class="loadingBlur">
+                <div class="notice">
+                    <ul class="active">
+                        <li></li>
+                        <li></li>
+                        <li></li>
+                        <li></li>
+                        loading
+                    </ul>
+                </div>
+            </div>
         }
     </div>
 </div>
@@ -26,6 +36,8 @@
     public EventCallback<bool?> ToggleBlurred => EventCallback.Factory.Create<bool?>(this, toggleBlurred);
 
     private bool blurred { get; set; }
+
+    private ElementReference divContent;
 
     public void toggleBlurred(bool? force)
     {

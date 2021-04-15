@@ -1,7 +1,9 @@
 ﻿using Compressarr.Filtering.Models;
 using Compressarr.Helpers;
+using Compressarr.Services.Models;
 using Microsoft.AspNetCore.Hosting;
 using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -12,11 +14,12 @@ namespace Compressarr.Filtering
 {
     public class FilterManager
     {
-        public static readonly List<FilterComparitor> StringComparitors;
-        public static readonly List<FilterComparitor> NumberComparitors;
-        public static readonly List<FilterComparitor> EnumComparitors;
+        public readonly List<FilterComparitor> StringComparitors;
+        public readonly List<FilterComparitor> NumberComparitors;
+        public readonly List<FilterComparitor> EnumComparitors;
+        public readonly List<FilterComparitor> DateComparitors;
 
-        public static readonly List<FilterProperty> FilterProperties;
+        public readonly List<FilterProperty> FilterProperties;
 
         private string filterFilePath => Path.Combine(_env.ContentRootPath, "config", "filters.json");
 
@@ -28,10 +31,13 @@ namespace Compressarr.Filtering
         public FilterManager(IWebHostEnvironment env)
         {
             _env = env;
-        }
 
-        static FilterManager()
-        {
+            DateComparitors = new List<FilterComparitor>()
+            {
+                new FilterComparitor("<"),
+                new FilterComparitor(">")
+            };
+
             StringComparitors = new List<FilterComparitor>()
             {
                 new FilterComparitor("=="),
@@ -56,22 +62,32 @@ namespace Compressarr.Filtering
                 new FilterComparitor("!=")
             };
 
-            FilterProperties = new List<FilterProperty>()
+            FilterProperties = new List<FilterProperty>();
+
+            buildFilterProperties();
+        }
+
+        private void buildFilterProperties(Type type = null, string name = null, string prefix = null)
+        {
+            foreach (var prop in (type ?? typeof(Services.Models.Movie)).GetProperties())
             {
-                new FilterProperty("title", FilterPropertyType.String),
-                new FilterProperty("movieFile.mediaInfo.width", FilterPropertyType.Number),
-                new FilterProperty("movieFile.mediaInfo.height", FilterPropertyType.Number),
-                new FilterProperty("movieFile.mediaInfo.videoCodec", FilterPropertyType.Enum),
-                new FilterProperty("movieFile.mediaInfo.videoCodecID", FilterPropertyType.String),
-                new FilterProperty("movieFile.mediaInfo.videoFormat", FilterPropertyType.Enum),
-                new FilterProperty("movieFile.mediaInfo.containerFormat", FilterPropertyType.Enum),
-                new FilterProperty("movieFile.mediaInfo.videoBitDepth", FilterPropertyType.Number),
-                new FilterProperty("movieFile.mediaInfo.videoBitrate", FilterPropertyType.Number),
-                new FilterProperty("movieFile.mediaInfo.videoFps", FilterPropertyType.Number),
-                new FilterProperty("movieFile.mediaInfo.videoDataRate", FilterPropertyType.Number),
-                new FilterProperty("movieFile.mediaInfo.audioFormat", FilterPropertyType.String),
-                new FilterProperty("movieFile.mediaInfo.audioCodecID", FilterPropertyType.Number)
-            };
+                var attr = prop.GetCustomAttributes(false).FirstOrDefault(a => a is FilterAttribute) as FilterAttribute;
+                if (attr != null)
+                {
+                    var attrName = string.IsNullOrWhiteSpace(name) ? attr.Name : $"{name} - {attr.Name}";
+                    var attrPrefix = string.IsNullOrWhiteSpace(prefix) ? prop.Name : $"{prefix}.{prop.Name}";
+                    var attrfilterOn = string.IsNullOrWhiteSpace(attr.FilterOn) ? attrPrefix : string.IsNullOrWhiteSpace(prefix) ? attr.FilterOn : $"{prefix}.{attr.FilterOn}";
+
+                    if (attr.Traverse)
+                    {
+                        buildFilterProperties(prop.PropertyType, attrName, attrPrefix);
+                    }
+                    else
+                    {
+                        FilterProperties.Add(new FilterProperty(attrName, attrPrefix, attr.PropertyType, attr.Suffix, attrfilterOn));
+                    }
+                }
+            }
         }
 
         public string ConstructFilterQuery(List<DynamicLinqFilter> dlFilters, out string[] vals)
@@ -82,6 +98,57 @@ namespace Compressarr.Filtering
             vals = filtervalues.ToArray();
 
             return filterStr;
+        }
+
+        public List<FilterComparitor> GetComparitors(FilterProperty property)
+        {
+            if (property != null)
+            {
+                switch (property.PropertyType)
+                {
+                    case FilterPropertyType.Boolean:
+                        return new List<FilterComparitor>() { new FilterComparitor("==") };
+
+                    case FilterPropertyType.Enum:
+                        return EnumComparitors;
+
+                    case FilterPropertyType.Number:
+                        return NumberComparitors;
+
+                    case FilterPropertyType.DateTime:
+                        return DateComparitors;
+
+                    case FilterPropertyType.String:
+                        return StringComparitors;
+                }
+            }
+
+            return StringComparitors;
+        }
+
+        public List<FilterProperty> GetTableColumns()
+        {
+            List<string> columns = new()
+            {
+                "title",
+                "movieFile.mediaInfo.width",
+                "movieFile.mediaInfo.height",
+                "movieFile.mediaInfo.videoCodec",
+                "movieFile.mediaInfo.videoFormat",
+                "movieFile.mediaInfo.containerFormat",
+                "movieFile.mediaInfo.videoBitDepth",
+                "movieFile.mediaInfo.videoColourPrimaries",
+                "movieFile.mediaInfo.videoBitrateNice",
+                "movieFile.mediaInfo.videoFps",
+                "movieFile.mediaInfo.audioFormat",
+                "movieFile.mediaInfo.audioCodecID",
+                "movieFile.mediaInfo.runTimeNice",
+                "movieFile.mediaInfo.videoDataRate",
+                "movieFile.sizeNice"
+            };
+
+            //The join here ensures the order
+            return columns.Join(FilterProperties.Where(f => columns.Contains(f.Value)), c => c, f => f.Value, (c,f) => f).ToList();
         }
 
         private string recursiveFilterQuery(List<DynamicLinqFilter> dlFilters, ref List<string> vals)
@@ -101,13 +168,23 @@ namespace Compressarr.Filtering
                     {
                         filterStr = $" {dlFilter.LogicalOperator} {dlFilter.Property.Value}{dlFilter.Comparitor.Operator}";
                     }
-                    else if (dlFilter.Property.PropertyType == FilterPropertyType.Enum || dlFilter.Property.PropertyType == FilterPropertyType.String)
-                    {
-                        filterStr = $" {dlFilter.LogicalOperator} {dlFilter.Property.Value}{dlFilter.Comparitor.Operator}\"{dlFilter.Value}\"";
-                    }
                     else
                     {
-                        filterStr = $" {dlFilter.LogicalOperator} {dlFilter.Property.Value}{dlFilter.Comparitor.Operator}{dlFilter.Value}";
+                        switch (dlFilter.Property.PropertyType)
+                        {
+                            case FilterPropertyType.DateTime:
+                            case FilterPropertyType.Enum:
+                            case FilterPropertyType.String:
+                                {
+                                    filterStr = $" {dlFilter.LogicalOperator} {dlFilter.Property.Value}{dlFilter.Comparitor.Operator}\"{dlFilter.Value}\"";
+                                }
+                                break;
+                            default:
+                                {
+                                    filterStr = $" {dlFilter.LogicalOperator} {dlFilter.Property.Value}{dlFilter.Comparitor.Operator}{dlFilter.Value}";
+                                }
+                                break;
+                        }
                     }
 
                     if (dlFilter.Comparitor.IsParamMethod)

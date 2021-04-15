@@ -5,10 +5,11 @@
 
 @inject Compressarr.Services.Interfaces.IRadarrService radarrService
 @inject FilterManager filterManager
+@inject IJSRuntime js
 
 @if (!string.IsNullOrWhiteSpace(AlertMessage))
 {
-<div class="alert alert-danger">@AlertMessage</div>
+    <div class="alert alert-danger">@AlertMessage</div>
 }
 <div class="my-2 filterList">
     <table class="filterTableWrapper">
@@ -18,32 +19,49 @@
                 </th>
                 <th>
                     <select @bind="filterPropertyStr" required>
-                        @foreach (var fp in FilterManager.FilterProperties)
+                        @foreach (var fp in filterManager.FilterProperties.OrderBy(f => f.Key))
                         {
-                        <option value="@fp.Value">@fp.Key</option>
+                            <option value="@fp.Value">@fp.Key</option>
                         }
                     </select>
                 </th>
                 <th>
                     <select @bind="filterComparitorStr" required>
                         <option value="" disabled selected hidden>is...</option>
-                        @foreach (var fc in FilterProperty.Comparitors)
+                        @if (FilterProperty != null)
                         {
-                        <option value="@fc.Value">@fc.Key</option>
+                            foreach (var fc in filterManager.GetComparitors(FilterProperty))
+                            {
+                                <option value="@fc.Value">@fc.Key</option>
+                            }
                         }
                     </select>
                 </th>
                 <th colspan="2">
                     @switch (FilterProperty.PropertyType)
                     {
+                        case FilterPropertyType.Boolean:
+                            {
+                    <select @bind="filterValue" required>
+                        <option value="" disabled selected hidden>something...</option>
+                        <option value="true">True</option>
+                        <option value="false">False</option>
+                    </select>
+                            }
+                            break;
+                        case FilterPropertyType.DateTime:
+                            {
+                                <input type="Date" @bind="filterValue" placeholder="something" />
+                            }
+                            break;
                         case FilterPropertyType.String:
                             {
-                    <input type="text" @bind="filterValue" placeholder="something" />
+                                <input type="text" @bind="filterValue" placeholder="something" />
                             }
                             break;
                         case FilterPropertyType.Number:
                             {
-                    <input type="number" @bind="filterValue" placeholder="something" />
+                                <input type="number" @bind="filterValue" placeholder="something" />
                             }
                             break;
                         case FilterPropertyType.Enum:
@@ -52,17 +70,17 @@
 
                                 if (filterValueResults.Success)
                                 {
-                    <select @bind="filterValue" required>
-                        <option value="" disabled selected hidden>something...</option>
-                        @foreach (var key in filterValueResults.Results)
+                                    <select @bind="filterValue" required>
+                                        <option value="" disabled selected hidden>something...</option>
+                                        @foreach (var key in filterValueResults.Results)
                                         {
-                        <option>@key</option>
+                                            <option>@key</option>
                                         }
-                    </select>
+                                    </select>
                                 }
                                 else
                                 {
-                    <span>@filterValueResults.ErrorString</span>
+                                    <span>@filterValueResults.ErrorString</span>
                                 }
 
                                 break;
@@ -72,80 +90,50 @@
                 <th class="hide">
                     <button @onclick="addFilter">@newFilterTextButton</button>
                 </th>
-                @if (!dlFilters.Any())
-                {
+
                 <th class="hide" width="99%">&nbsp;</th>
                 <th>
-                    <select @bind="filterName">
-                        <option value="">Load Filter</option>
+                    <select @bind="filterSelected">
+                        <option value="">Filters</option>
                         @foreach (var filter in filterManager.GetFilters(MediaSource.Radarr))
-                            {
-                        <option value="@filter.Name">@filter.Name</option>
-                            }
+                        {
+                            <option value="@filter.Name">@filter.Name</option>
+                        }
                     </select>
                 </th>
-                <th class="hide">
-                    <button @onclick="loadFilter"><i class="fas fa-filter"></i></button>
-                </th>
-                }
             </tr>
         </thead>
         @foreach (var dlf in dlFilters)
         {
-        <tr>
-            <DLFilter filter="dlf" OnDeleteFilter="deleteFilter" OnFilterUpdate="filterUpdate" />
-            <td>
-                <button @onclick="(() => groupFilter(dlf))">or</button>
-            </td>
-        </tr>
+            <tr>
+                <DLFilter filter="dlf" OnDeleteFilter="deleteFilter" OnFilterUpdate="filterUpdate" />
+                <td>
+                    <button @onclick="(() => groupFilter(dlf))">or</button>
+                </td>
+            </tr>
         }
     </table>
 </div>
 @if (dlFilters.Any())
 {
-<div class="my-2">
-    <button @onclick="(() => showFilterText = !showFilterText)" class="mx-1"><i class="fas fa-edit"></i></button>
-
-    @if (showFilterText)
+    <div id="divFilterOptions" class="input-group">
+        @if (showSaveDialog)
         {
-    <span class="mx-1">@filterStr</span>
+            <input type="text" @bind="filterName" placeholder="Name it" class="form-control" />
         }
-    @if (showSaveDialog)
-        {
-    <input type="text" @bind="filterName" placeholder="Filter Name"  class="mx-1"/>
-        }
-    <button @onclick="saveFilter" class="mx-1"><i class="fas fa-save"></i></button>
-    <button @onclick="clearFilters" class="mx-1"><i class="fas fa-trash-alt"></i></button>
-</div>
+        <button @onclick="saveFilter" class="mx-1"><i class="fas fa-save"></i> Save</button>
+        <button @onclick="clearFilters" class="mx-1"><i class="fas fa-ban"></i> Clear</button>
+        <button @onclick="deleteSavedFilter" class="mx-1"><i class="fas fa-trash-alt"></i> Delete</button>
+    </div>
 }
-<div class="row small">
-    <div class="col-4">
-    </div>
-    <div class="col-4 text-center">
-        <Paging pageCount="pageCount" pageNumber="pageNumber" OnFirstPage="FirstPage" OnPreviousPage="PreviousPage" OnNextPage="NextPage" OnLastPage="LastPage" />
-    </div>
-    <div class="col-4 text-right">
-        <span>Total records: @movieCount</span>
-    </div>
-</div>
-<table class="table-responsive-sm table my-2">
+<table class="table-responsive-sm table my-2" id="tableMovies">
     <thead>
         <tr>
-            <td>Name</td>
-            <td>Width</td>
-            <td>Height</td>
-            <td>Codec</td>
-            <td>Format</td>
-            <td>Container</td>
-            <td>Bit Depth</td>
-            <td>Colour Primaries</td>
-            <td>Bit Rate</td>
-            <td>FPS</td>
-            <td>Audio</td>
-            <td>Codec</td>
-            <td>Duration</td>
-            <td>Data Rate</td>
-            <td>File Size</td>
+           @foreach (var p in tableColumns)
+            {
+                <td title="@p.Key" @ondblclick="(() => filterPropertyStr = p.FilterOn)" >@p.Name</td>
+            }
+
         </tr>
     </thead>
     <tbody>
@@ -153,7 +141,7 @@
         {
             foreach (var movie in Movies)
             {
-        <Movie movie="@movie" />
+                <Movie movie="@movie" filterManager="filterManager" />
             }
         }
     </tbody>
@@ -177,6 +165,7 @@
 
     private bool showFilterText = false;
     private bool showSaveDialog = false;
+    private bool showingMovies = false;
 
     private long movieCount = 0;
 
@@ -192,14 +181,43 @@
     private string filterValue;
     private string filterName = "";
     private string filterStr = "";
+    private string filterSelected
+    {
+        get
+        {
+            return filterName;
+        }
+        set
+        {
+            filterName = value;
+            var filter = filterManager.GetFilter(filterName);
+            if (filter != null)
+            {
+                dlFilters = filter.Filters.Clone();
+                showSaveDialog = true;
+                LoadMovies();
+            }
+            else
+            {
+                clearFilters();
+            }
+            FirstPage();
+        }
+    }
 
-    private FilterProperty FilterProperty => FilterManager.FilterProperties.FirstOrDefault(x => x.Value == filterPropertyStr);
-    private FilterComparitor FilterComparitor => FilterProperty?.Comparitors.FirstOrDefault(x => x.Value == filterComparitorStr);
+    private List<FilterProperty> tableColumns => filterManager.GetTableColumns();
+
+    private HashSet<Compressarr.Services.Models.Movie> movies;
+
+    private FilterProperty FilterProperty => filterManager.FilterProperties.FirstOrDefault(x => x.Value == filterPropertyStr);
+    private FilterComparitor FilterComparitor => filterManager.GetComparitors(FilterProperty).FirstOrDefault(x => x.Value == filterComparitorStr);
 
     private List<DynamicLinqFilter> dlFilters { get; set; }
 
     [CascadingParameter]
     public EventCallback<bool?> ToggleBlurred { get; set; }
+    [CascadingParameter]
+    private ElementReference divContent { get; set; }
 
     protected override void OnInitialized()
     {
@@ -208,15 +226,28 @@
         base.OnInitialized();
     }
 
-    protected override Task OnAfterRenderAsync(bool firstRender)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             LoadMovies();
         }
-        this.StateHasChanged();
+        else
+        {
+            if (showingMovies)
+            {
+                showingMovies = false;
+                var contentScrolling = await js.InvokeAsync<bool>("eval", "content.scrollHeight > content.clientHeight");
 
-        return base.OnAfterRenderAsync(firstRender);
+                if (contentScrolling && pageSize > 5)
+                {
+                    pageSize = pageSize - 1;
+                    ShowMovies();
+                }
+            }
+        }
+
+        StateHasChanged();
     }
 
     private void addFilter()
@@ -312,14 +343,14 @@
         LoadMovies();
     }
 
-    private void loadFilter()
+    private void deleteSavedFilter()
     {
-        var filter = filterManager.GetFilter(filterName);
-        if (filter != null)
+        if (!string.IsNullOrWhiteSpace(filterName))
         {
-            dlFilters = filter.Filters.Clone();
-            showSaveDialog = true;
-            LoadMovies();
+            filterManager.DeleteFilter(filterName);
+            filterName = null;
+            showSaveDialog = false;
+            clearFilters();
         }
     }
 
@@ -332,8 +363,6 @@
         else
         {
             filterManager.AddFilter(dlFilters, filterName, MediaSource.Radarr);
-            filterName = null;
-            showSaveDialog = false;
         }
     }
 
@@ -353,6 +382,7 @@
 
     private async void LoadMovies()
     {
+        pageSize = 20;
         toggleLoading(true);
 
         if (dlFilters.Any())
@@ -369,7 +399,7 @@
         }
 
         Compressarr.Services.Models.ServiceResult<HashSet<Compressarr.Services.Models.Movie>> _result;
-        HashSet<Compressarr.Services.Models.Movie> _movies;
+
 
         if (string.IsNullOrWhiteSpace(filter))
         {
@@ -382,11 +412,8 @@
 
         if (_result.Success)
         {
-            _movies = _result.Results;
-            movieCount = _movies.Count();
-            pageCount = (int)Math.Ceiling((decimal)movieCount / pageSize);
-
-            Movies = _movies.Skip(pageNumber * pageSize).Take(pageSize);
+            movies = _result.Results;
+            ShowMovies();
         }
         else
         {
@@ -394,6 +421,16 @@
         }
 
         toggleLoading(false);
+    }
+
+    private void ShowMovies()
+    {
+        showingMovies = true;
+        movieCount = movies.Count();
+
+        Movies = movies.Skip(pageNumber * pageSize).Take(pageSize);
+
+        pageCount = (int)Math.Ceiling((decimal)movieCount / pageSize);
     }
 
     private void toggleLoading(bool? force)
@@ -407,28 +444,24 @@
     private void FirstPage()
     {
         pageNumber = 0;
-        LoadMovies();
-        this.StateHasChanged();
+        ShowMovies();
     }
 
     private void PreviousPage()
     {
         pageNumber = Math.Max(0, --pageNumber);
-        LoadMovies();
-        this.StateHasChanged();
+        ShowMovies();
     }
 
     private void NextPage()
     {
         pageNumber = Math.Min(pageCount - 1, ++pageNumber);
-        LoadMovies();
-        this.StateHasChanged();
+        ShowMovies();
     }
 
     private void LastPage()
     {
         pageNumber = pageCount - 1;
-        LoadMovies();
-        this.StateHasChanged();
+        ShowMovies();
     }
 }

@@ -2,6 +2,8 @@
 {
     public enum FilterPropertyType
     {
+        Boolean,
+        DateTime,
         String,
         Number,
         Enum

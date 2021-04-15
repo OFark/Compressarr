@@ -23,52 +23,41 @@ namespace Compressarr.Filtering.Models
             { "Audio Codec", "movieFile.mediaInfo.audioCodecID" }
         };
 
-        public FilterProperty(string value, FilterPropertyType propertyType)
+        public FilterProperty(string name, string value, FilterPropertyType propertyType, string suffix = null, string filterOn = null)
         {
+            Key = name;
             Value = value;
             PropertyType = propertyType;
+            Suffix = suffix;
+            FilterOn = filterOn;
         }
+
+        public string Key { get; set; }
+        //{
+        //    get
+        //    {
+        //        KeyValuePair<string, string> def = default;
+        //        var kpvalue = valueNames.FirstOrDefault(x => x.Value == Value);
+        //        if (!kpvalue.Equals(def))
+        //        {
+        //            return kpvalue.Key;
+        //        }
+
+        //        return Value;
+        //    }
+        //}
 
         [JsonIgnore]
-        public string Key
-        {
-            get
-            {
-                KeyValuePair<string, string> def = default;
-                var kpvalue = valueNames.FirstOrDefault(x => x.Value == Value);
-                if (!kpvalue.Equals(def))
-                {
-                    return kpvalue.Key;
-                }
-
-                return Value;
-            }
-        }
+        public string Name => Key.Split(" - ").LastOrDefault();
 
         public string Value { get; set; }
 
         [JsonIgnore]
-        public FilterPropertyType PropertyType { get; set; }
+        public string Suffix { get; set; }
 
         [JsonIgnore]
-        public List<FilterComparitor> Comparitors
-        {
-            get
-            {
-                switch (PropertyType)
-                {
-                    case FilterPropertyType.Enum:
-                        return FilterManager.EnumComparitors;
+        public string FilterOn { get; set; }
 
-                    case FilterPropertyType.Number:
-                        return FilterManager.NumberComparitors;
-
-                    case FilterPropertyType.String:
-                        return FilterManager.StringComparitors;
-                }
-
-                return null;
-            }
-        }
+        public FilterPropertyType PropertyType { get; set; }
     }
 }

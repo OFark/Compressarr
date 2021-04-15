@@ -40,12 +40,12 @@ namespace Compressarr.Services
 
                 if (string.IsNullOrWhiteSpace(radarrURL))
                 {
-                    return new ServiceResult<HashSet<Movie>>(false, "404", "Radarr URL not found. In settings. Go Home");
+                    return new ServiceResult<HashSet<Movie>>(false, "404", "Radarr URL not found. In Options. Go there");
                 }
 
                 if (string.IsNullOrWhiteSpace(radarrAPIKey))
                 {
-                    return new ServiceResult<HashSet<Movie>>(false, "404", "Radarr APIKey not found. In settings. Go Home");
+                    return new ServiceResult<HashSet<Movie>>(false, "404", "Radarr APIKey not found. In Options. Go there");
                 }
 
                 var movieJSON = string.Empty;

@@ -47,7 +47,7 @@ namespace Compressarr.JobProcessing
 
         }
 
-        public void AddJob(Job newJob)
+        public async Task AddJob(Job newJob)
         {
             var job = _Jobs.FirstOrDefault(j => j.Name == newJob.Name);
 
@@ -59,12 +59,13 @@ namespace Compressarr.JobProcessing
             }
             else
             {
+                job = newJob;
                 _Jobs.Add(newJob);
             }
 
-            newJob.JobStatus = JobStatus.Added;
+            job.JobStatus = JobStatus.Added;
             SaveJobs();
-            InitialiseJob(job, true);
+            await InitialiseJob(job, true);
         }
 
         public void CancelJob(Job job)
@@ -83,7 +84,7 @@ namespace Compressarr.JobProcessing
             job.JobTester ??= new JobTester(this);
         }
 
-        public void InitialiseJob(Job job, bool force = false)
+        public async Task InitialiseJob(Job job, bool force = false)
         {
             if ((job.JobStatus == JobStatus.New) || force)
             {
@@ -115,7 +116,7 @@ namespace Compressarr.JobProcessing
 
                         job.UpdateStatus("Connected to Radarr", "Fetching List of files from Radarr");
 
-                        GetFiles(job).ContinueWith(t =>
+                        await GetFiles(job).ContinueWith(t =>
                         {
                             var getFilesResults = t.Result;
                             if (!getFilesResults.Success)
@@ -289,7 +290,7 @@ namespace Compressarr.JobProcessing
                 }
             }
 
-            return null;
+            return new ();
         }
     }
 }
