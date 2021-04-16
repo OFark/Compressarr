@@ -2,6 +2,7 @@
 using Compressarr.FFmpegFactory.Models;
 using Compressarr.JobProcessing;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -19,6 +20,7 @@ namespace Compressarr.FFmpegFactory
     {
         private readonly IServiceProvider services;
         private readonly IWebHostEnvironment env;
+        private readonly ILogger<FFmpegManager> logger;
 
         private string ExecutablesPath => Path.Combine(env.ContentRootPath, "config", "FFmpeg");
         private string PresetsFilePath => Path.Combine(env.ContentRootPath, "config", "presets.json");
@@ -46,10 +48,11 @@ namespace Compressarr.FFmpegFactory
 
         private Task initTask = null;
 
-        public FFmpegManager(IServiceProvider services, IWebHostEnvironment env)
+        public FFmpegManager(IServiceProvider services, IWebHostEnvironment env, ILogger<FFmpegManager> logger)
         {
             this.services = services;
             this.env = env;
+            this.logger = logger;
 
             Status = FFmpegStatus.Initialising;
             FFmpeg.SetExecutablesPath(ExecutablesPath);
@@ -152,7 +155,7 @@ namespace Compressarr.FFmpegFactory
             string output = p.StandardOutput.ReadToEnd();
             p.WaitForExit();
 
-            var formatLines = output.Split("\r\n").ToList();
+            var formatLines = output.Split("\n").ToList();
 
             foreach (var line in formatLines)
             {
@@ -256,14 +259,21 @@ namespace Compressarr.FFmpegFactory
             var p = new Process();
             p.StartInfo.UseShellExecute = false;
             p.StartInfo.RedirectStandardOutput = true;
+            p.StartInfo.RedirectStandardError = true;
             p.StartInfo.FileName = FFMPEG;
             p.StartInfo.Arguments = "-encoders";
 
             p.Start();
-            string output = p.StandardOutput.ReadToEnd();
+            var output = p.StandardOutput.ReadToEnd();
+            var error = p.StandardError.ReadToEnd();
             p.WaitForExit();
 
-            var codecLines = output.Split("\r\n").ToList().Skip(10);
+            if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(error))
+            {
+                logger.LogError($"Process Error: ({p.ExitCode}) {error} <End OF Error>");
+            }
+
+            var codecLines = output.Split("\n").ToList().Skip(10);
 
             codecs.Add(CodecType.Audio, new SortedDictionary<string, string>());
             codecs.Add(CodecType.Subtitle, new SortedDictionary<string, string>());
@@ -289,6 +299,9 @@ namespace Compressarr.FFmpegFactory
                         case "V":
                             codecs[CodecType.Video].Add(codecName, codecDesc);
                             break;
+                        default:
+                            logger.LogWarning($"Unrecognised Codec line: {line}");
+                            break;
                     }
                 }
             }
@@ -311,7 +324,7 @@ namespace Compressarr.FFmpegFactory
             string output = p.StandardOutput.ReadToEnd();
             p.WaitForExit();
 
-            var formatLines = output.Split("\r\n").ToList().Skip(4);
+            var formatLines = output.Split("\n").ToList().Skip(4);
 
             foreach (var line in formatLines)
             {
