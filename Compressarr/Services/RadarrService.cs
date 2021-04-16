@@ -1,5 +1,4 @@
-﻿using Compressarr.Services.Interfaces;
-using Compressarr.Services.Models;
+﻿using Compressarr.Services.Models;
 using Compressarr.Settings;
 using Microsoft.AspNetCore.Hosting;
 using Newtonsoft.Json;

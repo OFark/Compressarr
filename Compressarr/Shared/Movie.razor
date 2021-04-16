@@ -37,9 +37,9 @@
     public Compressarr.Services.Models.Movie movie { get; set; }
 
     [Parameter]
-    public FilterManager filterManager { get; set; }
+    public IFilterManager filterManager { get; set; }
 
-    private List<FilterProperty> tableColumns => filterManager.GetTableColumns();
+    private List<FilterProperty> tableColumns => filterManager.RadarrTableColumns;
 
     private object GetPropertyValue(object src, string propName)
     {

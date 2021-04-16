@@ -1,4 +1,4 @@
-﻿using Compressarr.FFmpegFactory.Interfaces;
+﻿using Compressarr.FFmpegFactory;
 using Compressarr.FFmpegFactory.Models;
 using Compressarr.JobProcessing;
 using Microsoft.AspNetCore.Hosting;
@@ -174,6 +174,27 @@ namespace Compressarr.FFmpegFactory
             }
 
             return container;
+        }
+
+        public string GetFFmpegVersion()
+        {
+            var path = Path.Combine(ExecutablesPath, "version.json");
+
+            try
+            {
+                var json = File.ReadAllText(path);
+
+                if (!string.IsNullOrWhiteSpace(json))
+                {
+                    var version = JsonConvert.DeserializeObject<dynamic>(json);
+                    return version.version.ToString();
+                }
+            }
+            catch(UnauthorizedAccessException uae)
+            {
+                return uae.Message;
+            }
+            return null;
         }
 
         private HashSet<IFFmpegPreset> LoadPresets()

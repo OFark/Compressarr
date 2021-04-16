@@ -2,7 +2,7 @@
 using Compressarr.JobProcessing;
 using System.Collections.Generic;
 
-namespace Compressarr.FFmpegFactory.Interfaces
+namespace Compressarr.FFmpegFactory
 {
     public interface IFFmpegManager
     {
@@ -17,6 +17,7 @@ namespace Compressarr.FFmpegFactory.Interfaces
         bool CheckResult(WorkItem workitem);
         string ConvertContainerToExtension(string container);
         void DeletePreset(string presetName);
+        string GetFFmpegVersion();
         HashSet<CodecOptionValue> GetOptions(string codec);
         IFFmpegPreset GetPreset(string presetName);
         void Init();

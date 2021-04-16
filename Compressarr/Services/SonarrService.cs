@@ -1,5 +1,4 @@
-﻿using Compressarr.Services.Interfaces;
-using Compressarr.Services.Models;
+﻿using Compressarr.Services.Models;
 using Compressarr.Settings;
 using Newtonsoft.Json;
 using System;

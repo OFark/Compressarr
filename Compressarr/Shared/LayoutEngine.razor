@@ -1,0 +1,30 @@
+﻿@inherits LayoutEngineBase
+
+@if (LayoutService.Spinning)
+{
+    <div id="workingModal" class="modal">
+        <div class="content">
+            <h1>@LayoutService.Message</h1>
+        </div>
+    </div>
+}
+
+@if (LayoutService.NeedsConfirmation)
+{
+    <div id="confirmModal" class="modal">
+        <div class="card">
+            <div class="card-body">
+                <h3>@LayoutService.ConfirmationMessage</h3>
+            </div>
+            <div class="card-footer">
+                <button class="btn btn-success" @onclick="ConfirmYes">Ok</button>
+                @if (LayoutService.CancelRequired)
+                {
+                    <button class="btn btn-danger" @onclick="ConfirmNo">Cancel</button>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@ChildContent 

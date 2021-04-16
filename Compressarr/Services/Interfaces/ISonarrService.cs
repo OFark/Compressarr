@@ -1,6 +1,6 @@
 ﻿using Compressarr.Services.Models;
 
-namespace Compressarr.Services.Interfaces
+namespace Compressarr.Services
 {
     public interface ISonarrService
     {

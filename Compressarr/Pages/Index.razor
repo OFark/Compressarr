@@ -1,17 +1,20 @@
 ﻿@page "/"
+@using Compressarr.FFmpegFactory;
 @using Compressarr.Filtering;
-@using Compressarr.Filtering.Models;
 @using Compressarr.JobProcessing;
+@using Compressarr.Pages.Services;
+@using Compressarr.Services
+@using Compressarr.Settings
 @using JobProcessing.Models;
-@using Newtonsoft.Json;
 
+@inject IFFmpegManager FFmpegManager
+@inject IFilterManager filterManager
+@inject IJobManager jobManager
+@inject ILayoutService layoutService
+@inject IRadarrService radarrService
+@inject ISonarrService sonarrService
 @inject NavigationManager NavManager
-@inject Compressarr.Settings.SettingsManager settingsManager
-@inject Compressarr.Services.Interfaces.IRadarrService radarrService
-@inject Compressarr.Services.Interfaces.ISonarrService sonarrService
-@inject Compressarr.FFmpegFactory.Interfaces.IFFmpegManager FFmpegManager
-@inject FilterManager filterManager
-@inject JobManager jobManager
+@inject SettingsManager settingsManager
 
 @if (!string.IsNullOrWhiteSpace(AlertMessage))
 {
@@ -71,14 +74,14 @@
                 <div class="input-group">
                     <label class="col-form-label">Base Folder:</label>
                     <div class="">
-                        <input type="text" @bind="newJob.BaseFolder" class="form-control">
+                        <DirectoryLookup @bind-Folder="@newJob.BaseFolder"></DirectoryLookup>
                     </div>
                 </div>
 
                 <div class="input-group">
                     <label class="col-form-label">Destination Folder:</label>
                     <div class="">
-                        <input type="text" @bind="newJob.DestinationFolder" class="form-control">
+                        <DirectoryLookup @bind-Folder="@newJob.DestinationFolder"></DirectoryLookup>
                     </div>
                 </div>
 
@@ -114,7 +117,10 @@
 
     private bool showNewJob;
 
-    private Dictionary<DateTime, string> testEvents = new();
+
+
+    private System.Collections.Concurrent.ConcurrentDictionary<DateTime, string> testEvents = new();
+
 
     private Compressarr.JobProcessing.Models.Job newJob = new Job();
 
@@ -125,7 +131,14 @@
             NavManager.NavigateTo("options");
         }
 
+        layoutService.OnStateChanged += LayoutService_OnStateChanged;
+
         base.OnInitialized();
+    }
+
+    private async void LayoutService_OnStateChanged(object sender, EventArgs e)
+    {
+        await InvokeAsync(StateHasChanged);
     }
 
     private async void addJob()
@@ -144,14 +157,14 @@
         await jobManager.InitialiseJob(job);
     }
 
-    private  async void newJobTestStatusUpdate(object caller, EventArgs args)
+    private async void newJobTestStatusUpdate(object caller, EventArgs args)
     {
         var job = caller as Job;
         testEvents = job.Events;
 
         if (job.JobStatus == JobStatus.TestedOK)
         {
-            var newJob =  new Job()
+            var newJob = new Job()
             {
                 AutoImport = job.AutoImport,
                 BaseFolder = job.BaseFolder,

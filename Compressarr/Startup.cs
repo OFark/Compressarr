@@ -1,9 +1,8 @@
 using Compressarr.FFmpegFactory;
-using Compressarr.FFmpegFactory.Interfaces;
 using Compressarr.Filtering;
 using Compressarr.JobProcessing;
+using Compressarr.Pages.Services;
 using Compressarr.Services;
-using Compressarr.Services.Interfaces;
 using Compressarr.Settings;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -30,10 +29,12 @@ namespace Compressarr
             services.AddServerSideBlazor();
             services.AddSingleton<IRadarrService, RadarrService>();
             services.AddSingleton<ISonarrService, SonarrService>();
-            services.AddSingleton<FilterManager>();
+            services.AddSingleton<IFilterManager, FilterManager>();
             services.AddSingleton<SettingsManager>();
             services.AddSingleton<IFFmpegManager, FFmpegManager>();
-            services.AddSingleton<JobManager>();
+            services.AddSingleton<IJobManager, JobManager>();
+
+            services.AddScoped<ILayoutService, LayoutService>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

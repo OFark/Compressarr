@@ -9,6 +9,7 @@ namespace Compressarr
         {
             CreateHostBuilder(args).Build()
                                    .InitFFMPEG()
+                                   .InitJobs()
                                    .Run();
         }
 

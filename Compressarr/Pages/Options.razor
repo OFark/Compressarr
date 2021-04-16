@@ -1,14 +1,17 @@
 ﻿@page "/options"
+@using Compressarr.FFmpegFactory; 
 @using Compressarr.Filtering;
 @using Compressarr.JobProcessing;
+@using Compressarr.Services; 
+@using Compressarr.Settings;
 @using Newtonsoft.Json;
 
-@inject Compressarr.Settings.SettingsManager settingsManager
-@inject Compressarr.Services.Interfaces.IRadarrService radarrService
-@inject Compressarr.Services.Interfaces.ISonarrService sonarrService
-@inject Compressarr.FFmpegFactory.Interfaces.IFFmpegManager FFmpegManager
-@inject FilterManager filterManager
-@inject JobManager jobManager
+@inject SettingsManager settingsManager
+@inject IRadarrService radarrService
+@inject ISonarrService sonarrService
+@inject IFFmpegManager FFmpegManager
+@inject IFilterManager filterManager
+@inject IJobManager jobManager
 
 <div class="col-md-6 offset-md-3">
     <h1 title="It's easy to make good decisions when there are no bad options">Options</h1>
@@ -60,6 +63,17 @@
         {
             <pre>@sonarrTestResponse</pre>
         }
+    </div>
+
+    <div id="divInfo">
+        <ul>
+            <li>Application: @System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString()</li>
+            <li>Runtime: @Environment.Version.ToString()</li>
+            <li>FFmpeg: @FFmpegManager.GetFFmpegVersion()</li>
+            <li>OS: @Environment.OSVersion.VersionString</li>
+            <li>OS 64bit: @Environment.Is64BitOperatingSystem</li>
+            <li>App 64bit: @Environment.Is64BitProcess</li>
+        </ul>
     </div>
 </div>
 

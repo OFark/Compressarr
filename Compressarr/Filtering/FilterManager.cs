@@ -1,4 +1,5 @@
-﻿using Compressarr.Filtering.Models;
+﻿using Compressarr.Filtering;
+using Compressarr.Filtering.Models;
 using Compressarr.Helpers;
 using Compressarr.Services.Models;
 using Microsoft.AspNetCore.Hosting;
@@ -12,22 +13,9 @@ using System.Text.RegularExpressions;
 
 namespace Compressarr.Filtering
 {
-    public class FilterManager
+    public class FilterManager : IFilterManager
     {
-        public readonly List<FilterComparitor> StringComparitors;
-        public readonly List<FilterComparitor> NumberComparitors;
-        public readonly List<FilterComparitor> EnumComparitors;
-        public readonly List<FilterComparitor> DateComparitors;
-
-        public readonly List<FilterProperty> FilterProperties;
-
-        private string filterFilePath => Path.Combine(_env.ContentRootPath, "config", "filters.json");
-
-        private HashSet<Filter> _filters { get; set; }
-        public HashSet<Filter> Filters => _filters ?? LoadFilters();
-
         private IWebHostEnvironment _env;
-
         public FilterManager(IWebHostEnvironment env)
         {
             _env = env;
@@ -62,32 +50,36 @@ namespace Compressarr.Filtering
                 new FilterComparitor("!=")
             };
 
-            FilterProperties = new List<FilterProperty>();
+            RadarrFilterProperties = new List<FilterProperty>();
 
             buildFilterProperties();
+
+            //This HAS to come after building the filter properties.
+            RadarrTableColumns = GetRadarrTableColumns();
         }
 
-        private void buildFilterProperties(Type type = null, string name = null, string prefix = null)
+        public List<FilterComparitor> DateComparitors { get; }
+        public List<FilterComparitor> EnumComparitors { get; }
+        public HashSet<Filter> Filters => _filters ?? LoadFilters();
+        public List<FilterComparitor> NumberComparitors { get; }
+        public List<FilterProperty> RadarrFilterProperties { get; }
+        public List<FilterProperty> RadarrTableColumns { get; private set; }
+        public List<FilterComparitor> StringComparitors { get; }
+        private HashSet<Filter> _filters { get; set; }
+        private string filterFilePath => Path.Combine(_env.ContentRootPath, "config", "filters.json");
+        public void AddFilter(List<DynamicLinqFilter> dlFilters, string filterName, MediaSource filterType)
         {
-            foreach (var prop in (type ?? typeof(Services.Models.Movie)).GetProperties())
-            {
-                var attr = prop.GetCustomAttributes(false).FirstOrDefault(a => a is FilterAttribute) as FilterAttribute;
-                if (attr != null)
-                {
-                    var attrName = string.IsNullOrWhiteSpace(name) ? attr.Name : $"{name} - {attr.Name}";
-                    var attrPrefix = string.IsNullOrWhiteSpace(prefix) ? prop.Name : $"{prefix}.{prop.Name}";
-                    var attrfilterOn = string.IsNullOrWhiteSpace(attr.FilterOn) ? attrPrefix : string.IsNullOrWhiteSpace(prefix) ? attr.FilterOn : $"{prefix}.{attr.FilterOn}";
+            var filter = Filters.FirstOrDefault(x => x.Name == filterName);
 
-                    if (attr.Traverse)
-                    {
-                        buildFilterProperties(prop.PropertyType, attrName, attrPrefix);
-                    }
-                    else
-                    {
-                        FilterProperties.Add(new FilterProperty(attrName, attrPrefix, attr.PropertyType, attr.Suffix, attrfilterOn));
-                    }
-                }
+            if (filter == null)
+            {
+                filter = new Filter(filterName, filterType);
+                _filters.Add(filter);
             }
+
+            filter.Filters = dlFilters.Clone();
+
+            SaveFilters();
         }
 
         public string ConstructFilterQuery(List<DynamicLinqFilter> dlFilters, out string[] vals)
@@ -98,6 +90,18 @@ namespace Compressarr.Filtering
             vals = filtervalues.ToArray();
 
             return filterStr;
+        }
+
+        public void DeleteFilter(string filterName)
+        {
+            var filter = Filters.FirstOrDefault(x => x.Name == filterName);
+
+            if (filter != null)
+            {
+                _filters.Remove(filter);
+            }
+
+            SaveFilters();
         }
 
         public List<FilterComparitor> GetComparitors(FilterProperty property)
@@ -126,7 +130,38 @@ namespace Compressarr.Filtering
             return StringComparitors;
         }
 
-        public List<FilterProperty> GetTableColumns()
+        public Filter GetFilter(string filterName) => Filters.FirstOrDefault(x => x.Name == filterName);
+
+        /// <summary>
+        /// Gets all filters matching the selected source
+        /// </summary>
+        /// <param name="filterType"></param>
+        /// <returns></returns>
+        public IOrderedEnumerable<Filter> GetFilters(MediaSource filterType) => Filters.Where(x => x.MediaSource == filterType).OrderBy(x => x.Name);
+
+        private void buildFilterProperties(Type type = null, string name = null, string prefix = null)
+        {
+            foreach (var prop in (type ?? typeof(Services.Models.Movie)).GetProperties())
+            {
+                var attr = prop.GetCustomAttributes(false).FirstOrDefault(a => a is FilterAttribute) as FilterAttribute;
+                if (attr != null)
+                {
+                    var attrName = string.IsNullOrWhiteSpace(name) ? attr.Name : $"{name} - {attr.Name}";
+                    var attrPrefix = string.IsNullOrWhiteSpace(prefix) ? prop.Name : $"{prefix}.{prop.Name}";
+                    var attrfilterOn = string.IsNullOrWhiteSpace(attr.FilterOn) ? attrPrefix : string.IsNullOrWhiteSpace(prefix) ? attr.FilterOn : $"{prefix}.{attr.FilterOn}";
+
+                    if (attr.Traverse)
+                    {
+                        buildFilterProperties(prop.PropertyType, attrName, attrPrefix);
+                    }
+                    else
+                    {
+                        RadarrFilterProperties.Add(new FilterProperty(attrName, attrPrefix, attr.PropertyType, attr.Suffix, attrfilterOn));
+                    }
+                }
+            }
+        }
+        private List<FilterProperty> GetRadarrTableColumns()
         {
             List<string> columns = new()
             {
@@ -148,7 +183,23 @@ namespace Compressarr.Filtering
             };
 
             //The join here ensures the order
-            return columns.Join(FilterProperties.Where(f => columns.Contains(f.Value)), c => c, f => f.Value, (c,f) => f).ToList();
+            return columns.Join(RadarrFilterProperties.Where(f => columns.Contains(f.Value)), c => c, f => f.Value, (c, f) => f).ToList();
+        }
+
+        private HashSet<Filter> LoadFilters()
+        {
+            _filters = new HashSet<Filter>();
+
+            if (File.Exists(filterFilePath))
+            {
+                var json = File.ReadAllText(filterFilePath);
+                if (!string.IsNullOrWhiteSpace(json))
+                {
+                    _filters = JsonConvert.DeserializeObject<HashSet<Filter>>(json);
+                }
+            }
+
+            return _filters;
         }
 
         private string recursiveFilterQuery(List<DynamicLinqFilter> dlFilters, ref List<string> vals)
@@ -200,59 +251,6 @@ namespace Compressarr.Filtering
 
             return sb.ToString().Trim();
         }
-
-        public void AddFilter(List<DynamicLinqFilter> dlFilters, string filterName, MediaSource filterType)
-        {
-            var filter = Filters.FirstOrDefault(x => x.Name == filterName);
-
-            if (filter == null)
-            {
-                filter = new Filter(filterName, filterType);
-                _filters.Add(filter);
-            }
-
-            filter.Filters = dlFilters.Clone();
-
-            SaveFilters();
-        }
-
-        public void DeleteFilter(string filterName)
-        {
-            var filter = Filters.FirstOrDefault(x => x.Name == filterName);
-
-            if (filter != null)
-            {
-                _filters.Remove(filter);
-            }
-
-            SaveFilters();
-        }
-
-        public Filter GetFilter(string filterName) => Filters.FirstOrDefault(x => x.Name == filterName);
-
-        /// <summary>
-        /// Gets all filters matching the selected source
-        /// </summary>
-        /// <param name="filterType"></param>
-        /// <returns></returns>
-        public IOrderedEnumerable<Filter> GetFilters(MediaSource filterType) => Filters.Where(x => x.MediaSource == filterType).OrderBy(x => x.Name);
-
-        private HashSet<Filter> LoadFilters()
-        {
-            _filters = new HashSet<Filter>();
-
-            if (File.Exists(filterFilePath))
-            {
-                var json = File.ReadAllText(filterFilePath);
-                if (!string.IsNullOrWhiteSpace(json))
-                {
-                    _filters = JsonConvert.DeserializeObject<HashSet<Filter>>(json);
-                }
-            }
-
-            return _filters;
-        }
-
         private void SaveFilters()
         {
             var json = JsonConvert.SerializeObject(Filters, new JsonSerializerSettings() { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });

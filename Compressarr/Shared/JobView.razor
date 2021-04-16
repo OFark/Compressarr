@@ -1,6 +1,8 @@
 ﻿@using Compressarr.JobProcessing;
+@using Compressarr.Pages.Services;
 
-@inject JobManager jobManager
+@inject IJobManager jobManager
+@inject ILayoutService layoutService
 <div class="job">
     <div class="jobTitle">
         <h3 @onclick="() => { expand = !expand; }">
@@ -23,6 +25,7 @@
                 @if (editJob)
                 {
                     <button @onclick="saveJob"><i class="fas fa-save"></i></button>
+                    <button @onclick="deleteJob"><i class="fas fa-trash-alt"></i></button>
                 }
                 <button @onclick="() => { editJob = !editJob; }"><i class="fas fa-edit"></i></button>
             }
@@ -35,15 +38,26 @@
             <div class="editJob">
                 <h3>Edit</h3>
                 <div class="editJobWrapper">
-                    <h4>File Base Folder:</h4>
-                    <input type="text" @bind="job.BaseFolder" />
+                    <div class="input-group">
+                        <label class="col-form-label">Base Folder:</label>
+                        <div class="">
+                            <DirectoryLookup Folder="@job.BaseFolder"></DirectoryLookup>
+                        </div>
+                    </div>
 
+                    <div class="input-group">
+                        <label class="col-form-label">Destination Folder:</label>
+                        <div class="">
+                            <DirectoryLookup Folder="@job.DestinationFolder"></DirectoryLookup>
+                        </div>
+                    </div>
 
-                    <h4>Output Base Folder:</h4>
-                    <input type="text" @bind="job.DestinationFolder" />
-
-                    <h4>Auto Import:</h4>
-                    <input type="checkbox" @bind="job.AutoImport" />
+                    <div class="input-group">
+                        <label class="col-form-label">Automatically Import:</label>
+                        <div class="">
+                            <input type="checkbox" @bind="job.AutoImport" class="form-control">
+                        </div>
+                    </div>
                 </div>
             </div>
         }
@@ -112,7 +126,7 @@
 
     private string FilterImageSrc => $"https://raw.githubusercontent.com/{FilterType}/{FilterType}.github.io/master/logo/{FilterType}.svg";
 
-    private string FilterType => job.Filter.MediaSource == Filtering.MediaSource.Radarr ? "radarr" : "sonarr";
+    private string FilterType => job?.Filter?.MediaSource == Filtering.MediaSource.Radarr ? "radarr" : "sonarr" ?? "";
 
     private string buttonText
     {
@@ -174,11 +188,23 @@
         InvokeAsync(() => StateHasChanged());
     }
 
-    private void saveJob()
+    private async void saveJob()
     {
-        jobManager.AddJob(job);
-        editJob = false;
-        StateHasChanged();
+        using (layoutService.Working("Saving..."))
+        {
+            await jobManager.AddJob(job);
+            editJob = false;
+            StateHasChanged();
+        }
+    }
+
+    private async void deleteJob()
+    {
+        using (layoutService.Working("Deleting..."))
+        {
+            await jobManager.DeleteJob(job);
+            StateHasChanged();
+        }
     }
 
     private void startJob()

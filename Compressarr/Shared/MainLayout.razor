@@ -2,52 +2,28 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 
-<div class="topbar">
-    <NavMenu />
-</div>
+@inject Compressarr.Pages.Services.ILayoutService layoutService 
 
-<div class="main">
-    <div id="content" @ref="divContent">
-        <div class="@(blurred ? "blurred" : "")">
-            <CascadingValue Value=ToggleBlurred>
-                <CascadingValue Value=divContent>
-                    @Body
-                </CascadingValue>
+
+<LayoutEngine @ref="layoutEngine" OnStateChanged="LayoutEngineStateChanged">
+    <div class="topbar">
+        <NavMenu />
+    </div>
+
+    <div class="main">
+        <div id="content">
+            <CascadingValue Value=layoutEngine>
+                @Body
             </CascadingValue>
         </div>
-        @if (blurred)
-        {
-            <div class="loadingBlur">
-                <div class="notice">
-                    <ul class="active">
-                        <li></li>
-                        <li></li>
-                        <li></li>
-                        <li></li>
-                        loading
-                    </ul>
-                </div>
-            </div>
-        }
     </div>
-</div>
+</LayoutEngine>
 
 @code {
-    public EventCallback<bool?> ToggleBlurred => EventCallback.Factory.Create<bool?>(this, toggleBlurred);
+    protected LayoutEngineBase layoutEngine = new();
 
-    private bool blurred { get; set; }
-
-    private ElementReference divContent;
-
-    public void toggleBlurred(bool? force)
+    protected void LayoutEngineStateChanged()
     {
-        if (force.HasValue)
-        {
-            blurred = force.Value;
-        }
-        else
-        {
-            blurred = !blurred;
-        }
+        InvokeAsync(StateHasChanged);
     }
 }

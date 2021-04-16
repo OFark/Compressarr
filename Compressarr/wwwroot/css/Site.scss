@@ -13,12 +13,12 @@ $overBackground: rgba(0, 0, 0, 0.2);
 
 @mixin commandsBlock {
     display: flex;
-    grid-gap: .2em;
+    grid-gap: .6em;
+    margin-bottom: .5em;
 
     button {
-        background: none;
         color: white;
-        font-size: 1.8em;
+        font-size: 1.4em;
     }
 }
 
@@ -46,6 +46,31 @@ body {
         grid-template-rows: max-content auto;
         height: 100vh;
 
+        .modal {
+            background: rgba(0,0,0, 0.5);
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            text-align: center;
+
+            h1 {
+                font-size: 10vw;
+                color: #eee;
+                text-shadow: 0px 0px 5px #333;
+            }
+
+            .card-footer {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                grid-gap: 1em;
+            }
+        }
 
         > .topbar {
             width: 100%;
@@ -88,16 +113,16 @@ body {
         > .main {
             @include embedPanel;
             margin: 0 1em 1em;
-            position: relative;
             min-height: 0; //in grids this stops the grid item from growing
+            position: relative;
 
             #content {
-                position: relative;
-                padding-top: 1.1rem;
-                padding-left: 2rem !important;
-                padding-right: 1.5rem !important;
                 height: 100%;
                 overflow: auto;
+                padding-left: 2rem !important;
+                padding-right: 1.5rem !important;
+                padding-top: 1.1rem;
+                position: relative;
 
                 > div {
                     -webkit-transition: 1s -webkit-filter linear;
@@ -107,240 +132,180 @@ body {
                     -o-transition: 1s -o-filter linear;
                     transition: 1s filter linear, 1s -webkit-filter linear;
 
-                    &.blurred {
-                        filter: blur(10px);
-                    }
+                    &#divRadarr {
+                    .filterList {
+                        .filterTableWrapper {
+                            border-collapse: separate;
 
-                    &.loadingBlur {
-                        position: fixed;
-                        top: 0;
-                        left: 0;
-                        right: 0;
-                        height: 100vh;
-                        display: flex;
-                        justify-content: center;
-                        align-content: center;
-                        align-items: center;
+                            thead {
+                                th:not(.hide) {
+                                    border: 2px solid #666;
+                                    border-radius: 4px;
+                                    background: white;
 
-                        .notice {
-                            font-size: 5vw;
-                            text-shadow: 0 0 4px #000000;
-                            -webkit-text-stroke: 2px black;
+                                    select, input[type=text] {
+                                        padding: 3px;
+                                        border: none;
+                                        background: transparent;
+                                        color: #333;
+                                    }
 
-                            ul {
-                                position: absolute;
-                                top: 50%;
-                                left: 50%;
-                                transform: translate(-50%,-50%);
-                                width: $loading-width;
-                                height: $loading-height;
+                                    option {
+                                        /*                    background-color: $overBackground*/
+                                    }
+                                }
+                            }
+
+                            td:not(:first-child) {
+                                padding: 5px 10px;
+                            }
+
+                            td:first-child {
                                 text-align: center;
-                                line-height: $loading-height;
-                                color: #fff;
-                                font-size: 100px;
-                                text-transform: uppercase;
-                                overflow: hidden;
-
-
-                                li {
-                                    list-style: none;
-                                    position: absolute;
-                                    background: #fff;
-
-                                    &:nth-of-type(1) {
-                                        height: 10px;
-                                        width: $loading-width;
-                                        animation: animateLI1 2s infinite linear;
-                                    }
-
-                                    &:nth-of-type(2) {
-                                        height: $loading-height;
-                                        width: 10px;
-                                        animation: animateLI2 2s infinite linear;
-                                    }
-
-                                    &:nth-of-type(3) {
-                                        height: 10px;
-                                        width: $loading-width;
-                                        animation: animateLI3 2s infinite linear;
-                                    }
-
-                                    &:nth-of-type(4) {
-                                        height: $loading-height;
-                                        width: 10px;
-                                        animation: animateLI4 2s infinite linear;
-                                    }
-                                }
                             }
                         }
                     }
+                    }
 
-
-                    div {
-                        &.filterList {
-                            .filterTableWrapper {
-                                border-collapse: separate;
-
-                                thead {
-                                    th:not(.hide) {
-                                        border: 2px solid #666;
-                                        border-radius: 4px;
-                                        background: white;
-
-                                        select, input[type=text] {
-                                            padding: 3px;
-                                            border: none;
-                                            background: transparent;
-                                            color: #333;
-                                        }
-
-                                        option {
-                                            /*                    background-color: $overBackground*/
-                                        }
-                                    }
-                                }
-
-                                td:not(:first-child) {
-                                    padding: 5px 10px;
-                                }
-
-                                td:first-child {
-                                    text-align: center;
-                                }
-                            }
-                        }
-
-                        &#divJobList {
-                            .job {
-                                @include embedPanel;
-
-                                .jobTitle {
-                                    display: grid;
-                                    grid-template-columns: auto max-content;
-
-                                    h3 {
-                                        cursor: pointer;
-
-                                        img {
-                                            max-width: 20px;
-                                            margin-right: .3em;
-                                        }
-                                    }
-
-                                    .commands {
-                                        @include commandsBlock;
-                                    }
-                                }
-
-                                .editJob {
-                                    @include embedPanel;
-
-                                    .editJobWrapper {
-                                        @include embedPanel;
-                                    }
-                                }
-
-                                .workLoad {
-                                    @include embedPanel;
-                                    margin-bottom: 1em;
-
-                                    .workLoadItems {
-                                        overflow: auto;
-                                        max-height: 220px;
-
-                                        .workitem {
-                                            padding: .5em;
-                                            background: $overBackground;
-                                            border-radius: 2px;
-                                            margin-bottom: 1px;
-
-                                            span {
-                                                white-space: nowrap;
-                                                margin-right: 0.5em;
-                                            }
-                                        }
-                                    }
-                                }
-
-                                .jobLog {
-                                    @include embedPanel;
-                                    margin-bottom: 1em;
-
-                                    .jobEventsScrollWrapper {
-                                        display: flex;
-                                        flex-direction: column-reverse;
-                                        overflow: auto;
-                                        max-height: 195px;
-                                        position: relative;
-                                        margin-bottom: 1em;
-
-                                        .jobEvents {
-                                            cursor: pointer;
-                                            background: $overBackground;
-                                            border-radius: 4px;
-                                            padding: .5em .3em;
-
-                                            .event {
-                                                display: block;
-                                                font-family: SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            margin-bottom: 1em;
-                        }
-
-                        &#divNewJob {
+                    &#divJobList {
+                        .job {
                             @include embedPanel;
                             margin-bottom: 1em;
 
-                            .testEvents {
-                                background: $overBackground;
-                                font-family: SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
-                                margin: 1em 0;
+                            .jobTitle {
+                                display: grid;
+                                grid-template-columns: auto max-content;
 
-                                .testEvent {
-                                    display: block;
-                                    padding: .3em .5em;
+                                h3 {
+                                    cursor: pointer;
+
+                                    img {
+                                        max-width: 20px;
+                                        margin-right: .3em;
+                                    }
+                                }
+
+                                .commands {
+                                    @include commandsBlock;
+                                }
+                            }
+
+                            .editJob {
+                                @include embedPanel;
+
+                                .editJobWrapper {
+                                    @include embedPanel;
+                                }
+                            }
+
+                            .workLoad {
+                                @include embedPanel;
+                                margin-bottom: 1em;
+
+                                .workLoadItems {
+                                    overflow: auto;
+                                    max-height: 220px;
+
+                                    .workitem {
+                                        padding: .5em;
+                                        background: $overBackground;
+                                        border-radius: 2px;
+                                        margin-bottom: 1px;
+
+                                        span {
+                                            white-space: nowrap;
+                                            margin-right: 0.5em;
+                                        }
+                                    }
+                                }
+                            }
+
+                            .jobLog {
+                                @include embedPanel;
+                                margin-bottom: 1em;
+
+                                .jobEventsScrollWrapper {
+                                    display: flex;
+                                    flex-direction: column-reverse;
+                                    overflow: auto;
+                                    max-height: 195px;
+                                    position: relative;
+                                    margin-bottom: 1em;
+
+                                    .jobEvents {
+                                        cursor: pointer;
+                                        background: $overBackground;
+                                        border-radius: 4px;
+                                        padding: .5em .3em;
+
+                                        .event {
+                                            display: block;
+                                            font-family: SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+                                        }
+                                    }
                                 }
                             }
                         }
 
-                        &#divAddJobWrapper, &#divAddPresetWrapper {
+                        margin-bottom: 1em;
+                    }
+
+                    &#divNewJob {
+                        @include embedPanel;
+                        margin-bottom: 1em;
+
+                        .testEvents {
+                            background: $overBackground;
+                            font-family: SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+                            margin: 1em 0;
+
+                            .testEvent {
+                                display: block;
+                                padding: .3em .5em;
+                            }
+                        }
+
+                        #divAddJobWrapper {
                             text-align: center;
 
                             i {
                                 cursor: pointer;
                             }
                         }
+                    }
 
-                        &#divNewPreset {
+                    &#divNewPreset {
+                        @include embedPanel;
+                        margin-bottom: 1em;
+
+                        .codecOptions {
                             @include embedPanel;
                             margin-bottom: 1em;
+                        }
 
-                            .codecOptions {
-                                @include embedPanel;
-                                margin-bottom: 1em;
+                        #divAddPresetWrapper {
+                            text-align: center;
+
+                            i {
+                                cursor: pointer;
                             }
                         }
+                    }
 
-                        &.preset {
-                            @include embedPanel;
-                            margin-bottom: 1em;
-                            display: grid;
-                            grid-template-columns: auto max-content;
+                    &.preset {
+                        @include embedPanel;
+                        margin-bottom: 1em;
+                        display: grid;
+                        grid-template-columns: auto max-content;
 
-                            .commands {
-                                @include commandsBlock;
-                            }
+                        .commands {
+                            @include commandsBlock;
                         }
+                    }
 
-                        &#divRadarrOptions, &#divSonarrOptions {
-                            @include embedPanel;
-                            margin-bottom: 1em;
-                        }
+                    &#divRadarrOptions, &#divSonarrOptions {
+                        @include embedPanel;
+                        margin-bottom: 1em;
                     }
 
                     .input-group {
@@ -348,6 +313,7 @@ body {
                         border-radius: 3px;
                         margin-bottom: .5em;
                         display: flex;
+                        padding-left: 0.8em;
 
                         &:hover, &:focus, &:active {
                             background: opacify($overBackground, .1);
@@ -361,9 +327,19 @@ body {
                             color: $font-color;
                             border: none;
                             background: transparent;
+                            margin-right: 0.8em;
+
+                            &[type="text"] {
+                                border-bottom: 1px solid rgba(255,255,255, 0.2);
+                                -moz-border-radius: 0;
+                                -webkit-border-radius: 0;
+                                border-radius: 0;
+                                padding: 0 0.6em;
+                                margin: 0.5em 0.8em .5em 0;
+                                height: auto;
+                            }
 
                             &:focus {
-                                border: none;
                                 color: $font-color;
                                 outline: none;
                                 box-shadow: none;
@@ -373,7 +349,6 @@ body {
                         button {
                             margin: .3em;
                         }
-
 
                         input {
                             &.form-control {
@@ -399,7 +374,6 @@ body {
                         }
 
                         label {
-                            padding-left: .8em;
                         }
 
                         select {
@@ -445,17 +419,51 @@ body {
                             color: $font-red;
                         }
                     }
+                }
 
-                    table {
-                        color: $font-color !important;
+                table {
+                    color: $font-color !important;
 
-                        &#tableMovies {
-                            thead {
-                                font-weight: bold;
+                    &#tableMovies {
+                        thead {
+                            font-weight: bold;
+                            white-space: nowrap;
 
-                                tr {
-                                    background: rgba(0,0,0,0.2);
-                                }
+                            tr {
+                                background: $overBackground;
+                            }
+                        }
+                    }
+                }
+
+                folder {
+                    position: relative;
+                    display: block;
+
+                    ol {
+                        background: #444;
+                        -moz-box-shadow: 2px 2px 3px #000;
+                        -webkit-box-shadow: 2px 2px 3px #000;
+                        box-shadow: 2px 2px 3px #000;
+                        left: 0;
+                        list-style: none;
+                        margin: 0;
+                        max-height: 300px;
+                        overflow: auto;
+                        padding-left: 30px;
+                        position: absolute;
+                        top: 100%;
+                        z-index: 10;
+
+                        li {
+                            cursor: pointer;
+                            font-size: .8em;
+                            list-style-image: url(/icons/directory.png);
+                            margin: 0;
+                            padding: 0.2em .4em;
+
+                            &.active {
+                                background: $overBackground;
                             }
                         }
                     }
@@ -481,13 +489,13 @@ body {
     background: lightyellow;
     bottom: 0;
     box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    color: black;
     display: none;
     left: 0;
     padding: 0.6rem 1.25rem 0.7rem 1.25rem;
     position: fixed;
     width: 100%;
     z-index: 1000;
-    color: black;
 
     .dismiss {
         cursor: pointer;

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace Compressarr.FFmpegFactory.Interfaces
+namespace Compressarr.FFmpegFactory
 {
     public interface IFFmpegPreset
     {

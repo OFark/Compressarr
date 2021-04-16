@@ -1,8 +1,7 @@
 ﻿using Compressarr.FFmpegFactory;
-using Compressarr.FFmpegFactory.Interfaces;
 using Compressarr.Filtering;
 using Compressarr.JobProcessing.Models;
-using Compressarr.Services.Interfaces;
+using Compressarr.Services;
 using Compressarr.Services.Models;
 using Compressarr.Settings;
 using Microsoft.AspNetCore.Hosting;
@@ -15,21 +14,20 @@ using System.Threading.Tasks;
 
 namespace Compressarr.JobProcessing
 {
-    public class JobManager
+    public class JobManager : IJobManager
     {
         private string jobsFilePath => Path.Combine(_env.ContentRootPath, "config", "jobs.json");
 
-        private HashSet<Job> _Jobs { get; set; }
-        public HashSet<Job> Jobs => _Jobs;
+        public HashSet<Job> Jobs { get; set; }
 
         private IWebHostEnvironment _env;
         internal IRadarrService radarrService;
         internal ISonarrService sonarrService;
-        internal FilterManager filterManager;
+        internal IFilterManager filterManager;
         internal SettingsManager settingsManager;
         internal IFFmpegManager fFmpegManager;
 
-        public JobManager(IWebHostEnvironment env, SettingsManager settingsManager, IRadarrService radarrService, ISonarrService sonarrService, FilterManager filterManager, IFFmpegManager fFmpegManager)
+        public JobManager(IWebHostEnvironment env, SettingsManager settingsManager, IRadarrService radarrService, ISonarrService sonarrService, IFilterManager filterManager, IFFmpegManager fFmpegManager)
         {
             _env = env;
             this.settingsManager = settingsManager;
@@ -37,19 +35,21 @@ namespace Compressarr.JobProcessing
             this.sonarrService = sonarrService;
             this.filterManager = filterManager;
             this.fFmpegManager = fFmpegManager;
+        }
 
-            _Jobs = LoadJobs();
+        public async void Init()
+        {
+            Jobs = await LoadJobs();
 
-            foreach (var job in _Jobs)
+            foreach (var job in Jobs)
             {
-                InitialiseJob(job);
+                _ = InitialiseJob(job);
             }
-
         }
 
         public async Task AddJob(Job newJob)
         {
-            var job = _Jobs.FirstOrDefault(j => j.Name == newJob.Name);
+            var job = Jobs.FirstOrDefault(j => j.Name == newJob.Name);
 
             if (job != null)
             {
@@ -60,11 +60,11 @@ namespace Compressarr.JobProcessing
             else
             {
                 job = newJob;
-                _Jobs.Add(newJob);
+                Jobs.Add(newJob);
             }
 
             job.JobStatus = JobStatus.Added;
-            SaveJobs();
+            await SaveJobs();
             await InitialiseJob(job, true);
         }
 
@@ -79,9 +79,17 @@ namespace Compressarr.JobProcessing
             job.JobStatus = JobStatus.Finished;
         }
 
-        public void CreateJobTester(Job job)
+        public async Task DeleteJob(Job job)
         {
-            job.JobTester ??= new JobTester(this);
+            job = Jobs.FirstOrDefault(j => j.Name == job.Name);
+
+            if (job != null)
+            {
+                Jobs.Remove(job);
+            }
+
+            job = null;
+            await SaveJobs();
         }
 
         public async Task InitialiseJob(Job job, bool force = false)
@@ -267,30 +275,30 @@ namespace Compressarr.JobProcessing
             job.UpdateStatus("Test succeeded");
         }
 
-        private void SaveJobs()
+        private async Task SaveJobs()
         {
-            var json = JsonConvert.SerializeObject(_Jobs, new JsonSerializerSettings() { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
+            var json = JsonConvert.SerializeObject(Jobs, new JsonSerializerSettings() { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
 
             if (!Directory.Exists(Path.GetDirectoryName(jobsFilePath)))
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(jobsFilePath));
             }
 
-            File.WriteAllText(jobsFilePath, json);
+            await File.WriteAllTextAsync(jobsFilePath, json);
         }
 
-        private HashSet<Job> LoadJobs()
+        private async Task<HashSet<Job>> LoadJobs()
         {
             if (File.Exists(jobsFilePath))
             {
-                var json = File.ReadAllText(jobsFilePath);
+                var json = await File.ReadAllTextAsync(jobsFilePath);
                 if (!string.IsNullOrWhiteSpace(json))
                 {
                     return JsonConvert.DeserializeObject<HashSet<Job>>(json);
                 }
             }
 
-            return new ();
+            return new();
         }
     }
 }

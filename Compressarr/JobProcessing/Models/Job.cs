@@ -1,8 +1,8 @@
 ﻿using Compressarr.FFmpegFactory;
-using Compressarr.FFmpegFactory.Interfaces;
 using Compressarr.Filtering.Models;
 using Newtonsoft.Json;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -23,13 +23,13 @@ namespace Compressarr.JobProcessing.Models
         public string DestinationFolder { get; set; }
 
         [JsonIgnore]
-        private Dictionary<DateTime, string> _events = new Dictionary<DateTime, string>();
+        private ConcurrentDictionary<DateTime, string> _events = new ();
 
         [JsonIgnore]
         private object eventLock = new object();
 
         [JsonIgnore]
-        public Dictionary<DateTime, string> Events
+        public ConcurrentDictionary<DateTime, string> Events
         {
             get
             {
@@ -47,9 +47,6 @@ namespace Compressarr.JobProcessing.Models
 
         [JsonIgnore]
         public JobStatus JobStatus { get; internal set; }
-
-        [JsonIgnore]
-        public JobTester JobTester { get; internal set; }
 
         [JsonIgnore]
         public string Name => $"{FilterName}|{PresetName}";
@@ -72,7 +69,7 @@ namespace Compressarr.JobProcessing.Models
         {
             lock (eventLock)
             {
-                _events.Add(DateTime.Now, $"Job Finished: {(success ? "Success" : "Failed")}");
+                _events.AddOrUpdate(DateTime.Now, $"Job Finished: {(success ? "Success" : "Failed")}", (d, m) => m);
             }
 
             JobStatus = JobStatus.Finished;
@@ -86,7 +83,7 @@ namespace Compressarr.JobProcessing.Models
             {
                 foreach (var m in messages.Where(x => !string.IsNullOrWhiteSpace(x)))
                 {
-                    _events.Add(DateTime.Now, m);
+                    _events.AddOrUpdate(DateTime.Now, m, (d, m) => m);
                 }
             }
             StatusUpdate?.Invoke(this, EventArgs.Empty);

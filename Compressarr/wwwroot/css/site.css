@@ -19,6 +19,26 @@ body {
     display: grid;
     grid-template-rows: max-content auto;
     height: 100vh; }
+    body app .modal {
+      background: rgba(0, 0, 0, 0.5);
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      text-align: center; }
+      body app .modal h1 {
+        font-size: 10vw;
+        color: #eee;
+        text-shadow: 0px 0px 5px #333; }
+      body app .modal .card-footer {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-gap: 1em; }
     body app > .topbar {
       width: 100%;
       height: auto; }
@@ -48,15 +68,15 @@ body {
       padding: 1em;
       border-radius: 8px;
       margin: 0 1em 1em;
-      position: relative;
-      min-height: 0; }
+      min-height: 0;
+      position: relative; }
       body app > .main #content {
-        position: relative;
-        padding-top: 1.1rem;
+        height: 100%;
+        overflow: auto;
         padding-left: 2rem !important;
         padding-right: 1.5rem !important;
-        height: 100%;
-        overflow: auto; }
+        padding-top: 1.1rem;
+        position: relative; }
         body app > .main #content > div {
           -webkit-transition: 1s -webkit-filter linear;
           -moz-transition: 1s -moz-filter linear;
@@ -64,178 +84,134 @@ body {
           -ms-transition: 1s -ms-filter linear;
           -o-transition: 1s -o-filter linear;
           transition: 1s filter linear, 1s -webkit-filter linear; }
-          body app > .main #content > div.blurred {
-            filter: blur(10px); }
-          body app > .main #content > div.loadingBlur {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-content: center;
-            align-items: center; }
-            body app > .main #content > div.loadingBlur .notice {
-              font-size: 5vw;
-              text-shadow: 0 0 4px #000000;
-              -webkit-text-stroke: 2px black; }
-              body app > .main #content > div.loadingBlur .notice ul {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                width: 600px;
-                height: 200px;
-                text-align: center;
-                line-height: 200px;
-                color: #fff;
-                font-size: 100px;
-                text-transform: uppercase;
-                overflow: hidden; }
-                body app > .main #content > div.loadingBlur .notice ul li {
-                  list-style: none;
-                  position: absolute;
-                  background: #fff; }
-                  body app > .main #content > div.loadingBlur .notice ul li:nth-of-type(1) {
-                    height: 10px;
-                    width: 600px;
-                    animation: animateLI1 2s infinite linear; }
-                  body app > .main #content > div.loadingBlur .notice ul li:nth-of-type(2) {
-                    height: 200px;
-                    width: 10px;
-                    animation: animateLI2 2s infinite linear; }
-                  body app > .main #content > div.loadingBlur .notice ul li:nth-of-type(3) {
-                    height: 10px;
-                    width: 600px;
-                    animation: animateLI3 2s infinite linear; }
-                  body app > .main #content > div.loadingBlur .notice ul li:nth-of-type(4) {
-                    height: 200px;
-                    width: 10px;
-                    animation: animateLI4 2s infinite linear; }
-          body app > .main #content > div div.filterList .filterTableWrapper {
+          body app > .main #content > div#divRadarr .filterList .filterTableWrapper {
             border-collapse: separate; }
-            body app > .main #content > div div.filterList .filterTableWrapper thead th:not(.hide) {
+            body app > .main #content > div#divRadarr .filterList .filterTableWrapper thead th:not(.hide) {
               border: 2px solid #666;
               border-radius: 4px;
               background: white; }
-              body app > .main #content > div div.filterList .filterTableWrapper thead th:not(.hide) select, body app > .main #content > div div.filterList .filterTableWrapper thead th:not(.hide) input[type=text] {
+              body app > .main #content > div#divRadarr .filterList .filterTableWrapper thead th:not(.hide) select, body app > .main #content > div#divRadarr .filterList .filterTableWrapper thead th:not(.hide) input[type=text] {
                 padding: 3px;
                 border: none;
                 background: transparent;
                 color: #333; }
-              body app > .main #content > div div.filterList .filterTableWrapper thead th:not(.hide) option {
+              body app > .main #content > div#divRadarr .filterList .filterTableWrapper thead th:not(.hide) option {
                 /*                    background-color: $overBackground*/ }
-            body app > .main #content > div div.filterList .filterTableWrapper td:not(:first-child) {
+            body app > .main #content > div#divRadarr .filterList .filterTableWrapper td:not(:first-child) {
               padding: 5px 10px; }
-            body app > .main #content > div div.filterList .filterTableWrapper td:first-child {
+            body app > .main #content > div#divRadarr .filterList .filterTableWrapper td:first-child {
               text-align: center; }
-          body app > .main #content > div div#divJobList {
+          body app > .main #content > div#divJobList {
             margin-bottom: 1em; }
-            body app > .main #content > div div#divJobList .job {
+            body app > .main #content > div#divJobList .job {
               background: rgba(0, 0, 0, 0.2);
               padding: 1em;
-              border-radius: 8px; }
-              body app > .main #content > div div#divJobList .job .jobTitle {
+              border-radius: 8px;
+              margin-bottom: 1em; }
+              body app > .main #content > div#divJobList .job .jobTitle {
                 display: grid;
                 grid-template-columns: auto max-content; }
-                body app > .main #content > div div#divJobList .job .jobTitle h3 {
+                body app > .main #content > div#divJobList .job .jobTitle h3 {
                   cursor: pointer; }
-                  body app > .main #content > div div#divJobList .job .jobTitle h3 img {
+                  body app > .main #content > div#divJobList .job .jobTitle h3 img {
                     max-width: 20px;
                     margin-right: .3em; }
-                body app > .main #content > div div#divJobList .job .jobTitle .commands {
+                body app > .main #content > div#divJobList .job .jobTitle .commands {
                   display: flex;
-                  grid-gap: .2em; }
-                  body app > .main #content > div div#divJobList .job .jobTitle .commands button {
-                    background: none;
+                  grid-gap: .6em;
+                  margin-bottom: .5em; }
+                  body app > .main #content > div#divJobList .job .jobTitle .commands button {
                     color: white;
-                    font-size: 1.8em; }
-              body app > .main #content > div div#divJobList .job .editJob {
+                    font-size: 1.4em; }
+              body app > .main #content > div#divJobList .job .editJob {
                 background: rgba(0, 0, 0, 0.2);
                 padding: 1em;
                 border-radius: 8px; }
-                body app > .main #content > div div#divJobList .job .editJob .editJobWrapper {
+                body app > .main #content > div#divJobList .job .editJob .editJobWrapper {
                   background: rgba(0, 0, 0, 0.2);
                   padding: 1em;
                   border-radius: 8px; }
-              body app > .main #content > div div#divJobList .job .workLoad {
+              body app > .main #content > div#divJobList .job .workLoad {
                 background: rgba(0, 0, 0, 0.2);
                 padding: 1em;
                 border-radius: 8px;
                 margin-bottom: 1em; }
-                body app > .main #content > div div#divJobList .job .workLoad .workLoadItems {
+                body app > .main #content > div#divJobList .job .workLoad .workLoadItems {
                   overflow: auto;
                   max-height: 220px; }
-                  body app > .main #content > div div#divJobList .job .workLoad .workLoadItems .workitem {
+                  body app > .main #content > div#divJobList .job .workLoad .workLoadItems .workitem {
                     padding: .5em;
                     background: rgba(0, 0, 0, 0.2);
                     border-radius: 2px;
                     margin-bottom: 1px; }
-                    body app > .main #content > div div#divJobList .job .workLoad .workLoadItems .workitem span {
+                    body app > .main #content > div#divJobList .job .workLoad .workLoadItems .workitem span {
                       white-space: nowrap;
                       margin-right: 0.5em; }
-              body app > .main #content > div div#divJobList .job .jobLog {
+              body app > .main #content > div#divJobList .job .jobLog {
                 background: rgba(0, 0, 0, 0.2);
                 padding: 1em;
                 border-radius: 8px;
                 margin-bottom: 1em; }
-                body app > .main #content > div div#divJobList .job .jobLog .jobEventsScrollWrapper {
+                body app > .main #content > div#divJobList .job .jobLog .jobEventsScrollWrapper {
                   display: flex;
                   flex-direction: column-reverse;
                   overflow: auto;
                   max-height: 195px;
                   position: relative;
                   margin-bottom: 1em; }
-                  body app > .main #content > div div#divJobList .job .jobLog .jobEventsScrollWrapper .jobEvents {
+                  body app > .main #content > div#divJobList .job .jobLog .jobEventsScrollWrapper .jobEvents {
                     cursor: pointer;
                     background: rgba(0, 0, 0, 0.2);
                     border-radius: 4px;
                     padding: .5em .3em; }
-                    body app > .main #content > div div#divJobList .job .jobLog .jobEventsScrollWrapper .jobEvents .event {
+                    body app > .main #content > div#divJobList .job .jobLog .jobEventsScrollWrapper .jobEvents .event {
                       display: block;
                       font-family: SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace; }
-          body app > .main #content > div div#divNewJob {
+          body app > .main #content > div#divNewJob {
             background: rgba(0, 0, 0, 0.2);
             padding: 1em;
             border-radius: 8px;
             margin-bottom: 1em; }
-            body app > .main #content > div div#divNewJob .testEvents {
+            body app > .main #content > div#divNewJob .testEvents {
               background: rgba(0, 0, 0, 0.2);
               font-family: SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
               margin: 1em 0; }
-              body app > .main #content > div div#divNewJob .testEvents .testEvent {
+              body app > .main #content > div#divNewJob .testEvents .testEvent {
                 display: block;
                 padding: .3em .5em; }
-          body app > .main #content > div div#divAddJobWrapper, body app > .main #content > div div#divAddPresetWrapper {
-            text-align: center; }
-            body app > .main #content > div div#divAddJobWrapper i, body app > .main #content > div div#divAddPresetWrapper i {
-              cursor: pointer; }
-          body app > .main #content > div div#divNewPreset {
+            body app > .main #content > div#divNewJob #divAddJobWrapper {
+              text-align: center; }
+              body app > .main #content > div#divNewJob #divAddJobWrapper i {
+                cursor: pointer; }
+          body app > .main #content > div#divNewPreset {
             background: rgba(0, 0, 0, 0.2);
             padding: 1em;
             border-radius: 8px;
             margin-bottom: 1em; }
-            body app > .main #content > div div#divNewPreset .codecOptions {
+            body app > .main #content > div#divNewPreset .codecOptions {
               background: rgba(0, 0, 0, 0.2);
               padding: 1em;
               border-radius: 8px;
               margin-bottom: 1em; }
-          body app > .main #content > div div.preset {
+            body app > .main #content > div#divNewPreset #divAddPresetWrapper {
+              text-align: center; }
+              body app > .main #content > div#divNewPreset #divAddPresetWrapper i {
+                cursor: pointer; }
+          body app > .main #content > div.preset {
             background: rgba(0, 0, 0, 0.2);
             padding: 1em;
             border-radius: 8px;
             margin-bottom: 1em;
             display: grid;
             grid-template-columns: auto max-content; }
-            body app > .main #content > div div.preset .commands {
+            body app > .main #content > div.preset .commands {
               display: flex;
-              grid-gap: .2em; }
-              body app > .main #content > div div.preset .commands button {
-                background: none;
+              grid-gap: .6em;
+              margin-bottom: .5em; }
+              body app > .main #content > div.preset .commands button {
                 color: white;
-                font-size: 1.8em; }
-          body app > .main #content > div div#divRadarrOptions, body app > .main #content > div div#divSonarrOptions {
+                font-size: 1.4em; }
+          body app > .main #content > div#divRadarrOptions, body app > .main #content > div#divSonarrOptions {
             background: rgba(0, 0, 0, 0.2);
             padding: 1em;
             border-radius: 8px;
@@ -244,7 +220,8 @@ body {
             background: rgba(0, 0, 0, 0.2);
             border-radius: 3px;
             margin-bottom: .5em;
-            display: flex; }
+            display: flex;
+            padding-left: 0.8em; }
             body app > .main #content > div .input-group:hover, body app > .main #content > div .input-group:focus, body app > .main #content > div .input-group:active {
               background: rgba(0, 0, 0, 0.3); }
             body app > .main #content > div .input-group div {
@@ -252,9 +229,17 @@ body {
             body app > .main #content > div .input-group .form-control {
               color: #ededed;
               border: none;
-              background: transparent; }
+              background: transparent;
+              margin-right: 0.8em; }
+              body app > .main #content > div .input-group .form-control[type="text"] {
+                border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+                -moz-border-radius: 0;
+                -webkit-border-radius: 0;
+                border-radius: 0;
+                padding: 0 0.6em;
+                margin: 0.5em 0.8em .5em 0;
+                height: auto; }
               body app > .main #content > div .input-group .form-control:focus {
-                border: none;
                 color: #ededed;
                 outline: none;
                 box-shadow: none; }
@@ -271,8 +256,6 @@ body {
               width: 1.3em;
               border-radius: 5px;
               margin-left: .3em; }
-            body app > .main #content > div .input-group label {
-              padding-left: .8em; }
             body app > .main #content > div .input-group select.form-control option {
               background: #444;
               color: #ededed;
@@ -295,11 +278,37 @@ body {
               color: #888; }
             body app > .main #content > div button i {
               color: rgba(240, 0, 0, 0.75); }
-          body app > .main #content > div table {
-            color: #ededed !important; }
-            body app > .main #content > div table#tableMovies thead {
-              font-weight: bold; }
-              body app > .main #content > div table#tableMovies thead tr {
+        body app > .main #content table {
+          color: #ededed !important; }
+          body app > .main #content table#tableMovies thead {
+            font-weight: bold;
+            white-space: nowrap; }
+            body app > .main #content table#tableMovies thead tr {
+              background: rgba(0, 0, 0, 0.2); }
+        body app > .main #content folder {
+          position: relative;
+          display: block; }
+          body app > .main #content folder ol {
+            background: #444;
+            -moz-box-shadow: 2px 2px 3px #000;
+            -webkit-box-shadow: 2px 2px 3px #000;
+            box-shadow: 2px 2px 3px #000;
+            left: 0;
+            list-style: none;
+            margin: 0;
+            max-height: 300px;
+            overflow: auto;
+            padding-left: 30px;
+            position: absolute;
+            top: 100%;
+            z-index: 10; }
+            body app > .main #content folder ol li {
+              cursor: pointer;
+              font-size: .8em;
+              list-style-image: url(/icons/directory.png);
+              margin: 0;
+              padding: 0.2em .4em; }
+              body app > .main #content folder ol li.active {
                 background: rgba(0, 0, 0, 0.2); }
 
 .valid.modified:not([type=checkbox]) {
@@ -315,13 +324,13 @@ body {
   background: lightyellow;
   bottom: 0;
   box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+  color: black;
   display: none;
   left: 0;
   padding: 0.6rem 1.25rem 0.7rem 1.25rem;
   position: fixed;
   width: 100%;
-  z-index: 1000;
-  color: black; }
+  z-index: 1000; }
   #blazor-error-ui .dismiss {
     cursor: pointer;
     position: absolute;

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Compressarr.Services.Interfaces
+namespace Compressarr.Services
 {
     public interface IRadarrService
     {

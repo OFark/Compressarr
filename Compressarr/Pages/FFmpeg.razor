@@ -2,7 +2,7 @@
 @using Compressarr.Helpers
 @using Compressarr.FFmpegFactory.Models
 
-@inject Compressarr.FFmpegFactory.Interfaces.IFFmpegManager FFmpegManager
+@inject Compressarr.FFmpegFactory.IFFmpegManager FFmpegManager
 <h1>Presets</h1>
 @if (FFmpegManager.Presets.Any())
 {
@@ -218,9 +218,9 @@
 
     private List<string> ffmpegExecutionString => generateFFmpegArguments();
 
-    private Compressarr.FFmpegFactory.Interfaces.IFFmpegPreset presetBuilder()
+    private Compressarr.FFmpegFactory.IFFmpegPreset presetBuilder()
     {
-        FFmpegFactory.Interfaces.IFFmpegPreset preset = new FFmpegFactory.Models.FFmpegPreset();
+        FFmpegFactory.IFFmpegPreset preset = new FFmpegFactory.Models.FFmpegPreset();
 
         preset.AudioBitRate = newPresetAudioBitrate;
         preset.AudioCodec = newPresetAudioCodec;
@@ -255,12 +255,12 @@
         }
     }
 
-    private void deletePreset(Compressarr.FFmpegFactory.Interfaces.IFFmpegPreset preset)
+    private void deletePreset(Compressarr.FFmpegFactory.IFFmpegPreset preset)
     {
         FFmpegManager.DeletePreset(preset.Name);
     }
 
-    private void loadPreset(Compressarr.FFmpegFactory.Interfaces.IFFmpegPreset preset)
+    private void loadPreset(Compressarr.FFmpegFactory.IFFmpegPreset preset)
     {
         newPresetAudioBitrate = preset.AudioBitRate;
         newPresetAudioCodec = preset.AudioCodec;
