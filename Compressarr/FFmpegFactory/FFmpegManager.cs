@@ -345,7 +345,7 @@ namespace Compressarr.FFmpegFactory
 
         public HashSet<CodecOptionValue> GetOptions(string codec)
         {
-            var optionsFile = Path.Combine(env.ContentRootPath, "codecoptions", $"{codec}.json");
+            var optionsFile = Path.Combine(env.ContentRootPath, "codecOptions", $"{codec.ToLower()}.json");
 
             if (File.Exists(optionsFile))
             {
