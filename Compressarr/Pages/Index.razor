@@ -12,9 +12,9 @@
 @inject IJobManager jobManager
 @inject ILayoutService layoutService
 @inject IRadarrService radarrService
+@inject ISettingsManager settingsManager
 @inject ISonarrService sonarrService
 @inject NavigationManager NavManager
-@inject SettingsManager settingsManager
 
 @if (!string.IsNullOrWhiteSpace(AlertMessage))
 {
@@ -119,7 +119,7 @@
 
 
 
-    private System.Collections.Concurrent.ConcurrentDictionary<DateTime, string> testEvents = new();
+    private IEnumerable<JobEvent> testEvents;
 
 
     private Compressarr.JobProcessing.Models.Job newJob = new Job();
@@ -162,7 +162,7 @@
         var job = caller as Job;
         testEvents = job.Events;
 
-        if (job.JobStatus == JobStatus.TestedOK)
+        if (job.JobState == JobState.TestedOK)
         {
             var newJob = new Job()
             {

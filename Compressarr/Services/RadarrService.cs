@@ -1,6 +1,7 @@
 ﻿using Compressarr.Services.Models;
 using Compressarr.Settings;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -14,24 +15,28 @@ namespace Compressarr.Services
 {
     public class RadarrService : IRadarrService
     {
-        private SettingsManager settingsManager;
+        private readonly ISettingsManager settingsManager;
 
         private static HashSet<Movie> cachedMovies = null;
 
         public long MovieCount => cachedMovies == null ? 0 : cachedMovies.Count;
 
-        private IWebHostEnvironment env;
+        private readonly IWebHostEnvironment env;
+        private readonly ILogger<RadarrService> logger;
 
-        public RadarrService(SettingsManager _settingsManager, IWebHostEnvironment _env)
+        public RadarrService(ISettingsManager _settingsManager, IWebHostEnvironment _env, ILogger<RadarrService> logger)
         {
             settingsManager = _settingsManager;
+            this.logger = logger;
             env = _env;
         }
 
         public async Task<ServiceResult<HashSet<Movie>>> GetMovies()
         {
+            logger.LogDebug($"Get Movies.");
             if (cachedMovies == null)
             {
+                logger.LogDebug($"No cached movies, interrogate Radarr.");
                 var radarrURL = settingsManager.GetSetting(SettingType.RadarrURL);
                 var radarrAPIKey = settingsManager.GetSetting(SettingType.RadarrAPIKey);
 
@@ -39,11 +44,13 @@ namespace Compressarr.Services
 
                 if (string.IsNullOrWhiteSpace(radarrURL))
                 {
+                    logger.LogWarning($"No URL for Radarr.");
                     return new ServiceResult<HashSet<Movie>>(false, "404", "Radarr URL not found. In Options. Go there");
                 }
 
                 if (string.IsNullOrWhiteSpace(radarrAPIKey))
                 {
+                    logger.LogWarning($"No API key for Radarr.");
                     return new ServiceResult<HashSet<Movie>>(false, "404", "Radarr APIKey not found. In Options. Go there");
                 }
 
@@ -51,8 +58,10 @@ namespace Compressarr.Services
 
                 try
                 {
+                    logger.LogDebug($"Creating new HTTP client.");
                     using (var hc = new HttpClient())
                     {
+                        logger.LogDebug($"Downlading Movie List.");
                         movieJSON = await hc.GetStringAsync(link);
                         var moviesArr = JsonConvert.DeserializeObject<Movie[]>(movieJSON);
 
@@ -63,6 +72,7 @@ namespace Compressarr.Services
                 {
                     try
                     {
+                        logger.LogError($"{ex}");
                         var debugFolder = Path.Combine(env.ContentRootPath, "debug");
                         if (!Directory.Exists(debugFolder))
                         {
@@ -70,9 +80,15 @@ namespace Compressarr.Services
                         }
 
                         var movieJSONFile = Path.Combine(debugFolder, "movie.json");
+
+                        logger.LogWarning($"Error understanding output from Radarr. Dumping output to: {movieJSONFile}");
+
                         await File.WriteAllTextAsync(movieJSONFile, movieJSON);
                     }
-                    catch (Exception) { }
+                    catch (Exception) {
+                        logger.LogCritical("Cannot dump debug file, permissions?");
+                        logger.LogCritical(ex.ToString());
+                    }
 
                     return new ServiceResult<HashSet<Movie>>(false, ex.Message, ex.InnerException?.ToString());
                 }
@@ -85,6 +101,9 @@ namespace Compressarr.Services
 
         public async Task<ServiceResult<HashSet<Movie>>> GetMoviesFiltered(string filter, string[] filterValues)
         {
+            logger.LogDebug("Filtering Movies");
+            logger.LogDebug($"Filter: {filter}");
+            logger.LogDebug($"Filter Values: {string.Join(", ", filterValues)}");
             var movies = await GetMovies();
 
             if (movies.Success)
@@ -97,6 +116,7 @@ namespace Compressarr.Services
 
         public async Task<ServiceResult<List<string>>> GetValuesForProperty(string property)
         {
+            logger.LogDebug($"Get values for: {property}");
             var movies = await GetMovies();
 
             if (movies.Success)
@@ -109,15 +129,20 @@ namespace Compressarr.Services
 
         public SystemStatus TestConnection(string radarrURL, string radarrAPIKey)
         {
+            logger.LogDebug($"Test Radarr Connection.");
             SystemStatus ss = new SystemStatus();
 
             var link = $"{radarrURL}/api/system/status?apikey={radarrAPIKey}";
+
+            logger.LogDebug($"LinkURL: {link}");
+
             string statusJSON = null;
             HttpResponseMessage hrm = null;
 
             var hc = new HttpClient();
             try
             {
+                logger.LogDebug($"Connecting.");
                 hrm = hc.GetAsync(link).Result;
 
                 statusJSON = hrm.Content.ReadAsStringAsync().Result;
@@ -126,14 +151,17 @@ namespace Compressarr.Services
                 {
                     ss = JsonConvert.DeserializeObject<SystemStatus>(statusJSON);
                     ss.Success = true;
+                    logger.LogDebug($"Success.");
                 }
                 else
                 {
+                    logger.LogWarning($"Failed: {hrm.StatusCode}");
                     ss.Success = false;
                     ss.ErrorMessage = $"{hrm.StatusCode}";
                     if (hrm.ReasonPhrase != hrm.StatusCode.ToString())
                     {
                         ss.ErrorMessage += $"- {hrm.ReasonPhrase}";
+                        logger.LogWarning($"Failed: {hrm.ReasonPhrase}");
                     }
                 }
             }
@@ -142,6 +170,7 @@ namespace Compressarr.Services
                 ss.Success = false;
 
                 ss.ErrorMessage = $"Request Exception: {ex.Message}";
+                logger.LogError(ex.ToString());
             }
             //catch (JsonReaderException)
             //{

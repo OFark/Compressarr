@@ -1,6 +1,7 @@
 ﻿using Compressarr.FFmpegFactory;
 using Compressarr.JobProcessing;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using System;
 
 namespace Compressarr
@@ -9,7 +10,6 @@ namespace Compressarr
     {
         public static IHost InitFFMPEG(this IHost webHost)
         {
-            Console.WriteLine("Initialising FFMPEG, which means getting the latest version");
             var ffmpegManager = webHost.Services.GetService(typeof(IFFmpegManager)) as IFFmpegManager;
 
             ffmpegManager.Init();
@@ -19,7 +19,6 @@ namespace Compressarr
 
         public static IHost InitJobs(this IHost webHost)
         {
-            Console.WriteLine("Initialising Jobs");
             var jobManager = webHost.Services.GetService(typeof(IJobManager)) as IJobManager;
 
             jobManager.Init();

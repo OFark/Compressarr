@@ -1,5 +1,6 @@
 ﻿using Compressarr.FFmpegFactory;
 using Compressarr.Filtering.Models;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Concurrent;
@@ -23,20 +24,14 @@ namespace Compressarr.JobProcessing.Models
         public string DestinationFolder { get; set; }
 
         [JsonIgnore]
-        private ConcurrentDictionary<DateTime, string> _events = new ();
+        private List<JobEvent> _events = new();
 
         [JsonIgnore]
-        private object eventLock = new object();
-
-        [JsonIgnore]
-        public ConcurrentDictionary<DateTime, string> Events
+        public IEnumerable<JobEvent> Events
         {
             get
             {
-                lock (eventLock)
-                {
-                    return _events;
-                }
+                return _events.ToList().OrderBy(e => e.Date);
             }
         }
 
@@ -46,7 +41,7 @@ namespace Compressarr.JobProcessing.Models
         public string FilterName { get; set; }
 
         [JsonIgnore]
-        public JobStatus JobStatus { get; internal set; }
+        public JobState JobState { get; private set; }
 
         [JsonIgnore]
         public string Name => $"{FilterName}|{PresetName}";
@@ -65,33 +60,24 @@ namespace Compressarr.JobProcessing.Models
         [JsonIgnore]
         public string WriteFolder => DestinationFolder ?? BaseFolder;
 
-        public void EndOfJob(bool success)
+        public void UpdateState(JobState state)
         {
-            lock (eventLock)
-            {
-                _events.AddOrUpdate(DateTime.Now, $"Job Finished: {(success ? "Success" : "Failed")}", (d, m) => m);
-            }
-
-            JobStatus = JobStatus.Finished;
-            EndJob?.Invoke(this, EventArgs.Empty);
-            UpdateStatus("");
+            JobState = state;
+            StatusUpdate?.Invoke(this, EventArgs.Empty);
         }
 
-        public void UpdateStatus(params string[] messages)
+        public void Log(string message, LogLevel level)
         {
-            lock (eventLock)
+            if (!string.IsNullOrWhiteSpace(message))
             {
-                foreach (var m in messages.Where(x => !string.IsNullOrWhiteSpace(x)))
-                {
-                    _events.AddOrUpdate(DateTime.Now, m, (d, m) => m);
-                }
+                _events.Add(new JobEvent(level, message));
+                StatusUpdate?.Invoke(this, EventArgs.Empty);
             }
-            StatusUpdate?.Invoke(this, EventArgs.Empty);
         }
 
         public void UpdateStatus(object sender, EventArgs args)
         {
-            StatusUpdate?.Invoke(this, EventArgs.Empty);
+            StatusUpdate?.Invoke(sender, EventArgs.Empty);
         }
     }
 }

@@ -133,38 +133,38 @@ body {
                     transition: 1s filter linear, 1s -webkit-filter linear;
 
                     &#divRadarr {
-                    .filterList {
-                        .filterTableWrapper {
-                            border-collapse: separate;
+                        .filterList {
+                            .filterTableWrapper {
+                                border-collapse: separate;
 
-                            thead {
-                                th:not(.hide) {
-                                    border: 2px solid #666;
-                                    border-radius: 4px;
-                                    background: white;
+                                thead {
+                                    th:not(.hide) {
+                                        border: 2px solid #666;
+                                        border-radius: 4px;
+                                        background: white;
 
-                                    select, input[type=text] {
-                                        padding: 3px;
-                                        border: none;
-                                        background: transparent;
-                                        color: #333;
-                                    }
+                                        select, input[type=text] {
+                                            padding: 3px;
+                                            border: none;
+                                            background: transparent;
+                                            color: #333;
+                                        }
 
-                                    option {
-                                        /*                    background-color: $overBackground*/
+                                        option {
+                                            /*                    background-color: $overBackground*/
+                                        }
                                     }
                                 }
-                            }
 
-                            td:not(:first-child) {
-                                padding: 5px 10px;
-                            }
+                                td:not(:first-child) {
+                                    padding: 5px 10px;
+                                }
 
-                            td:first-child {
-                                text-align: center;
+                                td:first-child {
+                                    text-align: center;
+                                }
                             }
                         }
-                    }
                     }
 
                     &#divJobList {
@@ -241,6 +241,30 @@ body {
                                         .event {
                                             display: block;
                                             font-family: SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+
+                                            &.Trace {
+                                                color: #aaa;
+                                            }
+
+                                            &.Debug {
+                                                color: $font-color;
+                                            }
+
+                                            &.Information {
+                                                color: aqua;
+                                            }
+
+                                            &.Warning {
+                                                color: beige;
+                                            }
+
+                                            &.Error {
+                                                color: tomato
+                                            }
+
+                                            &.Critical {
+                                                color: red;
+                                            }
                                         }
                                     }
                                 }

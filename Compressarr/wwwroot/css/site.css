@@ -167,6 +167,18 @@ body {
                     body app > .main #content > div#divJobList .job .jobLog .jobEventsScrollWrapper .jobEvents .event {
                       display: block;
                       font-family: SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace; }
+                      body app > .main #content > div#divJobList .job .jobLog .jobEventsScrollWrapper .jobEvents .event.Trace {
+                        color: #aaa; }
+                      body app > .main #content > div#divJobList .job .jobLog .jobEventsScrollWrapper .jobEvents .event.Debug {
+                        color: #ededed; }
+                      body app > .main #content > div#divJobList .job .jobLog .jobEventsScrollWrapper .jobEvents .event.Information {
+                        color: aqua; }
+                      body app > .main #content > div#divJobList .job .jobLog .jobEventsScrollWrapper .jobEvents .event.Warning {
+                        color: beige; }
+                      body app > .main #content > div#divJobList .job .jobLog .jobEventsScrollWrapper .jobEvents .event.Error {
+                        color: tomato; }
+                      body app > .main #content > div#divJobList .job .jobLog .jobEventsScrollWrapper .jobEvents .event.Critical {
+                        color: red; }
           body app > .main #content > div#divNewJob {
             background: rgba(0, 0, 0, 0.2);
             padding: 1em;

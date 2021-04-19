@@ -3,6 +3,7 @@ using Compressarr.Filtering.Models;
 using Compressarr.Helpers;
 using Compressarr.Services.Models;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -16,9 +17,11 @@ namespace Compressarr.Filtering
     public class FilterManager : IFilterManager
     {
         private IWebHostEnvironment _env;
-        public FilterManager(IWebHostEnvironment env)
+        private ILogger<FilterManager> logger;
+        public FilterManager(IWebHostEnvironment env, ILogger<FilterManager> logger)
         {
             _env = env;
+            this.logger = logger;
 
             DateComparitors = new List<FilterComparitor>()
             {
@@ -69,10 +72,14 @@ namespace Compressarr.Filtering
         private string filterFilePath => Path.Combine(_env.ContentRootPath, "config", "filters.json");
         public void AddFilter(List<DynamicLinqFilter> dlFilters, string filterName, MediaSource filterType)
         {
+            logger.LogDebug($"Adding Filter ({filterName})");
+
             var filter = Filters.FirstOrDefault(x => x.Name == filterName);
 
             if (filter == null)
             {
+                logger.LogDebug($"Filter not found, creating a new one.");
+
                 filter = new Filter(filterName, filterType);
                 _filters.Add(filter);
             }
@@ -94,11 +101,17 @@ namespace Compressarr.Filtering
 
         public void DeleteFilter(string filterName)
         {
+            logger.LogDebug($"Deleting Filter ({filterName}).");
+
             var filter = Filters.FirstOrDefault(x => x.Name == filterName);
 
             if (filter != null)
             {
                 _filters.Remove(filter);
+            }
+            else
+            {
+                logger.LogWarning($"Filter not found.");
             }
 
             SaveFilters();
@@ -188,6 +201,8 @@ namespace Compressarr.Filtering
 
         private HashSet<Filter> LoadFilters()
         {
+            logger.LogDebug($"Load Filters from {filterFilePath}");
+
             _filters = new HashSet<Filter>();
 
             if (File.Exists(filterFilePath))
@@ -197,6 +212,14 @@ namespace Compressarr.Filtering
                 {
                     _filters = JsonConvert.DeserializeObject<HashSet<Filter>>(json);
                 }
+                else
+                {
+                    logger.LogWarning($"Filters file empty.");
+                }
+            }
+            else
+            {
+                logger.LogDebug($"Filter file not found.");
             }
 
             return _filters;
@@ -253,10 +276,13 @@ namespace Compressarr.Filtering
         }
         private void SaveFilters()
         {
+            logger.LogDebug($"Save filters to {filterFilePath}");
+
             var json = JsonConvert.SerializeObject(Filters, new JsonSerializerSettings() { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
 
             if (!Directory.Exists(Path.GetDirectoryName(filterFilePath)))
             {
+                logger.LogDebug($"Directory needs to be created.");
                 Directory.CreateDirectory(Path.GetDirectoryName(filterFilePath));
             }
 

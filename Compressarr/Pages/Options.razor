@@ -6,12 +6,12 @@
 @using Compressarr.Settings;
 @using Newtonsoft.Json;
 
-@inject SettingsManager settingsManager
-@inject IRadarrService radarrService
-@inject ISonarrService sonarrService
 @inject IFFmpegManager FFmpegManager
 @inject IFilterManager filterManager
 @inject IJobManager jobManager
+@inject IRadarrService radarrService
+@inject ISettingsManager settingsManager
+@inject ISonarrService sonarrService
 
 <div class="col-md-6 offset-md-3">
     <h1 title="It's easy to make good decisions when there are no bad options">Options</h1>

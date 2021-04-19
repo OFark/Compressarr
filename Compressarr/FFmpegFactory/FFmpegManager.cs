@@ -10,6 +10,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Xabe.FFmpeg;
 using Xabe.FFmpeg.Downloader;
@@ -60,17 +61,20 @@ namespace Compressarr.FFmpegFactory
 
         public void Init()
         {
+            logger.LogInformation("Initialising FFMPEG");
             initTask = Task.Run(async () =>
             {
+                logger.LogDebug("Getting latest version");
                 await FFmpegDownloader.GetLatestVersion(FFmpegVersion.Official, ExecutablesPath);
 
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 {
+                    logger.LogDebug("Running on Linux, CHMOD required");
                     foreach (var exe in new string[] { FFMPEG, FFPROBE })
                     {
-                        using (var process = new Process())
+                        using (var p = new Process())
                         {
-                            process.StartInfo = new ProcessStartInfo()
+                            p.StartInfo = new ProcessStartInfo()
                             {
                                 RedirectStandardOutput = true,
                                 UseShellExecute = false,
@@ -79,16 +83,27 @@ namespace Compressarr.FFmpegFactory
                                 FileName = "/bin/bash",
                                 Arguments = $"-c \"chmod +x {exe}\""
                             };
-                            process.StartInfo.RedirectStandardOutput = true;
-                            process.OutputDataReceived += (sender, args) => Console.WriteLine(args.Data);
-                            process.Start();
-                            process.WaitForExit();
+                            p.StartInfo.RedirectStandardOutput = true;
+                            p.StartInfo.RedirectStandardError = true;
+                            p.OutputDataReceived += (sender, args) => Console.WriteLine(args.Data);
+                            logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
+                            p.Start();
+                            var error = p.StandardError.ReadToEnd();
+                            p.WaitForExit();
+
+                            if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(error))
+                            {
+                                logger.LogError($"Process Error: ({p.ExitCode}) {error} <End Of Error>");
+                            }
+                            logger.LogDebug("Process finished");
                         };
                     }
                 }
             });
 
             initTask.Wait();
+
+            logger.LogDebug("FFmpeg downloaded.");
 
             Codecs = GetAvailableCodecs();
             Containers = GetAvailableContainers();
@@ -100,16 +115,20 @@ namespace Compressarr.FFmpegFactory
         public void AddPreset(IFFmpegPreset newPreset)
         {
             initTask.Wait();
+            logger.LogDebug($"Adding Preset: {newPreset.Name}.");
 
             var preset = Presets.FirstOrDefault(x => x.Name == newPreset.Name);
 
             if (preset == null)
             {
+                logger.LogDebug("New Preset.");
                 _presets.Add(newPreset);
             }
             else
             {
+                logger.LogDebug("Preset already exists, removing the old one.");
                 Presets.Remove(preset);
+                logger.LogDebug("Adding the new one.");
                 Presets.Add(newPreset);
             }
 
@@ -120,23 +139,29 @@ namespace Compressarr.FFmpegFactory
         {
             initTask.Wait();
 
+            logger.LogDebug($"Deleting Preset: {presetName}.");
+
             var preset = Presets.FirstOrDefault(x => x.Name == presetName);
 
             if (preset != null)
             {
                 _presets.Remove(preset);
             }
+            else
+            {
+                logger.LogWarning($"Preset {presetName} not found.");
+            }
 
             SavePresets();
         }
 
-        public bool CheckResult(WorkItem workitem)
+        public async Task<bool> CheckResult(WorkItem workitem)
         {
             initTask.Wait();
 
-            var mediaInfoTask = FFmpeg.GetMediaInfo(workitem.DestinationFile);
-            mediaInfoTask.Wait();
-            var mediaInfo = mediaInfoTask.Result;
+            logger.LogDebug("Checking Results.");
+
+            var mediaInfo = await FFmpeg.GetMediaInfo(workitem.DestinationFile);
 
             return mediaInfo.Duration == workitem.Duration;
         }
@@ -145,15 +170,25 @@ namespace Compressarr.FFmpegFactory
         {
             initTask.Wait();
 
+            logger.LogDebug($"Converting container name ({container}) to file extension.");
+
             var p = new Process();
             p.StartInfo.UseShellExecute = false;
             p.StartInfo.RedirectStandardOutput = true;
+            p.StartInfo.RedirectStandardError = true;
             p.StartInfo.FileName = FFMPEG;
             p.StartInfo.Arguments = $"-v 1 -h muxer={container}";
 
+            logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
             p.Start();
-            string output = p.StandardOutput.ReadToEnd();
+            var output = p.StandardOutput.ReadToEnd();
+            var error = p.StandardError.ReadToEnd();
             p.WaitForExit();
+
+            if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(error))
+            {
+                logger.LogError($"Process Error: ({p.ExitCode}) {error} <End Of Error>");
+            }
 
             var formatLines = output.Split("\n").ToList();
 
@@ -174,6 +209,10 @@ namespace Compressarr.FFmpegFactory
                         }
                     }
                 }
+                else
+                {
+                    logger.LogDebug($"No common extensions found.");
+                }
             }
 
             return container;
@@ -181,7 +220,10 @@ namespace Compressarr.FFmpegFactory
 
         public string GetFFmpegVersion()
         {
+            logger.LogDebug($"Get FFmpeg Version.");
+
             var path = Path.Combine(ExecutablesPath, "version.json");
+            logger.LogDebug($"From {path}.");
 
             try
             {
@@ -192,9 +234,14 @@ namespace Compressarr.FFmpegFactory
                     var version = JsonConvert.DeserializeObject<dynamic>(json);
                     return version.version.ToString();
                 }
+                else
+                {
+                    logger.LogDebug($"Empty file.");
+                }
             }
-            catch(UnauthorizedAccessException uae)
+            catch (UnauthorizedAccessException uae)
             {
+                logger.LogError(uae.ToString());
                 return uae.Message;
             }
             return null;
@@ -203,6 +250,7 @@ namespace Compressarr.FFmpegFactory
         private HashSet<IFFmpegPreset> LoadPresets()
         {
             initTask.Wait();
+            logger.LogDebug($"Presets empty - loading from file ({PresetsFilePath}).");
 
             _presets = new HashSet<IFFmpegPreset>();
 
@@ -213,15 +261,15 @@ namespace Compressarr.FFmpegFactory
                 {
                     var presets = JsonConvert.DeserializeObject<HashSet<FFmpegPreset>>(json);
 
-                    foreach(var preset in presets)
+                    foreach (var preset in presets)
                     {
-                        if(preset.VideoCodecOptions != null && preset.VideoCodecOptions.Any())
+                        if (preset.VideoCodecOptions != null && preset.VideoCodecOptions.Any())
                         {
                             var codecOptions = GetOptions(preset.VideoCodec);
-                            foreach(var co in codecOptions)
+                            foreach (var co in codecOptions)
                             {
                                 var val = preset.VideoCodecOptions.FirstOrDefault(x => x.Name == co.Name);
-                                if(val != null)
+                                if (val != null)
                                 {
                                     co.Value = val.Value;
                                 }
@@ -232,6 +280,14 @@ namespace Compressarr.FFmpegFactory
                         _presets.Add(preset);
                     }
                 }
+                else
+                {
+                    logger.LogDebug($"Presets file is empty.");
+                }
+            }
+            else
+            {
+                logger.LogDebug($"Presets file does not exist.");
             }
 
             return _presets;
@@ -240,11 +296,13 @@ namespace Compressarr.FFmpegFactory
         private void SavePresets()
         {
             initTask.Wait();
+            logger.LogDebug($"Saving Presets to {PresetsFilePath}.");
 
             var json = JsonConvert.SerializeObject(Presets, new JsonSerializerSettings() { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
 
             if (!Directory.Exists(Path.GetDirectoryName(PresetsFilePath)))
             {
+                logger.LogDebug($"Directory does not exist. Creating.");
                 Directory.CreateDirectory(Path.GetDirectoryName(PresetsFilePath));
             }
 
@@ -255,13 +313,17 @@ namespace Compressarr.FFmpegFactory
         {
             initTask.Wait();
 
+            logger.LogDebug($"Get available codecs.");
+
             var codecs = new Dictionary<CodecType, SortedDictionary<string, string>>();
             var p = new Process();
             p.StartInfo.UseShellExecute = false;
             p.StartInfo.RedirectStandardOutput = true;
             p.StartInfo.RedirectStandardError = true;
             p.StartInfo.FileName = FFMPEG;
-            p.StartInfo.Arguments = "-encoders";
+            p.StartInfo.Arguments = "-encoders -v 1";
+
+            logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
 
             p.Start();
             var output = p.StandardOutput.ReadToEnd();
@@ -270,39 +332,39 @@ namespace Compressarr.FFmpegFactory
 
             if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(error))
             {
-                logger.LogError($"Process Error: ({p.ExitCode}) {error} <End OF Error>");
+                logger.LogError($"Process Error: ({p.ExitCode}) {error} <End Of Error>");
             }
 
-            var codecLines = output.Split("\n").ToList().Skip(10);
 
-            codecs.Add(CodecType.Audio, new SortedDictionary<string, string>());
-            codecs.Add(CodecType.Subtitle, new SortedDictionary<string, string>());
-            codecs.Add(CodecType.Video, new SortedDictionary<string, string>());
+            codecs.Add(CodecType.Audio, new());
+            codecs.Add(CodecType.Subtitle, new());
+            codecs.Add(CodecType.Video, new());
 
-            foreach (var line in codecLines)
+            var regPattern = @"^\s([VAS])[F\.][S\.][X\.][B\.][D\.]\s(?!=)([^\s]*)\s*(.*)$";
+            var reg = new Regex(regPattern, RegexOptions.IgnoreCase | RegexOptions.Multiline);
+            logger.LogDebug($"Regex matching pattern: \"{regPattern}\"");
+
+            foreach (Match m in reg.Matches(output))
             {
-                var parts = line.Split(" ", StringSplitOptions.RemoveEmptyEntries);
-                if (!string.IsNullOrEmpty(line) && parts.Length >= 3)
+                var codecName = m.Groups[2].Value;
+                var codecDesc = m.Groups[3].Value;
+
+                switch (m.Groups[1].Value)
                 {
-                    var codecName = parts[1];
-                    var codecDesc = string.Join(" ", parts.Skip(2));
-                    switch (line.Trim().Substring(0, 1))
-                    {
-                        case "A":
-                            codecs[CodecType.Audio].Add(codecName, codecDesc);
-                            break;
+                    case "A":
+                        codecs[CodecType.Audio].Add(codecName, codecDesc);
+                        break;
 
-                        case "S":
-                            codecs[CodecType.Subtitle].Add(codecName, codecDesc);
-                            break;
+                    case "S":
+                        codecs[CodecType.Subtitle].Add(codecName, codecDesc);
+                        break;
 
-                        case "V":
-                            codecs[CodecType.Video].Add(codecName, codecDesc);
-                            break;
-                        default:
-                            logger.LogWarning($"Unrecognised Codec line: {line}");
-                            break;
-                    }
+                    case "V":
+                        codecs[CodecType.Video].Add(codecName, codecDesc);
+                        break;
+                    default:
+                        logger.LogWarning($"Unrecognised Codec line: {m.Groups[0]}");
+                        break;
                 }
             }
 
@@ -313,30 +375,37 @@ namespace Compressarr.FFmpegFactory
         {
             initTask.Wait();
 
+            logger.LogDebug($"Get Available Containers.");
+
             var formats = new SortedDictionary<string, string>();
             var p = new Process();
             p.StartInfo.UseShellExecute = false;
             p.StartInfo.RedirectStandardOutput = true;
+            p.StartInfo.RedirectStandardError = true;
             p.StartInfo.FileName = FFMPEG;
             p.StartInfo.Arguments = "-formats -v 1";
 
+            logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
+
             p.Start();
-            string output = p.StandardOutput.ReadToEnd();
+            var output = p.StandardOutput.ReadToEnd();
+            var error = p.StandardError.ReadToEnd();
             p.WaitForExit();
 
-            var formatLines = output.Split("\n").ToList().Skip(4);
-
-            foreach (var line in formatLines)
+            if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(error))
             {
-                var parts = line.Split(" ", StringSplitOptions.RemoveEmptyEntries);
-                if (!string.IsNullOrEmpty(line) && parts.Length >= 3)
+                logger.LogError($"Process Error: ({p.ExitCode}) {error} <End Of Error>");
+            }
+
+            var regPattern = @"^\s?([D\s])([E\s])\s(?!=)([^\s]*)\s*(.*)$";
+            var reg = new Regex(regPattern, RegexOptions.IgnoreCase | RegexOptions.Multiline);
+            logger.LogDebug($"Regex matching pattern: \"{regPattern}\"");
+
+            foreach (Match m in reg.Matches(output))
+            {
+                if (m.Groups[2].Value == "E")
                 {
-                    var formatName = parts[1];
-                    var formatDesc = string.Join(" ", parts.Skip(2));
-                    if (line.Substring(2, 1) == "E")
-                    {
-                        formats.Add(formatName, formatDesc);
-                    }
+                    formats.Add(m.Groups[3].Value, m.Groups[4].Value);
                 }
             }
 
@@ -345,17 +414,34 @@ namespace Compressarr.FFmpegFactory
 
         public HashSet<CodecOptionValue> GetOptions(string codec)
         {
+            logger.LogDebug($"Get options for Codec {codec}.");
             var optionsFile = Path.Combine(env.ContentRootPath, "CodecOptions", $"{codec}.json");
+            logger.LogDebug($"From {optionsFile}.");
 
             if (File.Exists(optionsFile))
             {
                 var json = File.ReadAllText(optionsFile);
                 if (!string.IsNullOrWhiteSpace(json))
                 {
-                    var cov = new HashSet<CodecOptionValue>();
-                    var options = JsonConvert.DeserializeObject<HashSet<CodecOptionValue>>(json);
+                    HashSet<CodecOptionValue> options = null;
+                    try
+                    {
+                        options = JsonConvert.DeserializeObject<HashSet<CodecOptionValue>>(json);
+                    }
+                    catch (JsonSerializationException jsex)
+                    {
+                        logger.LogError($"JSON parsing error: {jsex}.");
+                    }
                     return options;
                 }
+                else
+                {
+                    logger.LogDebug($"Options file empty.");
+                }
+            }
+            else
+            {
+                logger.LogDebug($"Codec Options file not found.");
             }
             return null;
         }

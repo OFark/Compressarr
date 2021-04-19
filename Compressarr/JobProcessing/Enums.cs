@@ -1,6 +1,6 @@
 ﻿namespace Compressarr.JobProcessing
 {
-    public enum JobStatus
+    public enum JobState
     {
         New,
         Initialising,

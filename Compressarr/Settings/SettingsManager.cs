@@ -5,7 +5,7 @@ using System.IO;
 
 namespace Compressarr.Settings
 {
-    public class SettingsManager
+    public class SettingsManager : ISettingsManager
     {
         private string settingsFilePath => Path.Combine(_env.ContentRootPath, "config", "settings.json");
         private Dictionary<string, string> _settings { get; set; }

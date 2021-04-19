@@ -41,14 +41,14 @@
                     <div class="input-group">
                         <label class="col-form-label">Base Folder:</label>
                         <div class="">
-                            <DirectoryLookup Folder="@job.BaseFolder"></DirectoryLookup>
+                            <DirectoryLookup @bind-Folder="@job.BaseFolder"></DirectoryLookup>
                         </div>
                     </div>
 
                     <div class="input-group">
                         <label class="col-form-label">Destination Folder:</label>
                         <div class="">
-                            <DirectoryLookup Folder="@job.DestinationFolder"></DirectoryLookup>
+                            <DirectoryLookup @bind-Folder="@job.DestinationFolder"></DirectoryLookup>
                         </div>
                     </div>
 
@@ -100,8 +100,8 @@
                     <div class="jobEvents">
                         @foreach (var e in job.Events)
                         {
-                            <div class="event">
-                                @e.Key.ToString("HH:mm:ss") - @e.Value
+                            <div class="event @e.Level">
+                                @e.Date.ToString("HH:mm:ss") - @e.Message
                             </div>
                         }
                     </div>
@@ -132,18 +132,18 @@
     {
         get
         {
-            switch (job.JobStatus)
+            switch (job.JobState)
             {
-                case JobStatus.Added:
+                case JobState.Added:
                     return "Initialising";
-                case JobStatus.Running:
+                case JobState.Running:
                     return mouseOnButton ? "Stop" : "Running";
-                case JobStatus.Finished:
+                case JobState.Finished:
                     return mouseOnButton ? "Re-Initialise" : "Finished";
-                case JobStatus.TestedFail:
+                case JobState.TestedFail:
                     return mouseOnButton ? "Re-Initialise" : "Test Failed";
-                case JobStatus.TestedOK:
-                case JobStatus.Waiting:
+                case JobState.TestedOK:
+                case JobState.Waiting:
                     return mouseOnButton ? "GO!" : "Ready";
             }
 
@@ -155,11 +155,11 @@
     {
         get
         {
-            switch (job.JobStatus)
+            switch (job.JobState)
             {
-                case JobStatus.Added:
-                case JobStatus.Running:
-                case JobStatus.TestedFail:
+                case JobState.Added:
+                case JobState.Running:
+                case JobState.TestedFail:
                     return "btn-warning";
 
             }
@@ -168,7 +168,7 @@
         }
     }
 
-    private bool running => job.JobStatus == JobStatus.Running;
+    private bool running => job.JobState == JobState.Running;
 
     private bool? Ok;
 
@@ -209,21 +209,21 @@
 
     private void startJob()
     {
-        switch (job.JobStatus)
+        switch (job.JobState)
         {
-            case JobStatus.TestedOK:
-            case JobStatus.Waiting:
+            case JobState.TestedOK:
+            case JobState.Waiting:
                 {
                     jobManager.RunJob(job);
                 }
                 break;
-            case JobStatus.TestedFail:
-            case JobStatus.Finished:
+            case JobState.TestedFail:
+            case JobState.Finished:
                 {
                     jobManager.InitialiseJob(job, true);
                 }
                 break;
-            case JobStatus.Running:
+            case JobState.Running:
                 {
                     jobManager.CancelJob(job);
                 }

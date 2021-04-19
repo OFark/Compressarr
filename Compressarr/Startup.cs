@@ -27,12 +27,13 @@ namespace Compressarr
         {
             services.AddRazorPages();
             services.AddServerSideBlazor();
-            services.AddSingleton<IRadarrService, RadarrService>();
-            services.AddSingleton<ISonarrService, SonarrService>();
-            services.AddSingleton<IFilterManager, FilterManager>();
-            services.AddSingleton<SettingsManager>();
             services.AddSingleton<IFFmpegManager, FFmpegManager>();
+            services.AddSingleton<IFilterManager, FilterManager>();
             services.AddSingleton<IJobManager, JobManager>();
+            services.AddSingleton<IProcessManager, ProcessManager>();
+            services.AddSingleton<IRadarrService, RadarrService>();
+            services.AddSingleton<ISettingsManager, SettingsManager>();
+            services.AddSingleton<ISonarrService, SonarrService>();
 
             services.AddScoped<ILayoutService, LayoutService>();
         }

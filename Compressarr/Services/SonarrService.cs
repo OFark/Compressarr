@@ -1,5 +1,6 @@
 ﻿using Compressarr.Services.Models;
 using Compressarr.Settings;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
 using System.Net.Http;
@@ -8,24 +9,30 @@ namespace Compressarr.Services
 {
     public class SonarrService : ISonarrService
     {
-        private SettingsManager settingsManager;
+        private readonly ISettingsManager settingsManager;
+        private readonly ILogger<SonarrService> logger;
 
-        public SonarrService(SettingsManager _settingsManager)
+        public SonarrService(ISettingsManager settingsManager, ILogger<SonarrService> logger)
         {
-            settingsManager = _settingsManager;
+            this.settingsManager = settingsManager;
+            this.logger = logger;
         }
 
         public SystemStatus TestConnection(string sonarrURL, string sonarrAPIKey)
         {
+            logger.LogDebug($"Test Sonarr Connection.");
             SystemStatus ss = new SystemStatus();
 
             var link = $"{sonarrURL}/api/system/status?apikey={sonarrAPIKey}";
+            logger.LogDebug($"LinkURL: {link}");
+
             string statusJSON = null;
             HttpResponseMessage hrm = null;
 
             var hc = new HttpClient();
             try
             {
+                logger.LogDebug($"Connecting.");
                 hrm = hc.GetAsync(link).Result;
 
                 statusJSON = hrm.Content.ReadAsStringAsync().Result;
@@ -34,27 +41,26 @@ namespace Compressarr.Services
                 {
                     ss = JsonConvert.DeserializeObject<SystemStatus>(statusJSON);
                     ss.Success = true;
+                    logger.LogDebug($"Success.");
                 }
                 else
                 {
+                    logger.LogWarning($"Failed: {hrm.StatusCode}");
                     ss.Success = false;
                     ss.ErrorMessage = $"{hrm.StatusCode}";
                     if (hrm.ReasonPhrase != hrm.StatusCode.ToString())
                     {
                         ss.ErrorMessage += $"- {hrm.ReasonPhrase}";
+                        logger.LogWarning($"Failed: {hrm.ReasonPhrase}");
                     }
                 }
             }
-            catch (Exception ex) when (ex is InvalidOperationException || ex is HttpRequestException)
+            catch (Exception ex)
             {
                 ss.Success = false;
 
                 ss.ErrorMessage = $"Request Exception: {ex.Message}";
-            }
-            catch (JsonReaderException)
-            {
-                ss.Success = false;
-                ss.ErrorMessage = $"Response wasn't a valid API response. This is usually due to an incorrect URL";
+                logger.LogError(ex.ToString());
             }
 
             return ss;
