@@ -19,7 +19,7 @@ namespace Compressarr
             Host.CreateDefaultBuilder(args)
                 .ConfigureAppConfiguration((context, configBuilder) =>
                 {
-                    configBuilder.AddJsonFile("config\\appsettings.json");
+                    configBuilder.AddJsonFile("config/appsettings.json");
                 })
                 .ConfigureLogging(loggingBuilder =>
                 {
