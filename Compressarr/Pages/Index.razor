@@ -96,7 +96,9 @@
                 <div class="testEvents">
                     @foreach (var e in testEvents)
                     {
-                        <span class="testEvent">@e</span>
+                        <div class="event @e.Level">
+                            @e.Date.ToString("HH:mm:ss") - @e.Message
+                        </div>
                     }
                 </div>
             }
@@ -118,9 +120,7 @@
     private bool showNewJob;
 
 
-
-    private IEnumerable<JobEvent> testEvents;
-
+    private IEnumerable<JobEvent> testEvents = new List<JobEvent>();
 
     private Compressarr.JobProcessing.Models.Job newJob = new Job();
 
