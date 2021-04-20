@@ -1,12 +1,7 @@
 ﻿using Compressarr.JobProcessing;
-using Microsoft.Extensions.Logging;
 using System;
-using System.Diagnostics;
-using System.Text.RegularExpressions;
 using System.Threading;
-using System.Threading.Tasks;
 using Xabe.FFmpeg;
-using Xabe.FFmpeg.Events;
 
 namespace Compressarr.FFmpegFactory
 {

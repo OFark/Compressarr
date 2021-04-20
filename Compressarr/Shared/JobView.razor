@@ -22,6 +22,10 @@
         <div class="commands">
             @if (expand)
             {
+                @if (canReload)
+                {
+                    <button @onclick="reloadJob"><i class="fas fa-sync-alt"></i></button>
+                }
                 @if (editJob)
                 {
                     <button @onclick="saveJob"><i class="fas fa-save"></i></button>
@@ -94,20 +98,23 @@
                     </div>
                 </div>
             }
-            <div class="jobLog">
-                <h4>Log</h4>
-                <div class="jobEventsScrollWrapper">
-                    <div class="jobEvents">
-                        @foreach (var e in job.Events)
-                        {
-                            <div class="event @e.Level">
-                                @e.Date.ToString("HH:mm:ss") - @e.Message
-                            </div>
-                        }
-                    </div>
+        }
+        <div class="jobLog">
+            <h4>Log</h4>
+            <div class="jobEventsScrollWrapper">
+                <div class="jobEvents">
+                    @foreach (var e in job.Events)
+                    {
+                        <div class="event @e.Level">
+                            @e.Date.ToString("HH:mm:ss") - @e.Message
+                        </div>
+                    }
                 </div>
             </div>
-            <button class="btn btn-block @buttonClass" @onclick="startJob" @onmouseover="() => { mouseOnButton = true;  }" @onmouseout="() => { mouseOnButton = false;  }">@buttonText</button>
+        </div>
+        @if (!editJob)
+        {
+            <button class="btn btn-block @buttonClass" @onclick="startJob" @onmouseover="() => { mouseOnButton = true; }" @onmouseout="() => { mouseOnButton = false; }">@buttonText</button>
         }
     }
 </div>
@@ -116,6 +123,7 @@
     [Parameter]
     public Compressarr.JobProcessing.Models.Job job { get; set; }
 
+    private bool canReload;
     private bool expand;
     private bool editJob;
     private bool mouseOnButton;
@@ -188,12 +196,23 @@
         InvokeAsync(() => StateHasChanged());
     }
 
+    private async void reloadJob()
+    {
+        using (layoutService.Working("Reloading..."))
+        {
+            job = await jobManager.ReloadJob(job);
+            canReload = false;
+            StateHasChanged();
+        }
+    }
+
     private async void saveJob()
     {
         using (layoutService.Working("Saving..."))
         {
-            await jobManager.AddJob(job);
-            editJob = false;
+            var success = await jobManager.AddJob(job);
+            editJob = !success;
+            canReload = !success;
             StateHasChanged();
         }
     }

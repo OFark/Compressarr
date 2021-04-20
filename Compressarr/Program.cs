@@ -1,7 +1,11 @@
+using Compressarr.Settings;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Serilog.Extensions.Logging;
+using System;
+using System.IO;
 
 namespace Compressarr
 {
@@ -10,27 +14,29 @@ namespace Compressarr
         public static void Main(string[] args)
         {
             CreateHostBuilder(args).Build()
-                                   .InitFFMPEG()
-                                   .InitJobs()
-                                   .Run();
+                                       .InitFFMPEG()
+                                       .InitJobs()
+                                       .Run();
         }
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>
             Host.CreateDefaultBuilder(args)
+                .ConfigureWebHostDefaults(webBuilder =>
+                {
+                    webBuilder.UseStartup<Startup>();
+                })
+                .ConfigureDefaultFiles()
                 .ConfigureAppConfiguration((context, configBuilder) =>
                 {
-                    configBuilder.AddJsonFile("config/appsettings.json");
+                    configBuilder.AddJsonFile(SettingsManager.appSettings);
                 })
                 .ConfigureLogging(loggingBuilder =>
                 {
                     loggingBuilder.ClearProviders();
                     loggingBuilder
                         .AddDebug()
-                        .AddConsole();
-                })
-                .ConfigureWebHostDefaults(webBuilder =>
-                {
-                    webBuilder.UseStartup<Startup>();
+                        .AddConsole()
+                        .AddFile($"{SettingsManager.ConfigDirectory}/logs/{{Date}}.txt");
                 });
     }
 }

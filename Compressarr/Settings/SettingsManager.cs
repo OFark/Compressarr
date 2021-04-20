@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Hosting;
 using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.IO;
 
@@ -7,8 +8,16 @@ namespace Compressarr.Settings
 {
     public class SettingsManager : ISettingsManager
     {
-        private string settingsFilePath => Path.Combine(_env.ContentRootPath, "config", "settings.json");
+        private string settingsFilePath => ConfigFile("settings.json");
         private Dictionary<string, string> _settings { get; set; }
+
+        public static bool InDocker { get { return Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true"; } }
+        public static string ConfigDirectory => InDocker ? "/config" : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config");
+        public static string CodecOptionsDirectory => Path.Combine(ConfigDirectory, "CodecOptions");
+
+        public static string appSettings => Path.Combine(ConfigDirectory, "appsettings.json");
+
+        public string ConfigFile(string fileName) => Path.Combine(ConfigDirectory, fileName);
 
         public Dictionary<string, string> Settings => _settings ?? LoadSettings();
 

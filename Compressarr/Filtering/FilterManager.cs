@@ -2,6 +2,7 @@
 using Compressarr.Filtering.Models;
 using Compressarr.Helpers;
 using Compressarr.Services.Models;
+using Compressarr.Settings;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -16,12 +17,13 @@ namespace Compressarr.Filtering
 {
     public class FilterManager : IFilterManager
     {
-        private IWebHostEnvironment _env;
-        private ILogger<FilterManager> logger;
-        public FilterManager(IWebHostEnvironment env, ILogger<FilterManager> logger)
+        private readonly ILogger<FilterManager> logger;
+        private readonly ISettingsManager settingsManager;
+
+        public FilterManager(ISettingsManager settingsManager, ILogger<FilterManager> logger)
         {
-            _env = env;
             this.logger = logger;
+            this.settingsManager = settingsManager;
 
             DateComparitors = new List<FilterComparitor>()
             {
@@ -69,7 +71,8 @@ namespace Compressarr.Filtering
         public List<FilterProperty> RadarrTableColumns { get; private set; }
         public List<FilterComparitor> StringComparitors { get; }
         private HashSet<Filter> _filters { get; set; }
-        private string filterFilePath => Path.Combine(_env.ContentRootPath, "config", "filters.json");
+        private string filterFilePath => settingsManager?.ConfigFile("filters.json");
+
         public void AddFilter(List<DynamicLinqFilter> dlFilters, string filterName, MediaSource filterType)
         {
             logger.LogDebug($"Adding Filter ({filterName})");

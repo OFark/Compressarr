@@ -67,6 +67,7 @@ body {
       background: rgba(0, 0, 0, 0.2);
       padding: 1em;
       border-radius: 8px;
+      border: 1px solid rgba(0, 0, 0, 0.2);
       margin: 0 1em 1em;
       min-height: 0;
       position: relative; }
@@ -107,6 +108,7 @@ body {
               background: rgba(0, 0, 0, 0.2);
               padding: 1em;
               border-radius: 8px;
+              border: 1px solid rgba(0, 0, 0, 0.2);
               margin-bottom: 1em; }
               body app > .main #content > div#divJobList .job .jobTitle {
                 display: grid;
@@ -126,15 +128,19 @@ body {
               body app > .main #content > div#divJobList .job .editJob {
                 background: rgba(0, 0, 0, 0.2);
                 padding: 1em;
-                border-radius: 8px; }
+                border-radius: 8px;
+                border: 1px solid rgba(0, 0, 0, 0.2);
+                margin-bottom: 1em; }
                 body app > .main #content > div#divJobList .job .editJob .editJobWrapper {
                   background: rgba(0, 0, 0, 0.2);
                   padding: 1em;
-                  border-radius: 8px; }
+                  border-radius: 8px;
+                  border: 1px solid rgba(0, 0, 0, 0.2); }
               body app > .main #content > div#divJobList .job .workLoad {
                 background: rgba(0, 0, 0, 0.2);
                 padding: 1em;
                 border-radius: 8px;
+                border: 1px solid rgba(0, 0, 0, 0.2);
                 margin-bottom: 1em; }
                 body app > .main #content > div#divJobList .job .workLoad .workLoadItems {
                   overflow: auto;
@@ -151,6 +157,7 @@ body {
                 background: rgba(0, 0, 0, 0.2);
                 padding: 1em;
                 border-radius: 8px;
+                border: 1px solid rgba(0, 0, 0, 0.2);
                 margin-bottom: 1em; }
                 body app > .main #content > div#divJobList .job .jobLog .jobEventsScrollWrapper {
                   display: flex;
@@ -183,6 +190,7 @@ body {
             background: rgba(0, 0, 0, 0.2);
             padding: 1em;
             border-radius: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.2);
             margin-bottom: 1em; }
             body app > .main #content > div#divNewJob .testEvents {
               background: rgba(0, 0, 0, 0.2);
@@ -199,11 +207,13 @@ body {
             background: rgba(0, 0, 0, 0.2);
             padding: 1em;
             border-radius: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.2);
             margin-bottom: 1em; }
             body app > .main #content > div#divNewPreset .codecOptions {
               background: rgba(0, 0, 0, 0.2);
               padding: 1em;
               border-radius: 8px;
+              border: 1px solid rgba(0, 0, 0, 0.2);
               margin-bottom: 1em; }
             body app > .main #content > div#divNewPreset #divAddPresetWrapper {
               text-align: center; }
@@ -213,6 +223,7 @@ body {
             background: rgba(0, 0, 0, 0.2);
             padding: 1em;
             border-radius: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.2);
             margin-bottom: 1em;
             display: grid;
             grid-template-columns: auto max-content; }
@@ -227,6 +238,7 @@ body {
             background: rgba(0, 0, 0, 0.2);
             padding: 1em;
             border-radius: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.2);
             margin-bottom: 1em; }
           body app > .main #content > div .input-group {
             background: rgba(0, 0, 0, 0.2);
@@ -276,16 +288,19 @@ body {
             color: rgba(240, 0, 0, 0.75); }
           body app > .main #content > div button {
             background: rgba(0, 0, 0, 0.2);
-            border: none;
+            border: 1px solid rgba(0, 0, 0, 0.2);
             border-radius: 3px;
             color: white;
-            padding: .2em 0.6em; }
+            padding: .2em 0.6em;
+            -moz-transition: box-shadow ease-in 200ms;
+            -o-transition: box-shadow ease-in 200ms;
+            -webkit-transition: box-shadow ease-in 200ms;
+            transition: box-shadow ease-in 200ms; }
             body app > .main #content > div button:active, body app > .main #content > div button:visited, body app > .main #content > div button:focus {
               border: none;
               outline: none; }
             body app > .main #content > div button:hover:not(:disabled) {
-              background: white;
-              color: #555; }
+              box-shadow: white 0 0 11px inset; }
             body app > .main #content > div button:disabled {
               color: #888; }
             body app > .main #content > div button i {

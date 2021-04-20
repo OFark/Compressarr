@@ -105,11 +105,11 @@ namespace Compressarr.JobProcessing
             process.Update();// Log();
         }
 
-        //private Regex reg = new Regex(@"\w+=\s*[\d\.\-:/A-Za-z]+(?=\s)");
-        private Regex reg = new Regex(@"frame=\s*(\d*)\s*fps=\s*(\d*)\s*q=\s*(-?[\d\.]*)\s*size=\s*(\d*\wB)\s*time=\s*([\d:\.]*)\s*bitrate=\s*([\d\.]*\w*\/s)\s*speed=\s*([\d.]*x)\s*");
+        private readonly Regex reg = new(@"frame=\s*(\d*)\sfps=\s*(\d*)\sq=\s*(-?[\d\.]*)\ssize=\s*([^\s]*)\stime=\s*([\d:\.]*)\sbitrate=\s*([^\s]*)\sspeed=\s*([\d.]*x)\s*");
         private void Converter_OnDataReceived(DataReceivedEventArgs e, FFmpegProcess process)
         {
             //"frame= 2171 fps= 58 q=-0.0 size=    4396kB time=00:01:28.50 bitrate= 406.9kbits/s speed=2.38x    ";
+            //"frame= 3097 fps= 22 q=-0.0 size=N/A time=00:02:04.72 bitrate=N/A speed=0.886x"
 
             logger.LogDebug(e.Data);
 

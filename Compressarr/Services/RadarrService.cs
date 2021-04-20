@@ -1,6 +1,5 @@
 ﻿using Compressarr.Services.Models;
 using Compressarr.Settings;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
@@ -21,14 +20,12 @@ namespace Compressarr.Services
 
         public long MovieCount => cachedMovies == null ? 0 : cachedMovies.Count;
 
-        private readonly IWebHostEnvironment env;
         private readonly ILogger<RadarrService> logger;
 
-        public RadarrService(ISettingsManager _settingsManager, IWebHostEnvironment _env, ILogger<RadarrService> logger)
+        public RadarrService(ISettingsManager _settingsManager,ILogger<RadarrService> logger)
         {
             settingsManager = _settingsManager;
             this.logger = logger;
-            env = _env;
         }
 
         public async Task<ServiceResult<HashSet<Movie>>> GetMovies()
@@ -73,7 +70,7 @@ namespace Compressarr.Services
                     try
                     {
                         logger.LogError($"{ex}");
-                        var debugFolder = Path.Combine(env.ContentRootPath, "debug");
+                        var debugFolder = Path.Combine(SettingsManager.ConfigDirectory, "debug");
                         if (!Directory.Exists(debugFolder))
                         {
                             Directory.CreateDirectory(debugFolder);

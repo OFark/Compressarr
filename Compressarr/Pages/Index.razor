@@ -154,30 +154,20 @@
 
         job.StatusUpdate += newJobTestStatusUpdate;
 
-        await jobManager.InitialiseJob(job);
+        if(await jobManager.AddJob(job))
+        {
+            job.StatusUpdate -= newJobTestStatusUpdate;
+            newJob = new();
+            showNewJob = false;
+            await InvokeAsync(() => StateHasChanged());
+        }
     }
 
-    private async void newJobTestStatusUpdate(object caller, EventArgs args)
+    private void newJobTestStatusUpdate(object caller, EventArgs args)
     {
         var job = caller as Job;
         testEvents = job.Events;
 
-        if (job.JobState == JobState.TestedOK)
-        {
-            var newJob = new Job()
-            {
-                AutoImport = job.AutoImport,
-                BaseFolder = job.BaseFolder,
-                DestinationFolder = job.DestinationFolder,
-                FilterName = job.FilterName,
-                PresetName = job.PresetName
-            };
-
-            await jobManager.AddJob(newJob);
-            job = null;
-            showNewJob = false;
-        }
-
-        await InvokeAsync(() => StateHasChanged());
+        InvokeAsync(() => StateHasChanged());
     }
 }

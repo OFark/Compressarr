@@ -1,7 +1,6 @@
-﻿using Compressarr.FFmpegFactory;
-using Compressarr.FFmpegFactory.Models;
+﻿using Compressarr.FFmpegFactory.Models;
 using Compressarr.JobProcessing;
-using Microsoft.AspNetCore.Hosting;
+using Compressarr.Settings;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
@@ -20,11 +19,11 @@ namespace Compressarr.FFmpegFactory
     public class FFmpegManager : IFFmpegManager
     {
         private readonly IServiceProvider services;
-        private readonly IWebHostEnvironment env;
+        private readonly ISettingsManager settingsManager;
         private readonly ILogger<FFmpegManager> logger;
 
-        private string ExecutablesPath => Path.Combine(env.ContentRootPath, "config", "FFmpeg");
-        private string PresetsFilePath => Path.Combine(env.ContentRootPath, "config", "presets.json");
+        private string ExecutablesPath => Path.Combine(SettingsManager.ConfigDirectory, "FFmpeg");
+        private string PresetsFilePath => settingsManager?.ConfigFile("presets.json");
 
         private string FFMPEG => RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? Path.Combine(ExecutablesPath, "ffmpeg.exe")
                                : RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? Path.Combine(ExecutablesPath, "ffmpeg")
@@ -49,10 +48,10 @@ namespace Compressarr.FFmpegFactory
 
         private Task initTask = null;
 
-        public FFmpegManager(IServiceProvider services, IWebHostEnvironment env, ILogger<FFmpegManager> logger)
+        public FFmpegManager(IServiceProvider services, ISettingsManager settingsManager, ILogger<FFmpegManager> logger)
         {
             this.services = services;
-            this.env = env;
+            this.settingsManager = settingsManager;
             this.logger = logger;
 
             Status = FFmpegStatus.Initialising;
@@ -161,9 +160,17 @@ namespace Compressarr.FFmpegFactory
 
             logger.LogDebug("Checking Results.");
 
-            var mediaInfo = await FFmpeg.GetMediaInfo(workitem.DestinationFile);
+            try
+            {
+                var mediaInfo = await FFmpeg.GetMediaInfo(workitem.DestinationFile);
 
-            return mediaInfo.Duration == workitem.Duration;
+                return mediaInfo.Duration == workitem.Duration;
+            }
+            catch(ArgumentException aex)
+            {
+                logger.LogError(aex.ToString());
+                return false;
+            }
         }
 
         public string ConvertContainerToExtension(string container)
@@ -415,7 +422,7 @@ namespace Compressarr.FFmpegFactory
         public HashSet<CodecOptionValue> GetOptions(string codec)
         {
             logger.LogDebug($"Get options for Codec {codec}.");
-            var optionsFile = Path.Combine(env.ContentRootPath, "CodecOptions", $"{codec}.json");
+            var optionsFile = Path.Combine(SettingsManager.CodecOptionsDirectory, $"{codec}.json");
             logger.LogDebug($"From {optionsFile}.");
 
             if (File.Exists(optionsFile))

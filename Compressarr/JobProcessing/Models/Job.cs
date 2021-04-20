@@ -15,6 +15,8 @@ namespace Compressarr.JobProcessing.Models
 
         public event EventHandler EndJob;
 
+        public Guid? ID { get; set; }
+
         public bool AutoImport { get; set; }
         public string BaseFolder { get; set; }
 

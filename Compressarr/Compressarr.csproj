@@ -22,16 +22,16 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.EntityFrameworkCore.DynamicLinq" Version="3.2.2" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.DynamicLinq" Version="5.2.9" />
 		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.10.9" />
 		<PackageReference Include="Microsoft.VisualStudio.Web.BrowserLink" Version="2.2.0" />
-		<PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
-		<PackageReference Include="Xabe.FFmpeg" Version="4.2.0" />
-		<PackageReference Include="Xabe.FFmpeg.Downloader" Version="4.2.0" />
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+		<PackageReference Include="Serilog.Extensions.Logging.File" Version="2.0.0" />
+		<PackageReference Include="Xabe.FFmpeg" Version="4.4.0" />
+		<PackageReference Include="Xabe.FFmpeg.Downloader" Version="4.4.0" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<Folder Include="debug\" />
 		<Folder Include="wwwroot\icons\" />
 	</ItemGroup>
 

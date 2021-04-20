@@ -9,6 +9,7 @@ $overBackground: rgba(0, 0, 0, 0.2);
     background: $overBackground;
     padding: 1em;
     border-radius: 8px;
+    border: 1px solid $overBackground;
 }
 
 @mixin commandsBlock {
@@ -192,6 +193,7 @@ body {
 
                             .editJob {
                                 @include embedPanel;
+                                margin-bottom: 1em;
 
                                 .editJobWrapper {
                                     @include embedPanel;
@@ -417,10 +419,14 @@ body {
 
                     button {
                         background: rgba(0,0,0,0.2);
-                        border: none;
+                        border: 1px solid $overBackground;
                         border-radius: 3px;
                         color: white;
                         padding: .2em 0.6em;
+                        -moz-transition: box-shadow ease-in 200ms;
+                        -o-transition: box-shadow ease-in 200ms;
+                        -webkit-transition: box-shadow ease-in 200ms;
+                        transition: box-shadow ease-in 200ms;
 
                         &:active, &:visited, &:focus {
                             border: none;
@@ -428,8 +434,7 @@ body {
                         }
 
                         &:hover:not(:disabled) {
-                            background: white;
-                            color: #555;
+                            box-shadow: white 0 0 11px inset;
                         }
 
                         &:disabled {

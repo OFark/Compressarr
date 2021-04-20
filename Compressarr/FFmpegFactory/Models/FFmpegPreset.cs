@@ -74,7 +74,7 @@ namespace Compressarr.FFmpegFactory.Models
                     }
                 }
 
-                var part1Ending = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "NUL && ^" : @"/dev/null && \";
+                var part1Ending = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "NUL" : @"/dev/null";
 
                 args.Add($"-y -i \"{{0}}\" -c:v {VideoCodec}{videoCodecOptions} -b:v {VideoBitRate}k{frameRate}{passStr} -an -f null {part1Ending}".Replace("%passnum%", "1"));
                 args.Add($"-y -i \"{{0}}\" -c:v {VideoCodec}{videoCodecOptions} -b:v {VideoBitRate}k{frameRate}{passStr} -c:a {AudioCodec}{audioBitrate}{opArgsStr} \"{{1}}\"".Replace("%passnum%", "2"));

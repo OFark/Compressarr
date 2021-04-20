@@ -4,7 +4,6 @@ using Compressarr.JobProcessing.Models;
 using Compressarr.Services;
 using Compressarr.Services.Models;
 using Compressarr.Settings;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
@@ -17,22 +16,20 @@ namespace Compressarr.JobProcessing
 {
     public class JobManager : IJobManager
     {
-        private string jobsFilePath => Path.Combine(_env.ContentRootPath, "config", "jobs.json");
+        private string jobsFilePath => settingsManager?.ConfigFile("jobs.json");
 
         public HashSet<Job> Jobs { get; set; }
 
-        private readonly IWebHostEnvironment _env;
         private readonly ILogger<JobManager> logger;
-        internal IRadarrService radarrService;
-        internal ISonarrService sonarrService;
-        internal IFilterManager filterManager;
-        internal ISettingsManager settingsManager;
-        internal IFFmpegManager fFmpegManager;
-        internal IProcessManager processManager;
+        private readonly IRadarrService radarrService;
+        private readonly ISonarrService sonarrService;
+        private readonly IFilterManager filterManager;
+        private readonly ISettingsManager settingsManager;
+        private readonly IFFmpegManager fFmpegManager;
+        private readonly IProcessManager processManager;
 
-        public JobManager(IWebHostEnvironment env, ILogger<JobManager> logger, ISettingsManager settingsManager, IRadarrService radarrService, ISonarrService sonarrService, IFilterManager filterManager, IFFmpegManager fFmpegManager, IProcessManager processManager)
+        public JobManager(ILogger<JobManager> logger, ISettingsManager settingsManager, IRadarrService radarrService, ISonarrService sonarrService, IFilterManager filterManager, IFFmpegManager fFmpegManager, IProcessManager processManager)
         {
-            _env = env;
             this.logger = logger;
             this.settingsManager = settingsManager;
             this.radarrService = radarrService;
@@ -54,28 +51,29 @@ namespace Compressarr.JobProcessing
             }
         }
 
-        public async Task AddJob(Job newJob)
+        public async Task<bool> AddJob(Job newJob)
         {
+            await InitialiseJob(newJob, true);
 
-            var job = Jobs.FirstOrDefault(j => j.Name == newJob.Name);
-
-            if (job != null)
+            if (newJob.JobState == JobState.TestedOK)
             {
-                logger.LogDebug($"Updating Existing Job.");
-                job.AutoImport = newJob.AutoImport;
-                job.BaseFolder = newJob.BaseFolder;
-                job.DestinationFolder = newJob.DestinationFolder;
-            }
-            else
-            {
-                logger.LogDebug($"Adding Job ({newJob.Name}).");
-                job = newJob;
-                Jobs.Add(newJob);
-            }
+                if (Jobs.Contains(newJob))
+                {
+                    logger.LogDebug($"Updating Existing Job.");
+                    //job.AutoImport = newJob.AutoImport;
+                    //job.BaseFolder = newJob.BaseFolder;
+                    //job.DestinationFolder = newJob.DestinationFolder;
+                }
+                else
+                {
+                    logger.LogDebug($"Adding Job ({newJob.Name}).");
+                    Jobs.Add(newJob);
+                }
 
-            UpdateJobState(job, JobState.Added);
-            await SaveJobs();
-            await InitialiseJob(job, true);
+                await SaveJobs();
+                return true;
+            }
+            return false;
         }
 
         public void CancelJob(Job job)
@@ -97,9 +95,7 @@ namespace Compressarr.JobProcessing
         {
             logger.LogDebug($"Delete Job ({job.Name}).");
 
-            job = Jobs.FirstOrDefault(j => j.Name == job.Name);
-
-            if (job != null)
+            if (Jobs.Contains(job))
             {
                 Jobs.Remove(job);
             }
@@ -128,7 +124,7 @@ namespace Compressarr.JobProcessing
                 if (job.Preset != null)
                 {
                     job.Preset.ContainerExtension = fFmpegManager.ConvertContainerToExtension(job.Preset.Container);
-                    logger.LogDebug($"Containter Extension set to {job.Preset.ContainerExtension}");
+                    logger.LogDebug($"Container Extension set to {job.Preset.ContainerExtension}");
                     UpdateJobState(job, JobState.Added);
                     job.Cancel = false;
 
@@ -253,6 +249,24 @@ namespace Compressarr.JobProcessing
             return new ServiceResult<HashSet<WorkItem>>(false, "404", "Not Implemented");
         }
 
+        public async Task<Job> ReloadJob(Job job)
+        {
+            var fileJobs = await LoadJobs();
+
+            var fileJob = fileJobs.FirstOrDefault(j => j.ID == job.ID);
+
+            if(fileJob != null)
+            {
+                job.AutoImport = fileJob.AutoImport;
+                job.BaseFolder = fileJob.BaseFolder;
+                job.DestinationFolder = fileJob.DestinationFolder;
+            }
+
+            _ = InitialiseJob(job, true);
+
+            return job;
+        }
+
         public async void RunJob(Job job)
         {
             logger.LogDebug($"Run Job.");
@@ -303,6 +317,8 @@ namespace Compressarr.JobProcessing
 
         private void Succeed(Job job)
         {
+            job.ID ??= Guid.NewGuid();
+
             UpdateJobState(job, JobState.TestedOK);
             job.Log("Test succeeded", LogLevel.Information);
         }
