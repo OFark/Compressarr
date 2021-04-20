@@ -2,6 +2,7 @@
 using Compressarr.JobProcessing;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Xabe.FFmpeg;
 
 namespace Compressarr.FFmpegFactory
 {
@@ -19,6 +20,7 @@ namespace Compressarr.FFmpegFactory
         string ConvertContainerToExtension(string container);
         void DeletePreset(string presetName);
         string GetFFmpegVersion();
+        Task<IMediaInfo> GetMediaInfo(string filepath);
         HashSet<CodecOptionValue> GetOptions(string codec);
         IFFmpegPreset GetPreset(string presetName);
         void Init();

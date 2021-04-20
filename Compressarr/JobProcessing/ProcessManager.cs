@@ -98,8 +98,8 @@ namespace Compressarr.JobProcessing
 
         private void Converter_OnProgress(ConversionProgressEventArgs args, FFmpegProcess process)
         {
+            //Here Duration is the current time frame;
             process.WorkItem.Duration = args.Duration;
-            process.WorkItem.TotalLength = args.TotalLength;
             process.WorkItem.Percent = args.Percent;
             //workItem.UpdateStatus("");
             process.Update();// Log();
@@ -110,6 +110,7 @@ namespace Compressarr.JobProcessing
         {
             //"frame= 2171 fps= 58 q=-0.0 size=    4396kB time=00:01:28.50 bitrate= 406.9kbits/s speed=2.38x    ";
             //"frame= 3097 fps= 22 q=-0.0 size=N/A time=00:02:04.72 bitrate=N/A speed=0.886x"
+            //"frame=   81 fps=0.0 q=-0.0 size=N/A time=00:00:03.44 bitrate=N/A speed=6.69x"
 
             logger.LogDebug(e.Data);
 

@@ -160,16 +160,31 @@ namespace Compressarr.FFmpegFactory
 
             logger.LogDebug("Checking Results.");
 
+
+            var mediaInfo = await GetMediaInfo(workitem.DestinationFile);
+            if (mediaInfo != null)
+            {
+                //Workitem.Duration refers to the processing time frame.
+                logger.LogDebug($"Original Duration: {workitem.TotalLength}");
+                logger.LogDebug($"New Duration: {mediaInfo.Duration}");
+
+                return mediaInfo.Duration != default && workitem.TotalLength.HasValue &&
+                    (long)Math.Round(mediaInfo.Duration.TotalSeconds, 0) == (long)Math.Round(workitem.TotalLength.Value.TotalSeconds, 0);
+            }
+            return false;
+        }
+
+        public async Task<IMediaInfo> GetMediaInfo(string filepath)
+        {
+            logger.LogDebug($"Getting MediaInfo ({filepath}).");
             try
             {
-                var mediaInfo = await FFmpeg.GetMediaInfo(workitem.DestinationFile);
-
-                return mediaInfo.Duration == workitem.Duration;
+                return await FFmpeg.GetMediaInfo(filepath);
             }
-            catch(ArgumentException aex)
+            catch (ArgumentException aex)
             {
                 logger.LogError(aex.ToString());
-                return false;
+                return null;
             }
         }
 

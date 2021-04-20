@@ -283,6 +283,13 @@ namespace Compressarr.JobProcessing
                         if (!job.Cancel)
                         {
                             wi.Success = false;
+                            //WorkItem Duration is the current process time frame, MediaInfo Duration is the movie length.
+                            var mediaInfo = await fFmpegManager.GetMediaInfo(wi.SourceFile);
+                            if (mediaInfo != null)
+                            {
+                                wi.TotalLength = TimeSpan.FromSeconds((long)Math.Round(mediaInfo.Duration.TotalSeconds,0));
+                            }
+
                             Log(job, LogLevel.Debug, $"Now Processing: {wi.SourceFileName}");
                             job.Process = new FFmpegProcess();
                             job.Process.OnUpdate += job.UpdateStatus;
