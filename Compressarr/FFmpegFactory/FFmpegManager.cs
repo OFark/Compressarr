@@ -18,36 +18,11 @@ namespace Compressarr.FFmpegFactory
 {
     public class FFmpegManager : IFFmpegManager
     {
+        private const string presetsFile = "presets.json";
+        private readonly ILogger<FFmpegManager> logger;
         private readonly IServiceProvider services;
         private readonly ISettingsManager settingsManager;
-        private readonly ILogger<FFmpegManager> logger;
-
-        private string ExecutablesPath => Path.Combine(SettingsManager.ConfigDirectory, "FFmpeg");
-        private string PresetsFilePath => settingsManager?.ConfigFile("presets.json");
-
-        private string FFMPEG => RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? Path.Combine(ExecutablesPath, "ffmpeg.exe")
-                               : RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? Path.Combine(ExecutablesPath, "ffmpeg")
-                               : throw new NotSupportedException("Cannot Identify OS");
-
-        private string FFPROBE => RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? Path.Combine(ExecutablesPath, "ffprobe.exe")
-                               : RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? Path.Combine(ExecutablesPath, "ffprobe")
-                               : throw new NotSupportedException("Cannot Identify OS");
-
-
-        private HashSet<IFFmpegPreset> _presets { get; set; }
-        public HashSet<IFFmpegPreset> Presets => _presets ?? LoadPresets();
-
-        public FFmpegStatus Status { get; private set; }
-
-        public SortedDictionary<string, string> AudioCodecs => Codecs[CodecType.Audio];
-        public SortedDictionary<string, string> Containers { get; private set; }
-        public SortedDictionary<string, string> SubtitleCodecs => Codecs[CodecType.Subtitle];
-        public SortedDictionary<string, string> VideoCodecs => Codecs[CodecType.Video];
-
-        private Dictionary<CodecType, SortedDictionary<string, string>> Codecs { get; set; }
-
         private Task initTask = null;
-
         public FFmpegManager(IServiceProvider services, ISettingsManager settingsManager, ILogger<FFmpegManager> logger)
         {
             this.services = services;
@@ -58,279 +33,284 @@ namespace Compressarr.FFmpegFactory
             FFmpeg.SetExecutablesPath(ExecutablesPath);
         }
 
-        public void Init()
-        {
-            logger.LogInformation("Initialising FFMPEG");
-            initTask = Task.Run(async () =>
-            {
-                logger.LogDebug("Getting latest version");
-                await FFmpegDownloader.GetLatestVersion(FFmpegVersion.Official, ExecutablesPath);
+        public SortedDictionary<string, string> AudioCodecs => Codecs[CodecType.Audio];
+        public SortedDictionary<string, string> Containers { get; private set; }
+        public HashSet<IFFmpegPreset> Presets => _presets ?? LoadPresets();
+        public FFmpegStatus Status { get; private set; }
+        public SortedDictionary<string, string> SubtitleCodecs => Codecs[CodecType.Subtitle];
+        public SortedDictionary<string, string> VideoCodecs => Codecs[CodecType.Video];
+        private HashSet<IFFmpegPreset> _presets { get; set; }
+        private Dictionary<CodecType, SortedDictionary<string, string>> Codecs { get; set; }
+        private string ExecutablesPath => Path.Combine(SettingsManager.ConfigDirectory, "FFmpeg");
+        private string FFMPEG => RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? Path.Combine(ExecutablesPath, "ffmpeg.exe")
+                               : RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? Path.Combine(ExecutablesPath, "ffmpeg")
+                               : throw new NotSupportedException("Cannot Identify OS");
 
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                {
-                    logger.LogDebug("Running on Linux, CHMOD required");
-                    foreach (var exe in new string[] { FFMPEG, FFPROBE })
-                    {
-                        using (var p = new Process())
-                        {
-                            p.StartInfo = new ProcessStartInfo()
-                            {
-                                RedirectStandardOutput = true,
-                                UseShellExecute = false,
-                                CreateNoWindow = true,
-                                WindowStyle = ProcessWindowStyle.Hidden,
-                                FileName = "/bin/bash",
-                                Arguments = $"-c \"chmod +x {exe}\""
-                            };
-                            p.StartInfo.RedirectStandardOutput = true;
-                            p.StartInfo.RedirectStandardError = true;
-                            p.OutputDataReceived += (sender, args) => Console.WriteLine(args.Data);
-                            logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
-                            p.Start();
-                            var error = p.StandardError.ReadToEnd();
-                            p.WaitForExit();
-
-                            if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(error))
-                            {
-                                logger.LogError($"Process Error: ({p.ExitCode}) {error} <End Of Error>");
-                            }
-                            logger.LogDebug("Process finished");
-                        };
-                    }
-                }
-            });
-
-            initTask.Wait();
-
-            logger.LogDebug("FFmpeg downloaded.");
-
-            Codecs = GetAvailableCodecs();
-            Containers = GetAvailableContainers();
-            Status = FFmpegStatus.Ready;
-        }
-
-        public IFFmpegPreset GetPreset(string presetName) => Presets.FirstOrDefault(p => p.Name == presetName);
-
+        private string FFPROBE => RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? Path.Combine(ExecutablesPath, "ffprobe.exe")
+                               : RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? Path.Combine(ExecutablesPath, "ffprobe")
+                               : throw new NotSupportedException("Cannot Identify OS");
         public void AddPreset(IFFmpegPreset newPreset)
         {
             initTask.Wait();
-            logger.LogDebug($"Adding Preset: {newPreset.Name}.");
-
-            var preset = Presets.FirstOrDefault(x => x.Name == newPreset.Name);
-
-            if (preset == null)
+            using (logger.BeginScope("Adding Preset"))
             {
-                logger.LogDebug("New Preset.");
-                _presets.Add(newPreset);
+                logger.LogInformation($"Preset Name: {newPreset.Name}");
+
+                var preset = Presets.FirstOrDefault(x => x.Name == newPreset.Name);
+
+                if (preset == null)
+                {
+                    logger.LogDebug("Adding a new preset.");
+                    _presets.Add(newPreset);
+                }
+                else
+                {
+                    logger.LogDebug("Preset already exists, removing the old one.");
+                    Presets.Remove(preset);
+                    logger.LogDebug("Adding the new one.");
+                    Presets.Add(newPreset);
+                }
+
+                SavePresets();
             }
-            else
-            {
-                logger.LogDebug("Preset already exists, removing the old one.");
-                Presets.Remove(preset);
-                logger.LogDebug("Adding the new one.");
-                Presets.Add(newPreset);
-            }
-
-            SavePresets();
-        }
-
-        public void DeletePreset(string presetName)
-        {
-            initTask.Wait();
-
-            logger.LogDebug($"Deleting Preset: {presetName}.");
-
-            var preset = Presets.FirstOrDefault(x => x.Name == presetName);
-
-            if (preset != null)
-            {
-                _presets.Remove(preset);
-            }
-            else
-            {
-                logger.LogWarning($"Preset {presetName} not found.");
-            }
-
-            SavePresets();
         }
 
         public async Task<bool> CheckResult(WorkItem workitem)
         {
             initTask.Wait();
 
-            logger.LogDebug("Checking Results.");
-
-
-            var mediaInfo = await GetMediaInfo(workitem.DestinationFile);
-            if (mediaInfo != null)
+            using (logger.BeginScope("Checking Results."))
             {
-                //Workitem.Duration refers to the processing time frame.
-                logger.LogDebug($"Original Duration: {workitem.TotalLength}");
-                logger.LogDebug($"New Duration: {mediaInfo.Duration}");
+                var mediaInfo = await GetMediaInfo(workitem.DestinationFile);
+                if (mediaInfo != null)
+                {
+                    //Workitem.Duration refers to the processing time frame.
+                    logger.LogDebug($"Original Duration: {workitem.TotalLength}");
+                    logger.LogDebug($"New Duration: {mediaInfo.Duration}");
 
-                return mediaInfo.Duration != default && workitem.TotalLength.HasValue &&
-                    (long)Math.Round(mediaInfo.Duration.TotalSeconds, 0) == (long)Math.Round(workitem.TotalLength.Value.TotalSeconds, 0);
-            }
-            return false;
-        }
-
-        public async Task<IMediaInfo> GetMediaInfo(string filepath)
-        {
-            logger.LogDebug($"Getting MediaInfo ({filepath}).");
-            try
-            {
-                return await FFmpeg.GetMediaInfo(filepath);
-            }
-            catch (ArgumentException aex)
-            {
-                logger.LogError(aex.ToString());
-                return null;
+                    return mediaInfo.Duration != default && workitem.TotalLength.HasValue &&
+                        (long)Math.Round(mediaInfo.Duration.TotalSeconds, 0) == (long)Math.Round(workitem.TotalLength.Value.TotalSeconds, 0);
+                }
+                return false;
             }
         }
 
         public string ConvertContainerToExtension(string container)
         {
             initTask.Wait();
-
-            logger.LogDebug($"Converting container name ({container}) to file extension.");
-
-            var p = new Process();
-            p.StartInfo.UseShellExecute = false;
-            p.StartInfo.RedirectStandardOutput = true;
-            p.StartInfo.RedirectStandardError = true;
-            p.StartInfo.FileName = FFMPEG;
-            p.StartInfo.Arguments = $"-v 1 -h muxer={container}";
-
-            logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
-            p.Start();
-            var output = p.StandardOutput.ReadToEnd();
-            var error = p.StandardError.ReadToEnd();
-            p.WaitForExit();
-
-            if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(error))
+            using (logger.BeginScope("Converting container to extension"))
             {
-                logger.LogError($"Process Error: ({p.ExitCode}) {error} <End Of Error>");
-            }
+                logger.LogInformation($"Container name: {container}");
 
-            var formatLines = output.Split("\n").ToList();
+                var p = new Process();
+                p.StartInfo.UseShellExecute = false;
+                p.StartInfo.RedirectStandardOutput = true;
+                p.StartInfo.RedirectStandardError = true;
+                p.StartInfo.FileName = FFMPEG;
+                p.StartInfo.Arguments = $"-v 1 -h muxer={container}";
 
-            foreach (var line in formatLines)
-            {
-                if (line.Trim().StartsWith("Common extensions:"))
+                logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
+                p.Start();
+                var output = p.StandardOutput.ReadToEnd();
+                var error = p.StandardError.ReadToEnd();
+                p.WaitForExit();
+
+                if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(error))
                 {
-                    var lineSplit = line.Split(":");
-                    if (lineSplit.Length == 2)
+                    logger.LogError($"Process Error: ({p.ExitCode}) {error} <End Of Error>");
+                }
+
+                var formatLines = output.Split("\n").ToList();
+
+                foreach (var line in formatLines)
+                {
+                    if (line.Trim().StartsWith("Common extensions:"))
                     {
-                        var extensions = lineSplit[1].Trim().TrimEnd('.');
-
-                        var splitExtensions = extensions.Split(",");
-
-                        if (splitExtensions.Length > 0)
+                        var lineSplit = line.Split(":");
+                        if (lineSplit.Length == 2)
                         {
-                            return splitExtensions[0];
+                            var extensions = lineSplit[1].Trim().TrimEnd('.');
+
+                            var splitExtensions = extensions.Split(",");
+
+                            if (splitExtensions.Length > 0)
+                            {
+                                return splitExtensions[0];
+                            }
                         }
                     }
+                    else
+                    {
+                        logger.LogDebug($"No common extensions found.");
+                    }
+                }
+
+                return container;
+            }
+        }
+
+        public void DeletePreset(string presetName)
+        {
+            initTask.Wait();
+
+            using (logger.BeginScope("Deleting Preset"))
+            {
+                logger.LogInformation($"Preset Name: {presetName}");
+
+                var preset = Presets.FirstOrDefault(x => x.Name == presetName);
+
+                if (preset != null)
+                {
+                    _presets.Remove(preset);
                 }
                 else
                 {
-                    logger.LogDebug($"No common extensions found.");
+                    logger.LogWarning($"Preset {presetName} not found.");
                 }
-            }
 
-            return container;
+                SavePresets();
+            }
         }
 
         public string GetFFmpegVersion()
         {
-            logger.LogDebug($"Get FFmpeg Version.");
-
-            var path = Path.Combine(ExecutablesPath, "version.json");
-            logger.LogDebug($"From {path}.");
-
-            try
+            using (logger.BeginScope("Get FFmpeg Version."))
             {
-                var json = File.ReadAllText(path);
+                var path = Path.Combine(ExecutablesPath, "version.json");
+                logger.LogDebug($"From {path}.");
 
-                if (!string.IsNullOrWhiteSpace(json))
+                try
                 {
-                    var version = JsonConvert.DeserializeObject<dynamic>(json);
-                    return version.version.ToString();
+                    var json = File.ReadAllText(path);
+
+                    if (!string.IsNullOrWhiteSpace(json))
+                    {
+                        var version = JsonConvert.DeserializeObject<dynamic>(json);
+                        return version.version.ToString();
+                    }
+                    else
+                    {
+                        logger.LogDebug($"Empty file.");
+                    }
                 }
-                else
+                catch (UnauthorizedAccessException uae)
                 {
-                    logger.LogDebug($"Empty file.");
+                    logger.LogError(uae.ToString());
+                    return uae.Message;
                 }
+                return null;
             }
-            catch (UnauthorizedAccessException uae)
-            {
-                logger.LogError(uae.ToString());
-                return uae.Message;
-            }
-            return null;
         }
 
-        private HashSet<IFFmpegPreset> LoadPresets()
+        public async Task<IMediaInfo> GetMediaInfo(string filepath)
         {
-            initTask.Wait();
-            logger.LogDebug($"Presets empty - loading from file ({PresetsFilePath}).");
-
-            _presets = new HashSet<IFFmpegPreset>();
-
-            if (File.Exists(PresetsFilePath))
+            using (logger.BeginScope($"Getting MediaInfo"))
             {
-                var json = File.ReadAllText(PresetsFilePath);
-                if (!string.IsNullOrWhiteSpace(json))
+                logger.LogInformation("File Name: {filepath}");
+                try
                 {
-                    var presets = JsonConvert.DeserializeObject<HashSet<FFmpegPreset>>(json);
+                    return await FFmpeg.GetMediaInfo(filepath);
+                }
+                catch (ArgumentException aex)
+                {
+                    logger.LogError(aex.ToString());
+                    return null;
+                }
+            }
+        }
 
-                    foreach (var preset in presets)
+        public HashSet<CodecOptionValue> GetOptions(string codec)
+        {
+            using (logger.BeginScope("Get Codec Options"))
+            {
+                logger.LogInformation($"Codec: {codec}");
+
+                var optionsFile = Path.Combine(SettingsManager.CodecOptionsDirectory, $"{codec}.json");
+                logger.LogDebug($"From {optionsFile}");
+
+                if (File.Exists(optionsFile))
+                {
+                    var json = File.ReadAllText(optionsFile);
+                    if (!string.IsNullOrWhiteSpace(json))
                     {
-                        if (preset.VideoCodecOptions != null && preset.VideoCodecOptions.Any())
+                        HashSet<CodecOptionValue> options = null;
+                        try
                         {
-                            var codecOptions = GetOptions(preset.VideoCodec);
-                            foreach (var co in codecOptions)
-                            {
-                                var val = preset.VideoCodecOptions.FirstOrDefault(x => x.Name == co.Name);
-                                if (val != null)
-                                {
-                                    co.Value = val.Value;
-                                }
-                            }
-
-                            preset.VideoCodecOptions = codecOptions;
+                            options = JsonConvert.DeserializeObject<HashSet<CodecOptionValue>>(json);
                         }
-                        _presets.Add(preset);
+                        catch (JsonSerializationException jsex)
+                        {
+                            logger.LogError($"JSON parsing error: {jsex}.");
+                        }
+                        return options;
+                    }
+                    else
+                    {
+                        logger.LogDebug($"Options file empty.");
                     }
                 }
                 else
                 {
-                    logger.LogDebug($"Presets file is empty.");
+                    logger.LogDebug($"Codec Options file not found.");
                 }
+                return null;
             }
-            else
-            {
-                logger.LogDebug($"Presets file does not exist.");
-            }
-
-            return _presets;
         }
 
-        private void SavePresets()
+        public IFFmpegPreset GetPreset(string presetName) => Presets.FirstOrDefault(p => p.Name == presetName);
+
+        public void Init()
         {
-            initTask.Wait();
-            logger.LogDebug($"Saving Presets to {PresetsFilePath}.");
-
-            var json = JsonConvert.SerializeObject(Presets, new JsonSerializerSettings() { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
-
-            if (!Directory.Exists(Path.GetDirectoryName(PresetsFilePath)))
+            using (logger.BeginScope("Initialising FFMPEG"))
             {
-                logger.LogDebug($"Directory does not exist. Creating.");
-                Directory.CreateDirectory(Path.GetDirectoryName(PresetsFilePath));
+                initTask = Task.Run(async () =>
+                {
+                    logger.LogInformation("Getting latest version");
+                    await FFmpegDownloader.GetLatestVersion(FFmpegVersion.Official, ExecutablesPath);
+
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                    {
+                        logger.LogDebug("Running on Linux, CHMOD required");
+                        foreach (var exe in new string[] { FFMPEG, FFPROBE })
+                        {
+                            using (var p = new Process())
+                            {
+                                p.StartInfo = new ProcessStartInfo()
+                                {
+                                    RedirectStandardOutput = true,
+                                    UseShellExecute = false,
+                                    CreateNoWindow = true,
+                                    WindowStyle = ProcessWindowStyle.Hidden,
+                                    FileName = "/bin/bash",
+                                    Arguments = $"-c \"chmod +x {exe}\""
+                                };
+                                p.StartInfo.RedirectStandardOutput = true;
+                                p.StartInfo.RedirectStandardError = true;
+                                p.OutputDataReceived += (sender, args) => Console.WriteLine(args.Data);
+                                logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
+                                p.Start();
+                                var error = p.StandardError.ReadToEnd();
+                                p.WaitForExit();
+
+                                if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(error))
+                                {
+                                    logger.LogError($"Process Error: ({p.ExitCode}) {error} <End Of Error>");
+                                }
+                                logger.LogDebug("Process finished");
+                            };
+                        }
+                    }
+                });
+
+                initTask.Wait();
+
+                logger.LogDebug("FFmpeg downloaded.");
+
+                Codecs = GetAvailableCodecs();
+                Containers = GetAvailableContainers();
+                Status = FFmpegStatus.Ready;
             }
-
-            File.WriteAllText(PresetsFilePath, json);
         }
-
         private Dictionary<CodecType, SortedDictionary<string, string>> GetAvailableCodecs()
         {
             initTask.Wait();
@@ -356,7 +336,6 @@ namespace Compressarr.FFmpegFactory
             {
                 logger.LogError($"Process Error: ({p.ExitCode}) {error} <End Of Error>");
             }
-
 
             codecs.Add(CodecType.Audio, new());
             codecs.Add(CodecType.Subtitle, new());
@@ -384,6 +363,7 @@ namespace Compressarr.FFmpegFactory
                     case "V":
                         codecs[CodecType.Video].Add(codecName, codecDesc);
                         break;
+
                     default:
                         logger.LogWarning($"Unrecognised Codec line: {m.Groups[0]}");
                         break;
@@ -434,38 +414,50 @@ namespace Compressarr.FFmpegFactory
             return formats;
         }
 
-        public HashSet<CodecOptionValue> GetOptions(string codec)
+        private HashSet<IFFmpegPreset> LoadPresets()
         {
-            logger.LogDebug($"Get options for Codec {codec}.");
-            var optionsFile = Path.Combine(SettingsManager.CodecOptionsDirectory, $"{codec}.json");
-            logger.LogDebug($"From {optionsFile}.");
+            using (logger.BeginScope("Load Presets"))
+            {
+                initTask.Wait();
 
-            if (File.Exists(optionsFile))
-            {
-                var json = File.ReadAllText(optionsFile);
-                if (!string.IsNullOrWhiteSpace(json))
+                logger.LogInformation($"Presets empty");
+
+                _presets = new HashSet<IFFmpegPreset>();
+
+                var presets = settingsManager.LoadSettingFile<HashSet<FFmpegPreset>>(presetsFile).Result ?? new();
+
+                foreach (var preset in presets)
                 {
-                    HashSet<CodecOptionValue> options = null;
-                    try
+                    if (preset.VideoCodecOptions != null && preset.VideoCodecOptions.Any())
                     {
-                        options = JsonConvert.DeserializeObject<HashSet<CodecOptionValue>>(json);
+                        var codecOptions = GetOptions(preset.VideoCodec);
+                        foreach (var co in codecOptions)
+                        {
+                            var val = preset.VideoCodecOptions.FirstOrDefault(x => x.Name == co.Name);
+                            if (val != null)
+                            {
+                                co.Value = val.Value;
+                            }
+                        }
+
+                        preset.VideoCodecOptions = codecOptions;
                     }
-                    catch (JsonSerializationException jsex)
-                    {
-                        logger.LogError($"JSON parsing error: {jsex}.");
-                    }
-                    return options;
+                    _presets.Add(preset);
                 }
-                else
-                {
-                    logger.LogDebug($"Options file empty.");
-                }
+
+                return _presets;
             }
-            else
+        }
+
+        private void SavePresets()
+        {
+            using (logger.BeginScope("Save Presets"))
             {
-                logger.LogDebug($"Codec Options file not found.");
+                initTask.Wait();
+                logger.LogInformation($"Saving Presets");
+
+                settingsManager.SaveSettingFile(presetsFile, Presets);
             }
-            return null;
         }
     }
 }

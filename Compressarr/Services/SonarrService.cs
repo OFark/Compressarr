@@ -20,50 +20,54 @@ namespace Compressarr.Services
 
         public SystemStatus TestConnection(string sonarrURL, string sonarrAPIKey)
         {
-            logger.LogDebug($"Test Sonarr Connection.");
-            SystemStatus ss = new SystemStatus();
-
-            var link = $"{sonarrURL}/api/system/status?apikey={sonarrAPIKey}";
-            logger.LogDebug($"LinkURL: {link}");
-
-            string statusJSON = null;
-            HttpResponseMessage hrm = null;
-
-            var hc = new HttpClient();
-            try
+            using (logger.BeginScope("Test Connection"))
             {
-                logger.LogDebug($"Connecting.");
-                hrm = hc.GetAsync(link).Result;
 
-                statusJSON = hrm.Content.ReadAsStringAsync().Result;
+                logger.LogInformation($"Test Sonarr Connection.");
+                SystemStatus ss = new SystemStatus();
 
-                if (hrm.IsSuccessStatusCode)
+                var link = $"{sonarrURL}/api/system/status?apikey={sonarrAPIKey}";
+                logger.LogDebug($"LinkURL: {link}");
+
+                string statusJSON = null;
+                HttpResponseMessage hrm = null;
+
+                var hc = new HttpClient();
+                try
                 {
-                    ss = JsonConvert.DeserializeObject<SystemStatus>(statusJSON);
-                    ss.Success = true;
-                    logger.LogDebug($"Success.");
-                }
-                else
-                {
-                    logger.LogWarning($"Failed: {hrm.StatusCode}");
-                    ss.Success = false;
-                    ss.ErrorMessage = $"{hrm.StatusCode}";
-                    if (hrm.ReasonPhrase != hrm.StatusCode.ToString())
+                    logger.LogDebug($"Connecting.");
+                    hrm = hc.GetAsync(link).Result;
+
+                    statusJSON = hrm.Content.ReadAsStringAsync().Result;
+
+                    if (hrm.IsSuccessStatusCode)
                     {
-                        ss.ErrorMessage += $"- {hrm.ReasonPhrase}";
-                        logger.LogWarning($"Failed: {hrm.ReasonPhrase}");
+                        ss = JsonConvert.DeserializeObject<SystemStatus>(statusJSON);
+                        ss.Success = true;
+                        logger.LogInformation($"Success.");
+                    }
+                    else
+                    {
+                        logger.LogWarning($"Failed: {hrm.StatusCode}");
+                        ss.Success = false;
+                        ss.ErrorMessage = $"{hrm.StatusCode}";
+                        if (hrm.ReasonPhrase != hrm.StatusCode.ToString())
+                        {
+                            ss.ErrorMessage += $"- {hrm.ReasonPhrase}";
+                            logger.LogWarning($"Failed: {hrm.ReasonPhrase}");
+                        }
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                ss.Success = false;
+                catch (Exception ex)
+                {
+                    ss.Success = false;
 
-                ss.ErrorMessage = $"Request Exception: {ex.Message}";
-                logger.LogError(ex.ToString());
-            }
+                    ss.ErrorMessage = $"Request Exception: {ex.Message}";
+                    logger.LogError(ex.ToString());
+                }
 
-            return ss;
+                return ss;
+            }
         }
     }
 }

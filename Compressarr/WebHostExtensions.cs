@@ -30,23 +30,25 @@ namespace Compressarr
 
         public static IHostBuilder ConfigureDefaultFiles(this IHostBuilder builder)
         {
-            
-            if (!Directory.Exists(SettingsManager.ConfigDirectory)) Directory.CreateDirectory(SettingsManager.ConfigDirectory);
-            if (!Directory.Exists(SettingsManager.CodecOptionsDirectory)) Directory.CreateDirectory(SettingsManager.CodecOptionsDirectory);
-
-            if (!File.Exists(SettingsManager.appSettings))
+            if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") != Environments.Development)
             {
-                File.Copy(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config", "appsettings.json"), SettingsManager.appSettings);
-            }
+                if (!Directory.Exists(SettingsManager.ConfigDirectory)) Directory.CreateDirectory(SettingsManager.ConfigDirectory);
+                if (!Directory.Exists(SettingsManager.CodecOptionsDirectory)) Directory.CreateDirectory(SettingsManager.CodecOptionsDirectory);
 
-            foreach (var f in new DirectoryInfo(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CodecOptions")).GetFiles())
-            {
-                if (!File.Exists(Path.Combine(SettingsManager.CodecOptionsDirectory, f.Name)))
+                if (SettingsManager.InDocker && !File.Exists(SettingsManager.dockerAppSettings))
                 {
-                    f.CopyTo(Path.Combine(SettingsManager.CodecOptionsDirectory, f.Name));
+                    File.Copy(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.Docker.json"), SettingsManager.dockerAppSettings);
                 }
-            }
 
+                foreach (var f in new DirectoryInfo(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CodecOptions")).GetFiles())
+                {
+                    if (!File.Exists(Path.Combine(SettingsManager.CodecOptionsDirectory, f.Name)))
+                    {
+                        f.CopyTo(Path.Combine(SettingsManager.CodecOptionsDirectory, f.Name));
+                    }
+                }
+
+            }
             return builder;
         }
     }

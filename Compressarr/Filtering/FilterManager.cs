@@ -17,6 +17,7 @@ namespace Compressarr.Filtering
 {
     public class FilterManager : IFilterManager
     {
+        private const string filterFile = "filters.json";
         private readonly ILogger<FilterManager> logger;
         private readonly ISettingsManager settingsManager;
 
@@ -71,25 +72,26 @@ namespace Compressarr.Filtering
         public List<FilterProperty> RadarrTableColumns { get; private set; }
         public List<FilterComparitor> StringComparitors { get; }
         private HashSet<Filter> _filters { get; set; }
-        private string filterFilePath => settingsManager?.ConfigFile("filters.json");
-
         public void AddFilter(List<DynamicLinqFilter> dlFilters, string filterName, MediaSource filterType)
         {
-            logger.LogDebug($"Adding Filter ({filterName})");
-
-            var filter = Filters.FirstOrDefault(x => x.Name == filterName);
-
-            if (filter == null)
+            using (logger.BeginScope("Add Filter"))
             {
-                logger.LogDebug($"Filter not found, creating a new one.");
+                logger.LogInformation($"Filter namne: {filterName}");
 
-                filter = new Filter(filterName, filterType);
-                _filters.Add(filter);
+                var filter = Filters.FirstOrDefault(x => x.Name == filterName);
+
+                if (filter == null)
+                {
+                    logger.LogDebug($"Filter not found, creating a new one.");
+
+                    filter = new Filter(filterName, filterType);
+                    _filters.Add(filter);
+                }
+
+                filter.Filters = dlFilters.Clone();
+
+                SaveFilters();
             }
-
-            filter.Filters = dlFilters.Clone();
-
-            SaveFilters();
         }
 
         public string ConstructFilterQuery(List<DynamicLinqFilter> dlFilters, out string[] vals)
@@ -204,28 +206,14 @@ namespace Compressarr.Filtering
 
         private HashSet<Filter> LoadFilters()
         {
-            logger.LogDebug($"Load Filters from {filterFilePath}");
-
-            _filters = new HashSet<Filter>();
-
-            if (File.Exists(filterFilePath))
+            using (logger.BeginScope("Load Filters"))
             {
-                var json = File.ReadAllText(filterFilePath);
-                if (!string.IsNullOrWhiteSpace(json))
-                {
-                    _filters = JsonConvert.DeserializeObject<HashSet<Filter>>(json);
-                }
-                else
-                {
-                    logger.LogWarning($"Filters file empty.");
-                }
-            }
-            else
-            {
-                logger.LogDebug($"Filter file not found.");
-            }
+                logger.LogInformation("Filters are empty");
 
-            return _filters;
+                _filters = settingsManager.LoadSettingFile<HashSet<Filter>>(filterFile).Result ?? new();
+
+                return _filters;
+            }
         }
 
         private string recursiveFilterQuery(List<DynamicLinqFilter> dlFilters, ref List<string> vals)
@@ -279,17 +267,10 @@ namespace Compressarr.Filtering
         }
         private void SaveFilters()
         {
-            logger.LogDebug($"Save filters to {filterFilePath}");
-
-            var json = JsonConvert.SerializeObject(Filters, new JsonSerializerSettings() { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
-
-            if (!Directory.Exists(Path.GetDirectoryName(filterFilePath)))
+            using (logger.BeginScope("Save Filters"))
             {
-                logger.LogDebug($"Directory needs to be created.");
-                Directory.CreateDirectory(Path.GetDirectoryName(filterFilePath));
+                settingsManager.SaveSettingFile(filterFile, Filters);
             }
-
-            File.WriteAllText(filterFilePath, json);
         }
     }
 }

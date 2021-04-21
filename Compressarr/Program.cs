@@ -28,15 +28,15 @@ namespace Compressarr
                 .ConfigureDefaultFiles()
                 .ConfigureAppConfiguration((context, configBuilder) =>
                 {
-                    configBuilder.AddJsonFile(SettingsManager.appSettings);
+                    if (SettingsManager.InDocker)
+                    {
+                        configBuilder.AddJsonFile(SettingsManager.dockerAppSettings);
+                    }
                 })
-                .ConfigureLogging(loggingBuilder =>
+                .ConfigureLogging((hostBuilder, loggingBuilder) =>
                 {
-                    loggingBuilder.ClearProviders();
                     loggingBuilder
-                        .AddDebug()
-                        .AddConsole()
-                        .AddFile($"{SettingsManager.ConfigDirectory}/logs/{{Date}}.txt");
+                        .AddFile(hostBuilder.Configuration.GetSection("Logging:File"));
                 });
     }
 }

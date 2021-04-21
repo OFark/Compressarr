@@ -364,5 +364,3 @@ FodyWeavers.xsd
 
 # App config output
 Compressarr/config/*
-!Compressarr/config/appsettings.json
-!Compressarr/config/appsettings.Development.json

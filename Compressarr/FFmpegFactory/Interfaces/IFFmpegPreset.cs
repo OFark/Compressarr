@@ -6,6 +6,7 @@ namespace Compressarr.FFmpegFactory
 {
     public interface IFFmpegPreset
     {
+        public List<string> Arguments { get; }
         public int? AudioBitRate { get; set; }
         public string AudioCodec { get; set; }
         public string Container { get; set; }
@@ -19,7 +20,5 @@ namespace Compressarr.FFmpegFactory
         public int? VideoBitRate { get; set; }
         public string VideoCodec { get; set; }
         HashSet<CodecOptionValue> VideoCodecOptions { get; set; }
-
-        public List<string> GetArgumentString();
     }
 }

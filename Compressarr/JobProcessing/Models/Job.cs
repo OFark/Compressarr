@@ -23,6 +23,8 @@ namespace Compressarr.JobProcessing.Models
         [JsonIgnore]
         public bool Cancel { get; internal set; } = false;
 
+        public int MinSSIM = 99;
+
         public string DestinationFolder { get; set; }
 
         [JsonIgnore]

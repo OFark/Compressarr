@@ -14,168 +14,178 @@ namespace Compressarr.Services
 {
     public class RadarrService : IRadarrService
     {
+        private readonly ILogger<RadarrService> logger;
         private readonly ISettingsManager settingsManager;
 
-        private static HashSet<Movie> cachedMovies = null;
+        private HashSet<Movie> cachedMovies = null;
 
-        public long MovieCount => cachedMovies == null ? 0 : cachedMovies.Count;
-
-        private readonly ILogger<RadarrService> logger;
-
-        public RadarrService(ISettingsManager _settingsManager,ILogger<RadarrService> logger)
+        public RadarrService(ISettingsManager _settingsManager, ILogger<RadarrService> logger)
         {
             settingsManager = _settingsManager;
             this.logger = logger;
         }
 
+        public long MovieCount => cachedMovies?.Count ?? 0;
         public async Task<ServiceResult<HashSet<Movie>>> GetMovies()
         {
-            logger.LogDebug($"Get Movies.");
-            if (cachedMovies == null)
+            using (logger.BeginScope("Get Movies"))
             {
-                logger.LogDebug($"No cached movies, interrogate Radarr.");
-                var radarrURL = settingsManager.GetSetting(SettingType.RadarrURL);
-                var radarrAPIKey = settingsManager.GetSetting(SettingType.RadarrAPIKey);
+                logger.LogInformation($"Fetching Movies");
 
-                var link = $"{radarrURL}/api/movie?apikey={radarrAPIKey}";
-
-                if (string.IsNullOrWhiteSpace(radarrURL))
+                if (cachedMovies == null)
                 {
-                    logger.LogWarning($"No URL for Radarr.");
-                    return new ServiceResult<HashSet<Movie>>(false, "404", "Radarr URL not found. In Options. Go there");
-                }
+                    logger.LogDebug($"No cached movies, interrogate Radarr.");
+                    var radarrURL = settingsManager.GetSetting(SettingType.RadarrURL);
+                    var radarrAPIKey = settingsManager.GetSetting(SettingType.RadarrAPIKey);
 
-                if (string.IsNullOrWhiteSpace(radarrAPIKey))
-                {
-                    logger.LogWarning($"No API key for Radarr.");
-                    return new ServiceResult<HashSet<Movie>>(false, "404", "Radarr APIKey not found. In Options. Go there");
-                }
+                    var link = $"{radarrURL}/api/movie?apikey={radarrAPIKey}";
 
-                var movieJSON = string.Empty;
-
-                try
-                {
-                    logger.LogDebug($"Creating new HTTP client.");
-                    using (var hc = new HttpClient())
+                    if (string.IsNullOrWhiteSpace(radarrURL))
                     {
-                        logger.LogDebug($"Downlading Movie List.");
-                        movieJSON = await hc.GetStringAsync(link);
-                        var moviesArr = JsonConvert.DeserializeObject<Movie[]>(movieJSON);
-
-                        cachedMovies = moviesArr.Where(m => m.downloaded).OrderBy(m => m.title).ToHashSet();
+                        logger.LogWarning($"No URL for Radarr.");
+                        return new ServiceResult<HashSet<Movie>>(false, "404", "Radarr URL not found. In Options. Go there");
                     }
-                }
-                catch (Exception ex)
-                {
+
+                    if (string.IsNullOrWhiteSpace(radarrAPIKey))
+                    {
+                        logger.LogWarning($"No API key for Radarr.");
+                        return new ServiceResult<HashSet<Movie>>(false, "404", "Radarr APIKey not found. In Options. Go there");
+                    }
+
+                    var movieJSON = string.Empty;
+
                     try
                     {
-                        logger.LogError($"{ex}");
-                        var debugFolder = Path.Combine(SettingsManager.ConfigDirectory, "debug");
-                        if (!Directory.Exists(debugFolder))
+                        logger.LogDebug($"Creating new HTTP client.");
+                        using (var hc = new HttpClient())
                         {
-                            Directory.CreateDirectory(debugFolder);
+                            logger.LogDebug($"Downlading Movie List.");
+                            movieJSON = await hc.GetStringAsync(link);
+                            var moviesArr = JsonConvert.DeserializeObject<Movie[]>(movieJSON);
+
+                            cachedMovies = moviesArr.Where(m => m.downloaded).OrderBy(m => m.title).ToHashSet();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        try
+                        {
+                            logger.LogError($"{ex}");
+                            var debugFolder = Path.Combine(SettingsManager.ConfigDirectory, "debug");
+                            if (!Directory.Exists(debugFolder))
+                            {
+                                Directory.CreateDirectory(debugFolder);
+                            }
+
+                            var movieJSONFile = Path.Combine(debugFolder, "movie.json");
+
+                            logger.LogWarning($"Error understanding output from Radarr. Dumping output to: {movieJSONFile}");
+
+                            await File.WriteAllTextAsync(movieJSONFile, movieJSON);
+                        }
+                        catch (Exception)
+                        {
+                            logger.LogCritical("Cannot dump debug file, permissions?");
+                            logger.LogCritical(ex.ToString());
                         }
 
-                        var movieJSONFile = Path.Combine(debugFolder, "movie.json");
-
-                        logger.LogWarning($"Error understanding output from Radarr. Dumping output to: {movieJSONFile}");
-
-                        await File.WriteAllTextAsync(movieJSONFile, movieJSON);
+                        return new ServiceResult<HashSet<Movie>>(false, ex.Message, ex.InnerException?.ToString());
                     }
-                    catch (Exception) {
-                        logger.LogCritical("Cannot dump debug file, permissions?");
-                        logger.LogCritical(ex.ToString());
-                    }
-
-                    return new ServiceResult<HashSet<Movie>>(false, ex.Message, ex.InnerException?.ToString());
                 }
-            }
 
-            return new ServiceResult<HashSet<Movie>>(true, cachedMovies);
+                return new ServiceResult<HashSet<Movie>>(true, cachedMovies);
+            }
         }
 
         public ServiceResult<HashSet<Movie>> GetMoviesByJSON(string json) => throw new NotImplementedException();
 
         public async Task<ServiceResult<HashSet<Movie>>> GetMoviesFiltered(string filter, string[] filterValues)
         {
-            logger.LogDebug("Filtering Movies");
-            logger.LogDebug($"Filter: {filter}");
-            logger.LogDebug($"Filter Values: {string.Join(", ", filterValues)}");
-            var movies = await GetMovies();
-
-            if (movies.Success)
+            using (logger.BeginScope("Get Filtered Movies"))
             {
-                movies.Results = movies.Results.AsQueryable().Where(filter, filterValues).ToHashSet();
-            }
+                logger.LogDebug("Filtering Movies");
+                logger.LogDebug($"Filter: {filter}");
+                logger.LogDebug($"Filter Values: {string.Join(", ", filterValues)}");
+                var movies = await GetMovies();
 
-            return movies;
+                if (movies.Success)
+                {
+                    movies.Results = movies.Results.AsQueryable().Where(filter, filterValues).ToHashSet();
+                }
+
+                return movies;
+            }
         }
 
         public async Task<ServiceResult<List<string>>> GetValuesForProperty(string property)
         {
-            logger.LogDebug($"Get values for: {property}");
-            var movies = await GetMovies();
-
-            if (movies.Success)
+            using (logger.BeginScope("Get Values for Property"))
             {
-                return new ServiceResult<List<string>>(true, movies.Results.AsQueryable().GroupBy(property).OrderBy("Count() desc").ThenBy("Key").Select("Key").ToDynamicArray<string>().Where(x => !string.IsNullOrEmpty(x)).ToList());
-            }
+                logger.LogDebug($"Property name: {property}");
 
-            return new ServiceResult<List<string>>(movies.Success, movies.ErrorCode, movies.ErrorMessage);
+                var movies = await GetMovies();
+
+                if (movies.Success)
+                {
+                    return new ServiceResult<List<string>>(true, movies.Results.AsQueryable().GroupBy(property).OrderBy("Count() desc").ThenBy("Key").Select("Key").ToDynamicArray<string>().Where(x => !string.IsNullOrEmpty(x)).ToList());
+                }
+
+                return new ServiceResult<List<string>>(movies.Success, movies.ErrorCode, movies.ErrorMessage);
+            }
         }
 
         public SystemStatus TestConnection(string radarrURL, string radarrAPIKey)
         {
-            logger.LogDebug($"Test Radarr Connection.");
-            SystemStatus ss = new SystemStatus();
-
-            var link = $"{radarrURL}/api/system/status?apikey={radarrAPIKey}";
-
-            logger.LogDebug($"LinkURL: {link}");
-
-            string statusJSON = null;
-            HttpResponseMessage hrm = null;
-
-            var hc = new HttpClient();
-            try
+            using (logger.BeginScope("Test Connection"))
             {
-                logger.LogDebug($"Connecting.");
-                hrm = hc.GetAsync(link).Result;
 
-                statusJSON = hrm.Content.ReadAsStringAsync().Result;
+                logger.LogInformation($"Test Radarr Connection.");
+                SystemStatus ss = new SystemStatus();
 
-                if (hrm.IsSuccessStatusCode)
+                var link = $"{radarrURL}/api/system/status?apikey={radarrAPIKey}";
+
+                logger.LogDebug($"LinkURL: {link}");
+
+                string statusJSON = null;
+                HttpResponseMessage hrm = null;
+
+                var hc = new HttpClient();
+                try
                 {
-                    ss = JsonConvert.DeserializeObject<SystemStatus>(statusJSON);
-                    ss.Success = true;
-                    logger.LogDebug($"Success.");
-                }
-                else
-                {
-                    logger.LogWarning($"Failed: {hrm.StatusCode}");
-                    ss.Success = false;
-                    ss.ErrorMessage = $"{hrm.StatusCode}";
-                    if (hrm.ReasonPhrase != hrm.StatusCode.ToString())
+                    logger.LogDebug($"Connecting.");
+                    hrm = hc.GetAsync(link).Result;
+
+                    statusJSON = hrm.Content.ReadAsStringAsync().Result;
+
+                    if (hrm.IsSuccessStatusCode)
                     {
-                        ss.ErrorMessage += $"- {hrm.ReasonPhrase}";
-                        logger.LogWarning($"Failed: {hrm.ReasonPhrase}");
+                        ss = JsonConvert.DeserializeObject<SystemStatus>(statusJSON);
+                        ss.Success = true;
+                        logger.LogInformation($"Success.");
+                    }
+                    else
+                    {
+                        logger.LogWarning($"Failed: {hrm.StatusCode}");
+                        ss.Success = false;
+                        ss.ErrorMessage = $"{hrm.StatusCode}";
+                        if (hrm.ReasonPhrase != hrm.StatusCode.ToString())
+                        {
+                            ss.ErrorMessage += $"- {hrm.ReasonPhrase}";
+                            logger.LogWarning($"Failed: {hrm.ReasonPhrase}");
+                        }
                     }
                 }
-            }
-            catch (Exception ex) //when (ex is InvalidOperationException || ex is HttpRequestException || ex is SocketException)
-            {
-                ss.Success = false;
+                catch (Exception ex)
+                {
+                    ss.Success = false;
 
-                ss.ErrorMessage = $"Request Exception: {ex.Message}";
-                logger.LogError(ex.ToString());
-            }
-            //catch (JsonReaderException)
-            //{
-            //    ss.Success = false;
-            //    ss.ErrorMessage = $"Response wasn't a valid API response. This is usually due to an incorrect URL";
-            //}
+                    ss.ErrorMessage = $"Request Exception: {ex.Message}";
+                    logger.LogError(ex.ToString());
+                }
 
-            return ss;
+
+                return ss;
+            }
         }
     }
 }
