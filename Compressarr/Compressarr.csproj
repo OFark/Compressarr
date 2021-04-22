@@ -21,7 +21,7 @@
 		<None Include="compilerconfig.json" />
 	</ItemGroup>
 
-	<ItemGroup>
+	<ItemGroup>rk down editor
 		<PackageReference Include="Microsoft.EntityFrameworkCore.DynamicLinq" Version="5.2.9" />
 		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.10.9" />
 		<PackageReference Include="Microsoft.VisualStudio.Web.BrowserLink" Version="2.2.0" />
