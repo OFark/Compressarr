@@ -1,47 +1,92 @@
-﻿@using Compressarr.JobProcessing;
+﻿@using Compressarr.FFmpegFactory;
+@using Compressarr.Filtering;
+@using Compressarr.JobProcessing;
 @using Compressarr.Pages.Services;
 
+@inject IFFmpegManager fFmpegManager
+@inject IFilterManager filterManager
 @inject IJobManager jobManager
 @inject ILayoutService layoutService
+
+
 <div class="job">
     <div class="jobTitle">
-        <h3 @onclick="() => { expand = !expand; }">
-            <img src="@FilterImageSrc" />@job.FilterName
-            <i class="fas fa-arrow-right"></i>
-            @job.PresetName
-            <i class="fas fa-sign-out-alt" aria-hidden="true"></i>
-            @job.BaseFolder
-            <i class="fas fa-sign-in-alt" aria-hidden="true"></i>
-            @job.WriteFolder
-            @if (!expand)
+        @if (!NewJob)
+        {
+            <h3 @onclick="() => { expand = !expand; }">
+                <img src="@FilterImageSrc" />@job.FilterName
+                <i class="fas fa-arrow-right"></i>
+                @job.PresetName
+                <i class="fas fa-sign-out-alt" aria-hidden="true"></i>
+                @job.BaseFolder
+                <i class="fas fa-sign-in-alt" aria-hidden="true"></i>
+                @job.WriteFolder
+                @if (!expand)
+                {
+                    @: -
+                    @buttonText
+                }
+            </h3>
+        }
+            else
             {
-                @: -
-                @buttonText
+                <h3>New Job</h3>
             }
-        </h3>
         <div class="commands">
-            @if (expand)
+            @if (expand || editing)
             {
-                @if (canReload)
+                @if (canReload && !NewJob)
                 {
                     <button @onclick="reloadJob"><i class="fas fa-sync-alt"></i></button>
                 }
-                @if (editJob)
+                @if (editing)
                 {
                     <button @onclick="saveJob"><i class="fas fa-save"></i></button>
-                    <button @onclick="deleteJob"><i class="fas fa-trash-alt"></i></button>
+                    @if (!NewJob)
+                    {
+                        <button @onclick="deleteJob"><i class="fas fa-trash-alt"></i></button>
+                    }
                 }
-                <button @onclick="() => { editJob = !editJob; }"><i class="fas fa-edit"></i></button>
+                @if (!NewJob)
+                {
+                    <button @onclick="() => { editJob = !editJob; }"><i class="fas fa-edit"></i></button>
+                }
             }
         </div>
     </div>
-    @if (expand)
+    @if (expand || editing)
     {
-        if (editJob)
+        if (editing)
         {
             <div class="editJob">
-                <h3>Edit</h3>
+                <h3>Settings</h3>
                 <div class="editJobWrapper">
+                    <div class="input-group">
+                        <label class="col-form-label">Filter:</label>
+                        <div class="">
+                            <select @bind="job.FilterName" class="form-control">
+                                <option value="">Select...</option>
+                                @foreach (var c in filterManager.Filters)
+                                {
+                                    <option value="@c.Name">@c.Name - @c.MediaSource</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label class="col-form-label">Preset:</label>
+                        <div class="">
+                            <select @bind="job.PresetName" class="form-control">
+                                <option value="">Select...</option>
+                                @foreach (var c in fFmpegManager.Presets)
+                                {
+                                    <option value="@c.Name">@c.Name</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
                     <div class="input-group">
                         <label class="col-form-label">Base Folder:</label>
                         <div class="">
@@ -62,6 +107,24 @@
                             <input type="checkbox" @bind="job.AutoImport" class="form-control">
                         </div>
                     </div>
+
+                    @if (job.AutoImport)
+                    {
+                        <div class="AutoImportOptions">
+                            <div class="input-group">
+                                <label class="col-form-label">Minimum SSIM:</label>
+                                <div class="percent">
+                                    <input type="number" @bind="minSSIM" class="form-control">
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label class="col-form-label">Maximum File Compression:</label>
+                                <div class="percent">
+                                    <input type="number" @bind="maxComp" class="form-control">
+                                </div>
+                            </div>
+                        </div>
+                    }
                 </div>
             </div>
         }
@@ -92,6 +155,8 @@
                                 @if (wi.Finished)
                                 {
                                     <span class="badge-pill badge-secondary">Success: @wi.Success</span>
+                                    <span class="badge-pill badge-secondary">SSIM: @(Math.Round((wi.SSIM ?? 0) * 100, 3))</span>
+                                    <span class="badge-pill badge-secondary">Compression: @(Math.Round((wi.Compression ?? 0) * 100, 3))</span>
                                 }
                             </div>
                         }
@@ -112,7 +177,7 @@
                 </div>
             </div>
         </div>
-        @if (!editJob)
+        @if (!editing)
         {
             <button class="btn btn-block @buttonClass" @onclick="startJob" @onmouseover="() => { mouseOnButton = true; }" @onmouseout="() => { mouseOnButton = false; }">@buttonText</button>
         }
@@ -120,13 +185,22 @@
 </div>
 
 @code {
-    [Parameter]
-    public Compressarr.JobProcessing.Models.Job job { get; set; }
+        [Parameter]
+        public Compressarr.JobProcessing.Models.Job job { get; set; }
+
+        [Parameter]
+        public bool NewJob { get; set; }
+
+        [Parameter]
+        public EventCallback OnAdd { get; set; }
+
 
     private bool canReload;
-    private bool expand;
     private bool editJob;
+    private bool expand;
     private bool mouseOnButton;
+
+    private bool editing => editJob || NewJob;
 
     private string fileCount;
 
@@ -135,6 +209,58 @@
     private string FilterImageSrc => $"https://raw.githubusercontent.com/{FilterType}/{FilterType}.github.io/master/logo/{FilterType}.svg";
 
     private string FilterType => job?.Filter?.MediaSource == Filtering.MediaSource.Radarr ? "radarr" : "sonarr" ?? "";
+
+    private string minSSIM
+    {
+        get
+        {
+            return job.MinSSIM.HasValue ? (job.MinSSIM * 100).ToString() : null;
+        }
+        set
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                if (decimal.TryParse(value, out var num))
+                {
+                    job.MinSSIM = num / 100;
+                }
+                else
+                {
+                    job.MinSSIM = null;
+                }
+            }
+            else
+            {
+                job.MinSSIM = null;
+            }
+        }
+    }
+
+    private string maxComp
+    {
+        get
+        {
+            return job.MaxCompression.HasValue ? (job.MaxCompression * 100).ToString() : null;
+        }
+        set
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                if (decimal.TryParse(value, out var num))
+                {
+                    job.MaxCompression = num / 100;
+                }
+                else
+                {
+                    job.MaxCompression = null;
+                }
+            }
+            else
+            {
+                job.MaxCompression = null;
+            }
+        }
+    }
 
     private string buttonText
     {
@@ -210,9 +336,19 @@
     {
         using (layoutService.Working("Saving..."))
         {
+
             var success = await jobManager.AddJob(job);
             editJob = !success;
-            canReload = !success;
+            canReload = !success && !NewJob;
+
+            if(success && NewJob)
+            {
+                if (OnAdd.HasDelegate)
+                {
+                    await OnAdd.InvokeAsync();
+                }
+            }
+
             StateHasChanged();
         }
     }

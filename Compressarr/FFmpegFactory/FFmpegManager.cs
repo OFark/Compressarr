@@ -1,5 +1,5 @@
 ﻿using Compressarr.FFmpegFactory.Models;
-using Compressarr.JobProcessing;
+using Compressarr.JobProcessing.Models;
 using Compressarr.Settings;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -75,23 +75,37 @@ namespace Compressarr.FFmpegFactory
             }
         }
 
-        public async Task<bool> CheckResult(WorkItem workitem)
+        public async Task<WorkItemCheckResult> CheckResult(Job job)
         {
             initTask.Wait();
 
             using (logger.BeginScope("Checking Results."))
             {
-                var mediaInfo = await GetMediaInfo(workitem.DestinationFile);
+                if (job?.Process?.WorkItem == null)
+                {
+                    return null;
+                }
+                var result = new WorkItemCheckResult(job.Process.WorkItem);
+
+                var mediaInfo = await GetMediaInfo(job.Process.WorkItem.DestinationFile);
                 if (mediaInfo != null)
                 {
                     //Workitem.Duration refers to the processing time frame.
-                    logger.LogDebug($"Original Duration: {workitem.TotalLength}");
+                    logger.LogDebug($"Original Duration: {job.Process.WorkItem.TotalLength}");
                     logger.LogDebug($"New Duration: {mediaInfo.Duration}");
 
-                    return mediaInfo.Duration != default && workitem.TotalLength.HasValue &&
-                        (long)Math.Round(mediaInfo.Duration.TotalSeconds, 0) == (long)Math.Round(workitem.TotalLength.Value.TotalSeconds, 0);
+                    result.LengthOK = mediaInfo.Duration != default && job.Process.WorkItem.TotalLength.HasValue &&
+                        (long)Math.Round(mediaInfo.Duration.TotalSeconds, 0) == (long)Math.Round(job.Process.WorkItem.TotalLength.Value.TotalSeconds, 0);
                 }
-                return false;
+
+                result.SSIMOK = result.LengthOK &&
+                    (!job.SSIMCheck || job.MinSSIM <= job.Process.WorkItem.SSIM);
+
+
+                result.SizeOK = result.SSIMOK &&
+                    (!job.SizeCheck || job.MaxCompression >= job.Process.WorkItem.Compression);
+
+                return result;
             }
         }
 

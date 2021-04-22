@@ -273,31 +273,17 @@ body {
                             }
                         }
 
-                        margin-bottom: 1em;
-                    }
-
-                    &#divNewJob {
-                        @include embedPanel;
-                        margin-bottom: 1em;
-
-                        .testEvents {
-                            background: $overBackground;
-                            font-family: SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
-                            margin: 1em 0;
-
-                            .testEvent {
-                                display: block;
-                                padding: .3em .5em;
-                            }
-                        }
-
                         #divAddJobWrapper {
+                            @include embedPanel;
+                            margin-bottom: 1em;
                             text-align: center;
 
                             i {
                                 cursor: pointer;
                             }
                         }
+
+                        margin-bottom: 1em;
                     }
 
                     &#divNewPreset {
@@ -345,15 +331,40 @@ body {
                             background: opacify($overBackground, .1);
                         }
 
-                        div {
-                            flex: 1 1 auto;
-                        }
-
                         .form-control {
-                            color: $font-color;
-                            border: none;
                             background: transparent;
+                            border: none;
+                            color: $font-color;
+                            display: block;
+                            font-size: 1rem;
+                            font-weight: 400;
+                            line-height: 1.5;
                             margin-right: 0.8em;
+                            width: 100%;
+
+                            &::placeholder {
+                                color: #ccc;
+                            }
+
+                            &:focus {
+                                color: $font-color;
+                                outline: none;
+                                box-shadow: none;
+                            }
+
+                            &[data-affix] {
+                                position: relative;
+
+                                &::before {
+                                    content: 'brrr'; //attr(data-affix);
+                                }
+                            }
+
+                            &[type=checkbox] {
+                                width: 1.3em;
+                                border-radius: 5px;
+                                margin-left: .3em;
+                            }
 
                             &[type="text"] {
                                 border-bottom: 1px solid rgba(255,255,255, 0.2);
@@ -365,51 +376,39 @@ body {
                                 height: auto;
                             }
 
-                            &:focus {
+                            option {
+                                background: #444;
                                 color: $font-color;
-                                outline: none;
-                                box-shadow: none;
+                                overflow: hidden;
                             }
                         }
+
+
+                        div {
+                            flex: 1 1 auto;
+                            position: relative;
+
+                            &.percent {
+                                &::after {
+                                    content: '%';
+                                    position: absolute;
+                                    top: .5em;
+                                    right: .5em;
+                                    transition: all .05s ease-in-out;
+                                }
+
+                                input {
+                                    width: calc(100% - 1em);
+                                }
+                            }
+                        }
+
 
                         button {
                             margin: .3em;
                         }
 
-                        input {
-                            &.form-control {
-                                &::placeholder {
-                                    color: #ccc;
-                                }
-
-                                &[data-affix] {
-                                    position: relative;
-
-                                    &::before {
-                                        content: 'brrr'; //attr(data-affix);
-                                    }
-                                }
-
-                                &[type=checkbox] {
-                                    background: red;
-                                    width: 1.3em;
-                                    border-radius: 5px;
-                                    margin-left: .3em;
-                                }
-                            }
-                        }
-
                         label {
-                        }
-
-                        select {
-                            &.form-control {
-                                option {
-                                    background: #444;
-                                    color: $font-color;
-                                    overflow: hidden;
-                                }
-                            }
                         }
                     }
 

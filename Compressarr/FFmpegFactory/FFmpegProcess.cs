@@ -1,4 +1,4 @@
-﻿using Compressarr.JobProcessing;
+﻿using Compressarr.JobProcessing.Models;
 using System;
 using System.Threading;
 using Xabe.FFmpeg;
@@ -15,15 +15,16 @@ namespace Compressarr.FFmpegFactory
 
         internal WorkItem WorkItem;
 
-        public event EventHandler OnUpdate;
+        public event EventHandler<string> OnUpdate;
 
         public bool Succeded;
 
         public string FileName;
 
-        public void Update(object sender = null)
+        public void Update(object sender = null, string message = null)
         {
-            OnUpdate?.Invoke(sender, EventArgs.Empty);
+
+            OnUpdate?.Invoke(sender, message);
         }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using Compressarr.FFmpegFactory.Models;
 using Compressarr.JobProcessing;
+using Compressarr.JobProcessing.Models;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Xabe.FFmpeg;
@@ -16,7 +17,7 @@ namespace Compressarr.FFmpegFactory
         SortedDictionary<string, string> VideoCodecs { get; }
 
         void AddPreset(IFFmpegPreset newPreset);
-        Task<bool> CheckResult(WorkItem workitem);
+        Task<WorkItemCheckResult> CheckResult(Job job);
         string ConvertContainerToExtension(string container);
         void DeletePreset(string presetName);
         string GetFFmpegVersion();

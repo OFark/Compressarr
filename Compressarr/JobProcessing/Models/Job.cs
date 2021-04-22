@@ -11,25 +11,18 @@ namespace Compressarr.JobProcessing.Models
 {
     public class Job
     {
-        public event EventHandler StatusUpdate;
-
-        public event EventHandler EndJob;
-
-        public Guid? ID { get; set; }
-
-        public bool AutoImport { get; set; }
-        public string BaseFolder { get; set; }
-
-        [JsonIgnore]
-        public bool Cancel { get; internal set; } = false;
-
-        public int MinSSIM = 99;
-
-        public string DestinationFolder { get; set; }
-
         [JsonIgnore]
         private List<JobEvent> _events = new();
 
+        public event EventHandler EndJob;
+
+        public event EventHandler StatusUpdate;
+        public bool AutoImport { get; set; }
+        public string BaseFolder { get; set; }
+        [JsonIgnore]
+        public bool Cancel { get; internal set; } = false;
+
+        public string DestinationFolder { get; set; }
         [JsonIgnore]
         public IEnumerable<JobEvent> Events
         {
@@ -43,10 +36,12 @@ namespace Compressarr.JobProcessing.Models
         public Filter Filter { get; internal set; }
 
         public string FilterName { get; set; }
-
+        public Guid? ID { get; set; }
         [JsonIgnore]
         public JobState JobState { get; private set; }
 
+        public decimal? MaxCompression { get; set; }
+        public decimal? MinSSIM { get; set; }
         [JsonIgnore]
         public string Name => $"{FilterName}|{PresetName}";
 
@@ -58,17 +53,15 @@ namespace Compressarr.JobProcessing.Models
         [JsonIgnore]
         public FFmpegProcess Process { get; internal set; }
 
+        public bool SizeCheck => AutoImport && MaxCompression.HasValue;
+
+        [JsonIgnore]
+        public bool SSIMCheck => AutoImport && MinSSIM.HasValue;
         [JsonIgnore]
         public HashSet<WorkItem> WorkLoad { get; internal set; }
 
         [JsonIgnore]
         public string WriteFolder => DestinationFolder ?? BaseFolder;
-
-        public void UpdateState(JobState state)
-        {
-            JobState = state;
-            StatusUpdate?.Invoke(this, EventArgs.Empty);
-        }
 
         public void Log(string message, LogLevel level)
         {
@@ -79,8 +72,18 @@ namespace Compressarr.JobProcessing.Models
             }
         }
 
-        public void UpdateStatus(object sender, EventArgs args)
+        public void UpdateState(JobState state)
         {
+            JobState = state;
+            StatusUpdate?.Invoke(this, EventArgs.Empty);
+        }
+        public void UpdateStatus(object sender, string message = null)
+        {
+            if(!string.IsNullOrWhiteSpace(message))
+            {
+                Log(message, LogLevel.Debug);
+            }
+
             StatusUpdate?.Invoke(sender, EventArgs.Empty);
         }
     }

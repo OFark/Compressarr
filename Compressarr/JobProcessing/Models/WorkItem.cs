@@ -5,11 +5,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace Compressarr.JobProcessing
+namespace Compressarr.JobProcessing.Models
+
 {
     public class WorkItem
     {
         public string Bitrate { get; internal set; }
+        public decimal? Compression { get; internal set; }
         public string DestinationFile { get; set; }
         public TimeSpan? Duration { get; internal set; }
         public bool Finished { get; internal set; } = false;
@@ -24,8 +26,9 @@ namespace Compressarr.JobProcessing
         public string SourceFileName => Path.GetFileName(SourceFile);
         public int SourceID { get; set; }
         public string Speed { get; internal set; }
-        public decimal SSIM { get; set; }
+        public decimal? SSIM { get; set; }
         public bool Success { get; internal set; } = false;
         public TimeSpan? TotalLength { get; internal set; }
+        public string DestinationFileName => Path.GetFileName(DestinationFile);
     }
 }

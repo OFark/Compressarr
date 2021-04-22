@@ -1,5 +1,6 @@
 ﻿using Compressarr.FFmpegFactory;
 using Compressarr.Filtering;
+using Compressarr.Helpers;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Services;
 using Compressarr.Services.Models;
@@ -58,7 +59,9 @@ namespace Compressarr.JobProcessing
                     else
                     {
                         logger.LogDebug($"Adding Job ({newJob.Name}).");
-                        Jobs.Add(newJob);
+                        var job = newJob.Clone();
+                        _ = InitialiseJob(job);
+                        Jobs.Add(job);
                     }
 
                     await SaveJobs();
@@ -328,23 +331,37 @@ namespace Compressarr.JobProcessing
 
                                 if (!job.Cancel) //Job.Cancel is on at this point if the job was cancelled.
                                 {
-                                    var checkResult = await fFmpegManager.CheckResult(wi);
-                                    if (!checkResult)
+                                    var checkResult = await fFmpegManager.CheckResult(job);
+                                    if (checkResult != null)
                                     {
-                                        job.Log("Duration mis-match", LogLevel.Warning);
-                                    }
-                                    
-                                    if(job.MinSSIM > 0 &&  job.MinSSIM > wi.SSIM)
-                                    {
-                                        job.Log($"SSIM too low: {wi.SSIM}", LogLevel.Warning);
-                                        checkResult = false;
+                                        if(checkResult.AllGood)
+                                        {
+                                            job.Log(checkResult.Result, LogLevel.Information);
+                                        }
+                                        else
+                                        {
+                                            job.Log(checkResult.Result, LogLevel.Warning);
+                                        }
                                     }
                                     else
                                     {
-                                        job.Log($"SSIM check passed: {wi.SSIM}", LogLevel.Information);
+                                        job.Log("Cannot complete checks, Workitem or Process missing", LogLevel.Error);
                                     }
                                     
-                                    wi.Success = wi.Success && checkResult;
+                                    wi.Success = wi.Success && checkResult.AllGood;
+
+                                    if(wi.Success && job.AutoImport)
+                                    {
+                                        switch(job.Filter.MediaSource)
+                                        {
+                                            case MediaSource.Radarr:
+                                                {
+                                                    await radarrService.ImportMovie(wi);
+                                                }
+                                                break;
+                                        }
+                                    }
+
                                 }
 
                             }

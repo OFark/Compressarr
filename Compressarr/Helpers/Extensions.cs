@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
 using System;
+using System.Text.RegularExpressions;
 
 namespace Compressarr.Helpers
 {
@@ -51,6 +52,12 @@ namespace Compressarr.Helpers
             var deserializeSettings = new JsonSerializerSettings { ObjectCreationHandling = ObjectCreationHandling.Replace };
 
             return JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(source), deserializeSettings);
+        }
+
+        public static bool TryMatch(this Regex reg, string input, out Match match)
+        {
+            match = reg.Match(input);
+            return match.Success;
         }
     }
 }

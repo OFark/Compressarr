@@ -1,4 +1,5 @@
-﻿using Compressarr.Services.Models;
+﻿using Compressarr.JobProcessing.Models;
+using Compressarr.Services.Models;
 using Compressarr.Settings;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -8,6 +9,7 @@ using System.IO;
 using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Net.Http;
+using System.Net.Http.Json;
 using System.Threading.Tasks;
 
 namespace Compressarr.Services
@@ -131,6 +133,65 @@ namespace Compressarr.Services
                 }
 
                 return new ServiceResult<List<string>>(movies.Success, movies.ErrorCode, movies.ErrorMessage);
+            }
+        }
+
+        public async Task<ServiceResult<object>> ImportMovie(WorkItem workItem)
+        {
+            //Sample API Call
+            //Request URL: /api/v3/command - /api/command may also work
+            //FormData: {"name":"ManualImport","files":[{"path":"/downloads/Movies/Leroy & Stitch (2006)/2006 - Leroy & Stitch.mkv","folderName":"Leroy & Stitch (2006)","movieId":1391,"quality":{"quality":{"id":8,"name":"WEBDL-480p","source":"webdl","resolution":480,"modifier":"none"},"revision":{"version":1,"real":0,"isRepack":false}},"languages":[{"id":1,"name":"English"}]}],"importMode":"move"}
+
+            using (logger.BeginScope("Import Movie"))
+            {
+                logger.LogInformation("Importing into Radarr");
+
+                var payload = new ImportMoviePayload()
+                {
+                    importMode = ImportMoviePayload.ImportMode.move
+                };
+
+                logger.LogDebug("Get FileInfo");
+
+                var encodedFile = new FileInfo(workItem.DestinationFile);
+
+                var file = new ImportMoviePayload.File()
+                {
+                    folderName = encodedFile.Directory.Name,
+                    path = encodedFile.FullName,
+                    movieId = workItem.SourceID
+                };
+
+                payload.files = new() { file };
+
+                var link = $"{settingsManager.GetSetting(SettingType.RadarrURL)}/command?apikey={settingsManager.GetSetting(SettingType.RadarrAPIKey)}";
+                logger.LogDebug($"Link: {link}");
+
+                HttpResponseMessage hrm = null;
+
+                using var hc = new HttpClient();
+                try
+                {
+                    logger.LogDebug("POSTing payload");
+                    var result = await hc.PostAsJsonAsync(link, payload);
+
+                    if (result.IsSuccessStatusCode)
+                    {
+                        logger.LogDebug("Success");
+                        return new ServiceResult<object>(true, true);
+                    }
+                    else
+                    {
+                        logger.LogWarning($"Failed: {hrm.ReasonPhrase}");
+                        return new ServiceResult<object>(false, result.StatusCode.ToString(), result.ReasonPhrase);
+                    }
+
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex.ToString());
+                    return new ServiceResult<object>(false, "Exception", ex.ToString());
+                }
             }
         }
 

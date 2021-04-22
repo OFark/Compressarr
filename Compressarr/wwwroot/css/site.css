@@ -186,22 +186,14 @@ body {
                         color: tomato; }
                       body app > .main #content > div#divJobList .job .jobLog .jobEventsScrollWrapper .jobEvents .event.Critical {
                         color: red; }
-          body app > .main #content > div#divNewJob {
-            background: rgba(0, 0, 0, 0.2);
-            padding: 1em;
-            border-radius: 8px;
-            border: 1px solid rgba(0, 0, 0, 0.2);
-            margin-bottom: 1em; }
-            body app > .main #content > div#divNewJob .testEvents {
+            body app > .main #content > div#divJobList #divAddJobWrapper {
               background: rgba(0, 0, 0, 0.2);
-              font-family: SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
-              margin: 1em 0; }
-              body app > .main #content > div#divNewJob .testEvents .testEvent {
-                display: block;
-                padding: .3em .5em; }
-            body app > .main #content > div#divNewJob #divAddJobWrapper {
+              padding: 1em;
+              border-radius: 8px;
+              border: 1px solid rgba(0, 0, 0, 0.2);
+              margin-bottom: 1em;
               text-align: center; }
-              body app > .main #content > div#divNewJob #divAddJobWrapper i {
+              body app > .main #content > div#divJobList #divAddJobWrapper i {
                 cursor: pointer; }
           body app > .main #content > div#divNewPreset {
             background: rgba(0, 0, 0, 0.2);
@@ -248,13 +240,30 @@ body {
             padding-left: 0.8em; }
             body app > .main #content > div .input-group:hover, body app > .main #content > div .input-group:focus, body app > .main #content > div .input-group:active {
               background: rgba(0, 0, 0, 0.3); }
-            body app > .main #content > div .input-group div {
-              flex: 1 1 auto; }
             body app > .main #content > div .input-group .form-control {
-              color: #ededed;
-              border: none;
               background: transparent;
-              margin-right: 0.8em; }
+              border: none;
+              color: #ededed;
+              display: block;
+              font-size: 1rem;
+              font-weight: 400;
+              line-height: 1.5;
+              margin-right: 0.8em;
+              width: 100%; }
+              body app > .main #content > div .input-group .form-control::placeholder {
+                color: #ccc; }
+              body app > .main #content > div .input-group .form-control:focus {
+                color: #ededed;
+                outline: none;
+                box-shadow: none; }
+              body app > .main #content > div .input-group .form-control[data-affix] {
+                position: relative; }
+                body app > .main #content > div .input-group .form-control[data-affix]::before {
+                  content: 'brrr'; }
+              body app > .main #content > div .input-group .form-control[type=checkbox] {
+                width: 1.3em;
+                border-radius: 5px;
+                margin-left: .3em; }
               body app > .main #content > div .input-group .form-control[type="text"] {
                 border-bottom: 1px solid rgba(255, 255, 255, 0.2);
                 -moz-border-radius: 0;
@@ -263,27 +272,23 @@ body {
                 padding: 0 0.6em;
                 margin: 0.5em 0.8em .5em 0;
                 height: auto; }
-              body app > .main #content > div .input-group .form-control:focus {
+              body app > .main #content > div .input-group .form-control option {
+                background: #444;
                 color: #ededed;
-                outline: none;
-                box-shadow: none; }
+                overflow: hidden; }
+            body app > .main #content > div .input-group div {
+              flex: 1 1 auto;
+              position: relative; }
+              body app > .main #content > div .input-group div.percent::after {
+                content: '%';
+                position: absolute;
+                top: .5em;
+                right: .5em;
+                transition: all .05s ease-in-out; }
+              body app > .main #content > div .input-group div.percent input {
+                width: calc(100% - 1em); }
             body app > .main #content > div .input-group button {
               margin: .3em; }
-            body app > .main #content > div .input-group input.form-control::placeholder {
-              color: #ccc; }
-            body app > .main #content > div .input-group input.form-control[data-affix] {
-              position: relative; }
-              body app > .main #content > div .input-group input.form-control[data-affix]::before {
-                content: 'brrr'; }
-            body app > .main #content > div .input-group input.form-control[type=checkbox] {
-              background: red;
-              width: 1.3em;
-              border-radius: 5px;
-              margin-left: .3em; }
-            body app > .main #content > div .input-group select.form-control option {
-              background: #444;
-              color: #ededed;
-              overflow: hidden; }
           body app > .main #content > div a {
             color: rgba(240, 0, 0, 0.75); }
           body app > .main #content > div button {
