@@ -65,7 +65,7 @@ namespace Compressarr.JobProcessing
                         Jobs.Add(job);
                     }
 
-                    await SaveJobs();
+                    SaveJobs();
                     return true;
                 }
                 return false;
@@ -106,7 +106,7 @@ namespace Compressarr.JobProcessing
                 }
 
                 job = null;
-                await SaveJobs();
+                SaveJobs();
             }
         }
 
@@ -138,13 +138,13 @@ namespace Compressarr.JobProcessing
             }
         }
 
-        public async void Init()
+        public void Init()
         {
             using (logger.BeginScope("JobManager Initialisation"))
             {
                 logger.LogInformation("JobManager Initialising");
 
-                Jobs = await LoadJobs();
+                Jobs = LoadJobs();
 
                 foreach (var job in Jobs)
                 {
@@ -273,11 +273,11 @@ namespace Compressarr.JobProcessing
                 }
             }
         }
-        public async Task<Job> ReloadJob(Job job)
+        public Job ReloadJob(Job job)
         {
             using (logger.BeginScope("Reload Job"))
             {
-                var fileJobs = await LoadJobs();
+                var fileJobs = LoadJobs();
 
                 logger.LogInformation($"Job ID: {job.ID}");
 
@@ -391,11 +391,11 @@ namespace Compressarr.JobProcessing
             job.Log("Test failed", LogLevel.Warning);
         }
 
-        private async Task<HashSet<Job>> LoadJobs()
+        private HashSet<Job> LoadJobs()
         {
             using (logger.BeginScope("Load Jobs"))
             {
-                return await settingsManager.LoadSettingFile<HashSet<Job>>(jobsFile) ?? new();
+                return settingsManager.LoadSettingFile<HashSet<Job>>(jobsFile) ?? new();
             }
         }
 
@@ -408,11 +408,11 @@ namespace Compressarr.JobProcessing
             }
         }
 
-        private async Task SaveJobs()
+        private void SaveJobs()
         {
             using (logger.BeginScope("Save Jobs"))
             {
-                await settingsManager.SaveSettingFile(jobsFile, Jobs);
+                settingsManager.SaveSettingFile(jobsFile, Jobs);
             }
         }
 

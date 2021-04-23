@@ -438,19 +438,22 @@ namespace Compressarr.FFmpegFactory
 
                 _presets = new HashSet<IFFmpegPreset>();
 
-                var presets = settingsManager.LoadSettingFile<HashSet<FFmpegPreset>>(presetsFile).Result ?? new();
+                var presets = settingsManager.LoadSettingFile<HashSet<FFmpegPreset>>(presetsFile) ?? new();
 
                 foreach (var preset in presets)
                 {
                     if (preset.VideoCodecOptions != null && preset.VideoCodecOptions.Any())
                     {
                         var codecOptions = GetOptions(preset.VideoCodec);
-                        foreach (var co in codecOptions)
+                        if (codecOptions != null)
                         {
-                            var val = preset.VideoCodecOptions.FirstOrDefault(x => x.Name == co.Name);
-                            if (val != null)
+                            foreach (var co in codecOptions)
                             {
-                                co.Value = val.Value;
+                                var val = preset.VideoCodecOptions.FirstOrDefault(x => x.Name == co.Name);
+                                if (val != null)
+                                {
+                                    co.Value = val.Value;
+                                }
                             }
                         }
 

@@ -12,7 +12,7 @@ namespace Compressarr.Settings
         void DumpDebugFile(string fileName, string content);
         string GetSetting(SettingType setting);
         bool HasSetting(SettingType setting);
-        Task<T> LoadSettingFile<T>(string fileName);
-        Task SaveSettingFile(string fileName, object content);
+        T LoadSettingFile<T>(string fileName);
+        void SaveSettingFile(string fileName, object content);
     }
 }

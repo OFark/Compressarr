@@ -15,7 +15,7 @@ namespace Compressarr.JobProcessing
         Task<ServiceResult<HashSet<WorkItem>>> GetFiles(Job job);
         void Init();
         Task InitialiseJob(Job job, bool force = false);
-        Task<Job> ReloadJob(Job job);
+        Job ReloadJob(Job job);
         void RunJob(Job job);
     }
 }

@@ -210,7 +210,7 @@ namespace Compressarr.Filtering
             {
                 logger.LogInformation("Filters are empty");
 
-                _filters = settingsManager.LoadSettingFile<HashSet<Filter>>(filterFile).Result ?? new();
+                _filters = settingsManager.LoadSettingFile<HashSet<Filter>>(filterFile) ?? new();
 
                 return _filters;
             }

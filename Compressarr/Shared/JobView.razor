@@ -331,11 +331,11 @@
         await jobManager.InitialiseJob(job, true);
     }
 
-    private async void reloadJob()
+    private void reloadJob()
     {
         using (layoutService.Working("Reloading..."))
         {
-            job = await jobManager.ReloadJob(job);
+            job = jobManager.ReloadJob(job);
             canReload = false;
             StateHasChanged();
         }

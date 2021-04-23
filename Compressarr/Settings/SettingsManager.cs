@@ -18,13 +18,13 @@ namespace Compressarr.Settings
         }
 
         public static string CodecOptionsDirectory => IsDevelopment ? "CodecOptions" : Path.Combine(ConfigDirectory, "CodecOptions");
-        public static string ConfigDirectory => InDocker ? "/config" : IsDevelopment? "config" : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config");
+        public static string ConfigDirectory => InDocker ? "/config" : IsDevelopment ? "config" : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config");
         public static string DebugDirectory => Path.Combine(ConfigDirectory, "debug");
         public static string dockerAppSettings => Path.Combine(ConfigDirectory, "appsettings.json");
         public static string Group => Environment.GetEnvironmentVariable("PUID");
         public static bool InDocker => Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true";
 
-        public static bool IsDevelopment => Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == Environments.Development;
+        public static bool IsDevelopment => !InDocker && Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == Environments.Development;
 
         public static string User => Environment.GetEnvironmentVariable("PUID");
         public Dictionary<string, string> Settings => _settings ?? LoadSettings();
@@ -96,20 +96,28 @@ namespace Compressarr.Settings
 
         public bool HasSetting(SettingType setting) => Settings.ContainsKey(setting.ToString());
 
-        public async Task<T> LoadSettingFile<T>(string fileName)
+        public T LoadSettingFile<T>(string fileName)
         {
             using (logger.BeginScope("Loading a Setting file"))
             {
-                logger.LogInformation($"File name: {fileName}");
-
                 var filePath = ConfigFile(fileName);
+
+                logger.LogInformation($"File name: {filePath}");
 
                 if (File.Exists(filePath))
                 {
-                    var json = await File.ReadAllTextAsync(filePath);
-                    if (!string.IsNullOrWhiteSpace(json))
+                    try
                     {
-                        return JsonConvert.DeserializeObject<T>(json);
+                        var json = File.ReadAllText(filePath);
+
+                        if (!string.IsNullOrWhiteSpace(json))
+                        {
+                            return JsonConvert.DeserializeObject<T>(json);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Cannot load file");
                     }
                     logger.LogWarning("Settings file is empty");
                 }
@@ -122,13 +130,13 @@ namespace Compressarr.Settings
             }
         }
 
-        public async Task SaveSettingFile(string fileName, object content)
+        public void SaveSettingFile(string fileName, object content)
         {
             using (logger.BeginScope("Saving a Setting file"))
             {
-                logger.LogInformation($"File name: {fileName}");
-
                 var filePath = ConfigFile(fileName);
+
+                logger.LogInformation($"File name: {filePath}");
 
                 var fileDir = Path.GetDirectoryName(filePath);
                 if (!Directory.Exists(fileDir))
@@ -141,7 +149,7 @@ namespace Compressarr.Settings
 
                 var json = JsonConvert.SerializeObject(content, new JsonSerializerSettings() { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
 
-                await File.WriteAllTextAsync(filePath, json);
+                File.WriteAllText(filePath, json);
             }
         }
 
@@ -152,7 +160,7 @@ namespace Compressarr.Settings
             {
                 _settings = new Dictionary<string, string>();
 
-                _settings = LoadSettingFile<Dictionary<string, string>>(settingsFile).Result ?? new();
+                _settings = LoadSettingFile<Dictionary<string, string>>(settingsFile) ?? new();
 
                 return _settings;
             }
@@ -162,7 +170,7 @@ namespace Compressarr.Settings
         {
             using (logger.BeginScope("Save Settings"))
             {
-                _ = SaveSettingFile(settingsFile, Settings);
+                SaveSettingFile(settingsFile, Settings);
             }
         }
     }

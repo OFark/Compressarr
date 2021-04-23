@@ -30,7 +30,7 @@ namespace Compressarr
 
         public static IHostBuilder ConfigureDefaultFiles(this IHostBuilder builder)
         {
-            if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") != Environments.Development)
+            if (!SettingsManager.IsDevelopment)
             {
                 if (!Directory.Exists(SettingsManager.ConfigDirectory)) Directory.CreateDirectory(SettingsManager.ConfigDirectory);
                 if (!Directory.Exists(SettingsManager.CodecOptionsDirectory)) Directory.CreateDirectory(SettingsManager.CodecOptionsDirectory);
