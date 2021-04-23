@@ -359,7 +359,7 @@ namespace Compressarr.Services
 
                         var moviesArr = JsonConvert.DeserializeObject<Movie[]>(movieJSON);
 
-                        cachedMovies = moviesArr.Where(m => m.downloaded).OrderBy(m => m.title).ToHashSet();
+                        cachedMovies = moviesArr.Where(m => m.downloaded && m.movieFile != null && m.movieFile.mediaInfo != null).OrderBy(m => m.title).ToHashSet();
                         lastCached = DateTime.Now;
                         logger.LogDebug($"Success.");
                         return new(true, null);
