@@ -1,4 +1,5 @@
 ﻿using Compressarr.FFmpegFactory;
+using Compressarr.FFmpegFactory.Models;
 using Compressarr.Helpers;
 using Compressarr.JobProcessing.Models;
 using Microsoft.Extensions.Logging;
@@ -26,7 +27,7 @@ namespace Compressarr.JobProcessing
 
         public async Task Process(Job job)
         {
-            using (logger.BeginScope("FFmper Process"))
+            using (logger.BeginScope("FFmpeg Process"))
             {
                 logger.LogInformation("Starting.");
 
@@ -51,11 +52,9 @@ namespace Compressarr.JobProcessing
                             job.Process.Converter.OnDataReceived += (sender, args) => Converter_OnDataReceived(args, job.Process);
                             job.Process.Converter.OnProgress += (sender, args) => Converter_OnProgress(args, job.Process);
 
-                            logger.LogDebug("FFmpeg conversion started.");
-
                             converionTask = job.Process.Converter.Start(arguments, job.Process.cancellationTokenSource.Token);
+                            logger.LogDebug("FFmpeg conversion started.");
                             await converionTask;
-
                             logger.LogDebug("FFmpeg conversion finished.");
                         }
                         catch (Exception ex)
@@ -91,23 +90,36 @@ namespace Compressarr.JobProcessing
                         job.Process.Converter.OnDataReceived += (sender, args) => Converter_OnDataReceived(args, job.Process);
                         job.Process.Converter.OnProgress += (sender, args) => Converter_OnProgress(args, job.Process);
 
-                        logger.LogDebug("FFmpeg starting SSIM.");
-                        await job.Process.Converter.Start(arguments, job.Process.cancellationTokenSource.Token);
-                        logger.LogDebug("FFmpeg finished SSIM.");
+                        try
+                        {
+                            logger.LogDebug("FFmpeg starting SSIM.");
+                            await job.Process.Converter.Start(arguments, job.Process.cancellationTokenSource.Token);
+                            logger.LogDebug("FFmpeg finished SSIM.");
+                        }
+                        catch(OperationCanceledException ocex)
+                        {
+                            job.Process.Update(this); 
+                            job.Log(ocex.Message, LogLevel.Error);
+                            job.Log(ocex.InnerException?.Message, LogLevel.Error);
+                            succeded = false;
+                        }
                     }
 
-                    try
+                    if (succeded)
                     {
-                        var originalFileSize = new FileInfo(job.Process.WorkItem.SourceFile).Length;
-                        var newFileSize = new FileInfo(job.Process.WorkItem.DestinationFile).Length;
+                        try
+                        {
+                            var originalFileSize = new FileInfo(job.Process.WorkItem.SourceFile).Length;
+                            var newFileSize = new FileInfo(job.Process.WorkItem.DestinationFile).Length;
 
-                        job.Process.WorkItem.Compression = newFileSize / (decimal)originalFileSize;
+                            job.Process.WorkItem.Compression = newFileSize / (decimal)originalFileSize;
 
-                    }
-                    catch (Exception ex) when (ex is FileNotFoundException || ex is IOException)
-                    {
-                        job.Process.WorkItem.Compression = null;
-                        logger.LogWarning(ex, "Error fetching file lengths");
+                        }
+                        catch (Exception ex) when (ex is FileNotFoundException || ex is IOException)
+                        {
+                            job.Process.WorkItem.Compression = null;
+                            logger.LogWarning(ex, "Error fetching file lengths");
+                        }
                     }
                 }
 
@@ -118,73 +130,75 @@ namespace Compressarr.JobProcessing
             }
         }
 
-    public void Stop(Job job)
-    {
-        using (logger.BeginScope("Stop Processing"))
+        public void Stop(Job job)
         {
-            if (job.Process != null)
+            using (logger.BeginScope("Stop Processing"))
             {
-                job.Process.cont = false;
-                job.Log("Job Stop requested", LogLevel.Information);
-                if (job.Process.Converter != null)
+                if (job.Process != null)
                 {
-                    logger.LogDebug("Cancellation Token Set");
-                    job.Process.cancellationTokenSource.Cancel();
+                    job.Process.cont = false;
+                    job.Log("Job Stop requested", LogLevel.Information);
+                    if (job.Process.Converter != null)
+                    {
+                        logger.LogDebug("Cancellation Token Set");
+                        job.Process.cancellationTokenSource.Cancel();
+                    }
+                }
+                else
+                {
+                    logger.LogWarning("Job process cannot be stopped, Process is null");
                 }
             }
-            else
-            {
-                logger.LogWarning("Job process cannot be stopped, Process is null");
-            }
         }
-    }
 
-    private void Converter_OnDataReceived(DataReceivedEventArgs e, FFmpegProcess process)
-    {
-        //Conversion:
-        //"frame= 2171 fps= 58 q=-0.0 size=    4396kB time=00:01:28.50 bitrate= 406.9kbits/s speed=2.38x    ";
-        //"frame= 3097 fps= 22 q=-0.0 size=N/A time=00:02:04.72 bitrate=N/A speed=0.886x"
-        //"frame=   81 fps=0.0 q=-0.0 size=N/A time=00:00:03.44 bitrate=N/A speed=6.69x"
-
-        //SSIM:
-        //"frame=16622 fps=2073 q=-0.0 size=N/A time=00:11:06.93 bitrate=N/A speed=83.2x"
-        //"[Parsed_ssim_4 @ 000002aaab376c00] SSIM Y:0.995682 (23.646920) U:0.995202 (23.189259) V:0.995373 (23.347260) All:0.995550 (23.516743)"
-        //"[Parsed_ssim_4 @ 000001d1588cd080] SSIM Y:1.000000 (inf) U:1.000000 (inf) V:1.000000 (inf) All:1.000000 (inf)"
-
-        using (logger.BeginScope("Converter Data Received"))
+        private void Converter_OnDataReceived(DataReceivedEventArgs e, FFmpegProcess process)
         {
-            logger.LogTrace(e.Data);
+            //Conversion:
+            //"frame= 2171 fps= 58 q=-0.0 size=    4396kB time=00:01:28.50 bitrate= 406.9kbits/s speed=2.38x    ";
+            //"frame= 3097 fps= 22 q=-0.0 size=N/A time=00:02:04.72 bitrate=N/A speed=0.886x"
+            //"frame=   81 fps=0.0 q=-0.0 size=N/A time=00:00:03.44 bitrate=N/A speed=6.69x"
 
-            if (progressReg.TryMatch(e.Data, out var match))
-            {
-                if (long.TryParse(match.Groups[1].Value.Trim(), out var frame)) process.WorkItem.Frame = frame;
-                if (decimal.TryParse(match.Groups[2].Value.Trim(), out var fps)) process.WorkItem.FPS = fps;
-                if (decimal.TryParse(match.Groups[3].Value.Trim(), out var q)) process.WorkItem.Q = q;
-                process.WorkItem.Size = match.Groups[4].Value.Trim();
-                process.WorkItem.Bitrate = match.Groups[6].Value.Trim();
-                process.WorkItem.Speed = match.Groups[7].Value.Trim();
-                process.Update();
-            }
-            else if (ssimReg.TryMatch(e.Data, out var ssimMatch))
-            {
-                if (decimal.TryParse(ssimMatch.Groups[1].Value.Trim(), out var ssim)) process.WorkItem.SSIM = ssim;
+            //SSIM:
+            //"frame=16622 fps=2073 q=-0.0 size=N/A time=00:11:06.93 bitrate=N/A speed=83.2x"
+            //"[Parsed_ssim_4 @ 000002aaab376c00] SSIM Y:0.995682 (23.646920) U:0.995202 (23.189259) V:0.995373 (23.347260) All:0.995550 (23.516743)"
+            //"[Parsed_ssim_4 @ 000001d1588cd080] SSIM Y:1.000000 (inf) U:1.000000 (inf) V:1.000000 (inf) All:1.000000 (inf)"
 
-                logger.LogInformation($"SSIM: {process.WorkItem.SSIM}");
-            }
-            else
+            using (logger.BeginScope("Converter Data Received"))
             {
-                logger.LogInformation($"Converter data not recognised: {e.Data}");
+                process.Output(e.Data, LogLevel.Debug);
+
+                if (progressReg.TryMatch(e.Data, out var match))
+                {
+                    logger.LogTrace(e.Data);
+                    if (long.TryParse(match.Groups[1].Value.Trim(), out var frame)) process.WorkItem.Frame = frame;
+                    if (decimal.TryParse(match.Groups[2].Value.Trim(), out var fps)) process.WorkItem.FPS = fps;
+                    if (decimal.TryParse(match.Groups[3].Value.Trim(), out var q)) process.WorkItem.Q = q;
+                    process.WorkItem.Size = match.Groups[4].Value.Trim();
+                    process.WorkItem.Bitrate = match.Groups[6].Value.Trim();
+                    process.WorkItem.Speed = match.Groups[7].Value.Trim();
+                    process.Update();
+                }
+                else if (ssimReg.TryMatch(e.Data, out var ssimMatch))
+                {
+                    logger.LogTrace(e.Data);
+                    if (decimal.TryParse(ssimMatch.Groups[1].Value.Trim(), out var ssim)) process.WorkItem.SSIM = ssim;
+
+                    logger.LogInformation($"SSIM: {process.WorkItem.SSIM}");
+                }
+                else
+                {
+                    logger.LogTrace($"Converter data not recognised: {e.Data}");
+                }
             }
         }
-    }
 
-    private void Converter_OnProgress(ConversionProgressEventArgs args, FFmpegProcess process)
-    {
-        //Here Duration is the current time frame;
-        process.WorkItem.Duration = args.Duration;
-        process.WorkItem.Percent = args.Percent;
+        private void Converter_OnProgress(ConversionProgressEventArgs args, FFmpegProcess process)
+        {
+            //Here Duration is the current time frame;
+            process.WorkItem.Duration = args.Duration;
+            process.WorkItem.Percent = args.Percent;
 
-        process.Update();
+            process.Update();
+        }
     }
-}
 }

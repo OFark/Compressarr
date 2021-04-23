@@ -143,6 +143,8 @@
                 radarrConnected = ss.Success;
 
                 radarrTestResponse = JsonConvert.SerializeObject(ss, new JsonSerializerSettings() { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
+                
+                radarrService.ClearCache();
 
                 showRadarrStatus = false;
             }

@@ -18,6 +18,7 @@ namespace Compressarr.Services
         public Task<ServiceResult<List<string>>> GetValuesForProperty(string property);
 
         public SystemStatus TestConnection(string radarrURL, string radarrAPIKey);
+        void ClearCache();
         Task<ServiceResult<object>> ImportMovie(WorkItem workItem);
     }
 }

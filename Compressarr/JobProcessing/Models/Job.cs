@@ -1,4 +1,5 @@
 ﻿using Compressarr.FFmpegFactory;
+using Compressarr.FFmpegFactory.Models;
 using Compressarr.Filtering.Models;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -13,8 +14,7 @@ namespace Compressarr.JobProcessing.Models
     {
         [JsonIgnore]
         private List<JobEvent> _events = new();
-
-        public event EventHandler EndJob;
+       
 
         public event EventHandler StatusUpdate;
         public bool AutoImport { get; set; }

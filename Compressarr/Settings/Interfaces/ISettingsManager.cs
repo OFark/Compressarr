@@ -9,6 +9,7 @@ namespace Compressarr.Settings
 
         void AddSetting(SettingType setting, string value);
         void DeleteSetting(SettingType setting);
+        void DumpDebugFile(string fileName, string content);
         string GetSetting(SettingType setting);
         bool HasSetting(SettingType setting);
         Task<T> LoadSettingFile<T>(string fileName);

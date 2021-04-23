@@ -28,10 +28,10 @@
                 }
             </h3>
         }
-            else
-            {
-                <h3>New Job</h3>
-            }
+        else
+        {
+            <h3>New Job</h3>
+        }
         <div class="commands">
             @if (expand || editing)
             {
@@ -49,6 +49,10 @@
                 }
                 @if (!NewJob)
                 {
+                    if (job.JobState != JobState.Running)
+                    {
+                        <button @onclick="reInitialise" title="Re-Initialise"><i class="fas fa-redo"></i></button>
+                    }
                     <button @onclick="() => { editJob = !editJob; }"><i class="fas fa-edit"></i></button>
                 }
             }
@@ -185,14 +189,14 @@
 </div>
 
 @code {
-        [Parameter]
-        public Compressarr.JobProcessing.Models.Job job { get; set; }
+    [Parameter]
+    public Compressarr.JobProcessing.Models.Job job { get; set; }
 
-        [Parameter]
-        public bool NewJob { get; set; }
+    [Parameter]
+    public bool NewJob { get; set; }
 
-        [Parameter]
-        public EventCallback OnAdd { get; set; }
+    [Parameter]
+    public EventCallback OnAdd { get; set; }
 
 
     private bool canReload;
@@ -322,6 +326,11 @@
         InvokeAsync(() => StateHasChanged());
     }
 
+    private async void reInitialise()
+    {
+        await jobManager.InitialiseJob(job, true);
+    }
+
     private async void reloadJob()
     {
         using (layoutService.Working("Reloading..."))
@@ -341,7 +350,7 @@
             editJob = !success;
             canReload = !success && !NewJob;
 
-            if(success && NewJob)
+            if (success && NewJob)
             {
                 if (OnAdd.HasDelegate)
                 {

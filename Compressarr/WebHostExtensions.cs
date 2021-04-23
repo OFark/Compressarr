@@ -40,6 +40,13 @@ namespace Compressarr
                     File.Copy(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.Docker.json"), SettingsManager.dockerAppSettings);
                 }
 
+                if (SettingsManager.InDocker 
+                            && !File.Exists(Path.Combine(SettingsManager.ConfigDirectory, "presets.json"))
+                            && File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config", "presets.json")))
+                {
+                    File.Copy(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config","presets.json"), Path.Combine(SettingsManager.ConfigDirectory, "presets.json"));
+                }
+
                 foreach (var f in new DirectoryInfo(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CodecOptions")).GetFiles())
                 {
                     if (!File.Exists(Path.Combine(SettingsManager.CodecOptionsDirectory, f.Name)))

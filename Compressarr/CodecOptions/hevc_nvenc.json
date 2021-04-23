@@ -1,0 +1,71 @@
+[
+
+  {
+    "Name": "Constant Quality",
+    "Type": "Range",
+    "Min": 0,
+    "Max": 51,
+    "Arg": "-cq <val>",
+    "DisabledByVideoBitRate": true
+  },
+  {
+    "Name": "Preset",
+    "Type": "Select",
+    "Values": [
+      "default",
+      "slow",
+      "medium",
+      "fast",
+      "hp",
+      "hq",
+      "bd",
+      "ll",
+      "llhq",
+      "llhp",
+      "lossless",
+      "losslesshp",
+      "p1",
+      "p2",
+      "p3",
+      "p4",
+      "p5",
+      "p6",
+      "p7"
+    ],
+    "Arg": "-preset <val>"
+  },
+  {
+    "Name": "Profile",
+    "Type": "Select",
+    "Values": [
+      "main",
+      "main10",
+      "rext"
+    ],
+    "Arg": "-profile <val>"
+  },
+  {
+    "Name": "Tune",
+    "Type": "Select",
+    "Values": [
+      "hq",
+      "ll",
+      "ull",
+      "lossless"
+    ],
+    "Arg": "-tune <val>"
+  },
+  {
+    "Name": "Rate Control",
+    "Type": "Select",
+    "Values": [
+      "constqp",
+      "vbr",
+      "cbr",
+      "cbr_ld_hq",
+      "cbr_hq",
+      "vbr_hq"
+    ],
+    "Arg": "-rc <val>"
+  }
+]

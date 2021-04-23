@@ -1,12 +1,9 @@
-﻿using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Security.AccessControl;
-using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace Compressarr.Settings
@@ -20,11 +17,14 @@ namespace Compressarr.Settings
             this.logger = logger;
         }
 
-        public static string CodecOptionsDirectory => Path.Combine(ConfigDirectory, "CodecOptions");
-        public static string ConfigDirectory => InDocker ? "/config" : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config");
+        public static string CodecOptionsDirectory => IsDevelopment ? "CodecOptions" : Path.Combine(ConfigDirectory, "CodecOptions");
+        public static string ConfigDirectory => InDocker ? "/config" : IsDevelopment? "config" : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config");
+        public static string DebugDirectory => Path.Combine(ConfigDirectory, "debug");
         public static string dockerAppSettings => Path.Combine(ConfigDirectory, "appsettings.json");
         public static string Group => Environment.GetEnvironmentVariable("PUID");
         public static bool InDocker => Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true";
+
+        public static bool IsDevelopment => Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == Environments.Development;
 
         public static string User => Environment.GetEnvironmentVariable("PUID");
         public Dictionary<string, string> Settings => _settings ?? LoadSettings();
@@ -64,6 +64,18 @@ namespace Compressarr.Settings
 
                 SaveSettings();
             }
+        }
+
+        public async void DumpDebugFile(string fileName, string content)
+        {
+            if (!Directory.Exists(DebugDirectory))
+            {
+                Directory.CreateDirectory(DebugDirectory);
+            }
+
+            var dumpFile = Path.Combine(DebugDirectory, fileName);
+
+            await File.WriteAllTextAsync(dumpFile, content);
         }
 
         public string GetSetting(SettingType setting)

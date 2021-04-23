@@ -337,5 +337,8 @@ namespace Compressarr.Services.Models
 
         [Filter("Version", FilterPropertyType.Number)]
         public int version { get; set; }
+
+        [Filter("Is Repack", FilterPropertyType.Boolean)]
+        public bool isRepack { get; set; }
     }
 }

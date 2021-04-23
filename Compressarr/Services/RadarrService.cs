@@ -1,6 +1,8 @@
 ﻿using Compressarr.JobProcessing.Models;
 using Compressarr.Services.Models;
 using Compressarr.Settings;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
@@ -10,7 +12,9 @@ using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Text;
 using System.Threading.Tasks;
+using System.Web;
 
 namespace Compressarr.Services
 {
@@ -18,13 +22,16 @@ namespace Compressarr.Services
     {
         private readonly ILogger<RadarrService> logger;
         private readonly ISettingsManager settingsManager;
+        private readonly IWebHostEnvironment env;
 
         private HashSet<Movie> cachedMovies = null;
+        private DateTime lastCached;
 
-        public RadarrService(ISettingsManager _settingsManager, ILogger<RadarrService> logger)
+        public RadarrService(ISettingsManager _settingsManager, ILogger<RadarrService> logger, IWebHostEnvironment env)
         {
             settingsManager = _settingsManager;
             this.logger = logger;
+            this.env = env;
         }
 
         public long MovieCount => cachedMovies?.Count ?? 0;
@@ -37,66 +44,22 @@ namespace Compressarr.Services
                 if (cachedMovies == null)
                 {
                     logger.LogDebug($"No cached movies, interrogate Radarr.");
-                    var radarrURL = settingsManager.GetSetting(SettingType.RadarrURL);
-                    var radarrAPIKey = settingsManager.GetSetting(SettingType.RadarrAPIKey);
-
-                    var link = $"{radarrURL}/api/movie?apikey={radarrAPIKey}";
-
-                    if (string.IsNullOrWhiteSpace(radarrURL))
-                    {
-                        logger.LogWarning($"No URL for Radarr.");
-                        return new ServiceResult<HashSet<Movie>>(false, "404", "Radarr URL not found. In Options. Go there");
-                    }
-
-                    if (string.IsNullOrWhiteSpace(radarrAPIKey))
-                    {
-                        logger.LogWarning($"No API key for Radarr.");
-                        return new ServiceResult<HashSet<Movie>>(false, "404", "Radarr APIKey not found. In Options. Go there");
-                    }
-
-                    var movieJSON = string.Empty;
-
-                    try
-                    {
-                        logger.LogDebug($"Creating new HTTP client.");
-                        using (var hc = new HttpClient())
-                        {
-                            logger.LogDebug($"Downlading Movie List.");
-                            movieJSON = await hc.GetStringAsync(link);
-                            var moviesArr = JsonConvert.DeserializeObject<Movie[]>(movieJSON);
-
-                            cachedMovies = moviesArr.Where(m => m.downloaded).OrderBy(m => m.title).ToHashSet();
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        try
-                        {
-                            logger.LogError($"{ex}");
-                            var debugFolder = Path.Combine(SettingsManager.ConfigDirectory, "debug");
-                            if (!Directory.Exists(debugFolder))
-                            {
-                                Directory.CreateDirectory(debugFolder);
-                            }
-
-                            var movieJSONFile = Path.Combine(debugFolder, "movie.json");
-
-                            logger.LogWarning($"Error understanding output from Radarr. Dumping output to: {movieJSONFile}");
-
-                            await File.WriteAllTextAsync(movieJSONFile, movieJSON);
-                        }
-                        catch (Exception)
-                        {
-                            logger.LogCritical("Cannot dump debug file, permissions?");
-                            logger.LogCritical(ex.ToString());
-                        }
-
-                        return new ServiceResult<HashSet<Movie>>(false, ex.Message, ex.InnerException?.ToString());
-                    }
+                    await RequestMovies();
+                }
+                else if ((DateTime.Now - lastCached).TotalMinutes > 1)
+                {
+                    logger.LogDebug($"Cache has expired, interrogate Radarr.");
+                    // we will update in the background, return the stale results for now.
+                    _ = RequestMovies();
                 }
 
                 return new ServiceResult<HashSet<Movie>>(true, cachedMovies);
             }
+        }
+
+        public void ClearCache()
+        {
+            cachedMovies = null;
         }
 
         public ServiceResult<HashSet<Movie>> GetMoviesByJSON(string json) => throw new NotImplementedException();
@@ -138,18 +101,108 @@ namespace Compressarr.Services
 
         public async Task<ServiceResult<object>> ImportMovie(WorkItem workItem)
         {
-            //Sample API Call
+            //Get ManualImport 
+            //Request URL: /api/manualimport?folder=C%3A%5CCompressarr%5C&filterExistingFiles=true
+
+            //Do Import
             //Request URL: /api/v3/command - /api/command may also work
-            //FormData: {"name":"ManualImport","files":[{"path":"/downloads/Movies/Leroy & Stitch (2006)/2006 - Leroy & Stitch.mkv","folderName":"Leroy & Stitch (2006)","movieId":1391,"quality":{"quality":{"id":8,"name":"WEBDL-480p","source":"webdl","resolution":480,"modifier":"none"},"revision":{"version":1,"real":0,"isRepack":false}},"languages":[{"id":1,"name":"English"}]}],"importMode":"move"}
+            //FormData: {"name":"ManualImport",
+            //       "files":[{
+            //           "path":"C:\\Compressarr\\Leroy & Stitch (2006)\\Leroy & Stitch (2006) SDTV.mkv",
+            //           "folderName":"Leroy & Stitch (2006)",
+            //           "movieId":1,
+            //           "quality":{
+            //               "quality":{
+            //                   "id":1,
+            //           "name":"SDTV",
+            //           "source":"tv",
+            //           "resolution":480,
+            //           "modifier":"none"
+            //                   },
+            //        "revision":{
+            //                   "version":1,
+            //           "real":0,
+            //           "isRepack":false
+            //           }
+            //           },
+            //    "languages":[{ "id":1,"name":"English"}]}],
+            //    "importMode":"auto"}
+
+            //Refresh
+            //Request URL: /api/v3/command - /api/command may also work
+            //FormData: {"name":"RefreshMovie","movieIds":[1]}:
 
             using (logger.BeginScope("Import Movie"))
             {
+                logger.LogInformation("Asking Radarr to validate imports");
+
+                var destinationFolder = Path.GetDirectoryName(workItem.DestinationFile);
+
+                var link = $"{settingsManager.GetSetting(SettingType.RadarrURL)}/api/manualimport?folder={HttpUtility.UrlEncode(destinationFolder)}&filterExistingFiles=true&apikey={settingsManager.GetSetting(SettingType.RadarrAPIKey)}";
+                logger.LogDebug($"Link: {link}");
+
+                ManualImportResponse mir = null;
+
+                using (var hc = new HttpClient())
+                {
+                    try
+                    {
+                        logger.LogDebug("Requesting ManualImport");
+
+                        var hrm = hc.GetAsync(link).Result;
+
+                        var manualImportJSON = hrm.Content.ReadAsStringAsync().Result;
+
+                        if (env.IsDevelopment())
+                        {
+                            settingsManager.DumpDebugFile("manualImport.json", manualImportJSON);
+                        }
+
+                        if (hrm.IsSuccessStatusCode)
+                        {
+                            var mirs = JsonConvert.DeserializeObject<HashSet<ManualImportResponse>>(manualImportJSON);
+
+                            mir = mirs.FirstOrDefault(x => x.movie.id == workItem.SourceID && x.relativePath == workItem.DestinationFileName);
+
+                            if (mir == null)
+                            {
+                                logger.LogWarning("Failed: Radarr didn't recognise the file to import");
+                                return new(false, "Failed", "Radarr didn't recognise the file to import");
+                            }
+
+                            logger.LogInformation($"Success.");
+                        }
+                        else
+                        {
+                            logger.LogWarning($"Failed: {hrm.StatusCode}");
+                            if (hrm.ReasonPhrase != hrm.StatusCode.ToString())
+                            {
+                                logger.LogWarning($"Failed: {hrm.ReasonPhrase}");
+                                return new(false, "Failed", hrm.ReasonPhrase);
+                            }
+
+                            return new(false, "Failed", hrm.StatusCode.ToString());
+                        }
+
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex.ToString());
+                        return new ServiceResult<object>(false, "Exception", ex.ToString());
+                    }
+                }
+
+                if (mir.rejections.Any())
+                {
+                    logger.LogWarning($"Radarr rejection [{mir.rejections.FirstOrDefault().type}] : {mir.rejections.FirstOrDefault().reason}");
+
+                    return new(false, $"Radarr rejection: {mir.rejections.FirstOrDefault().type}", mir.rejections.FirstOrDefault().reason);
+                }
+
                 logger.LogInformation("Importing into Radarr");
 
-                var payload = new ImportMoviePayload()
-                {
-                    importMode = ImportMoviePayload.ImportMode.move
-                };
+                var payload = new ImportMoviePayload();
+                
 
                 logger.LogDebug("Get FileInfo");
 
@@ -158,39 +211,53 @@ namespace Compressarr.Services
                 var file = new ImportMoviePayload.File()
                 {
                     folderName = encodedFile.Directory.Name,
-                    path = encodedFile.FullName,
-                    movieId = workItem.SourceID
+                    path = mir.path,
+                    movieId = workItem.SourceID,
+                    quality = mir.quality,
+                    languages = new() { new Language() { id = 1, name = "English" } }                    
                 };
 
                 payload.files = new() { file };
 
-                var link = $"{settingsManager.GetSetting(SettingType.RadarrURL)}/command?apikey={settingsManager.GetSetting(SettingType.RadarrAPIKey)}";
+                link = $"{settingsManager.GetSetting(SettingType.RadarrURL)}/api/command?apikey={settingsManager.GetSetting(SettingType.RadarrAPIKey)}";
                 logger.LogDebug($"Link: {link}");
 
-                HttpResponseMessage hrm = null;
 
-                using var hc = new HttpClient();
-                try
+                using (var hc = new HttpClient())
                 {
-                    logger.LogDebug("POSTing payload");
-                    var result = await hc.PostAsJsonAsync(link, payload);
-
-                    if (result.IsSuccessStatusCode)
+                    try
                     {
-                        logger.LogDebug("Success");
-                        return new ServiceResult<object>(true, true);
-                    }
-                    else
-                    {
-                        logger.LogWarning($"Failed: {hrm.ReasonPhrase}");
-                        return new ServiceResult<object>(false, result.StatusCode.ToString(), result.ReasonPhrase);
-                    }
+                        logger.LogDebug("POSTing payload");
 
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex.ToString());
-                    return new ServiceResult<object>(false, "Exception", ex.ToString());
+                        var payloadJson = JsonConvert.SerializeObject(payload);
+
+                        var result = await hc.PostAsync(link, new StringContent(payloadJson, Encoding.UTF8, "application/json"));
+
+                        if (env.IsDevelopment())
+                        {
+                            settingsManager.DumpDebugFile("importMoviePayload.json", payloadJson);
+                            settingsManager.DumpDebugFile("importMovieResponse.json", await result.Content.ReadAsStringAsync());
+                        }
+
+                        if (result.IsSuccessStatusCode)
+                        {
+                            logger.LogDebug("Success");
+                            ClearCache();
+                            return new ServiceResult<object>(true, true);
+                        }
+                        else
+                        {
+                            logger.LogWarning($"Failed: {result.ReasonPhrase}");
+                            settingsManager.DumpDebugFile("importMovieResponse.json", await result.Content.ReadAsStringAsync());
+                            return new ServiceResult<object>(false, result.StatusCode.ToString(), result.ReasonPhrase);
+                        }
+
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex.ToString());
+                        return new ServiceResult<object>(false, "Exception", ex.ToString());
+                    }
                 }
             }
         }
@@ -208,15 +275,19 @@ namespace Compressarr.Services
                 logger.LogDebug($"LinkURL: {link}");
 
                 string statusJSON = null;
-                HttpResponseMessage hrm = null;
 
                 var hc = new HttpClient();
                 try
                 {
                     logger.LogDebug($"Connecting.");
-                    hrm = hc.GetAsync(link).Result;
+                    var hrm = hc.GetAsync(link).Result;
 
                     statusJSON = hrm.Content.ReadAsStringAsync().Result;
+
+                    if (env.IsDevelopment())
+                    {
+                        settingsManager.DumpDebugFile("testConnection.json", statusJSON);
+                    }
 
                     if (hrm.IsSuccessStatusCode)
                     {
@@ -246,6 +317,72 @@ namespace Compressarr.Services
 
 
                 return ss;
+            }
+        }
+
+        private async Task<ServiceResult<object>> RequestMovies()
+        {
+            using (logger.BeginScope("Requesting Movies"))
+            {
+                var radarrURL = settingsManager.GetSetting(SettingType.RadarrURL);
+                var radarrAPIKey = settingsManager.GetSetting(SettingType.RadarrAPIKey);
+
+                var link = $"{radarrURL}/api/movie?apikey={radarrAPIKey}";
+                logger.LogDebug($"Link: {link}");
+
+                if (string.IsNullOrWhiteSpace(radarrURL))
+                {
+                    logger.LogWarning($"No URL for Radarr.");
+                    return new(false, "404", "Radarr URL not found. In Options. Go there");
+                }
+
+                if (string.IsNullOrWhiteSpace(radarrAPIKey))
+                {
+                    logger.LogWarning($"No API key for Radarr.");
+                    return new(false, "404", "Radarr APIKey not found. In Options. Go there");
+                }
+
+                var movieJSON = string.Empty;
+
+                try
+                {
+                    logger.LogDebug($"Creating new HTTP client.");
+                    using (var hc = new HttpClient())
+                    {
+                        logger.LogDebug($"Downlading Movie List.");
+                        movieJSON = await hc.GetStringAsync(link);
+
+                        if (env.IsDevelopment())
+                        {
+                            settingsManager.DumpDebugFile("movies.json", movieJSON);
+                        }
+
+                        var moviesArr = JsonConvert.DeserializeObject<Movie[]>(movieJSON);
+
+                        cachedMovies = moviesArr.Where(m => m.downloaded).OrderBy(m => m.title).ToHashSet();
+                        lastCached = DateTime.Now;
+                        logger.LogDebug($"Success.");
+                        return new(true, null);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    try
+                    {
+                        logger.LogError($"{ex}");
+
+                        logger.LogWarning($"Error understanding output from Radarr. Dumping output to: movie.json");
+
+                        await File.WriteAllTextAsync("movie.json", movieJSON);
+                    }
+                    catch (Exception)
+                    {
+                        logger.LogCritical("Cannot dump debug file, permissions?");
+                        logger.LogCritical(ex.ToString());
+                    }
+
+                    return new(false, ex.Message, ex.InnerException?.ToString());
+                }
             }
         }
     }

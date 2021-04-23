@@ -1,4 +1,5 @@
 ﻿using Compressarr.FFmpegFactory;
+using Compressarr.FFmpegFactory.Models;
 using Compressarr.Filtering;
 using Compressarr.Helpers;
 using Compressarr.JobProcessing.Models;
@@ -336,7 +337,7 @@ namespace Compressarr.JobProcessing
                                     {
                                         if(checkResult.AllGood)
                                         {
-                                            job.Log(checkResult.Result, LogLevel.Information);
+                                            job.Log(checkResult.Result, LogLevel.Debug);
                                         }
                                         else
                                         {
@@ -356,7 +357,16 @@ namespace Compressarr.JobProcessing
                                         {
                                             case MediaSource.Radarr:
                                                 {
-                                                    await radarrService.ImportMovie(wi);
+                                                    job.Log("Auto Import - Importing into Radarr", LogLevel.Information);
+                                                    var response = await radarrService.ImportMovie(wi);
+                                                    if(response.Success)
+                                                    {
+                                                        job.Log("Movie Imported", LogLevel.Information);
+                                                    }
+                                                    else
+                                                    {
+                                                        job.Log($"Import Failed [{response.ErrorCode}]: {response.ErrorMessage}", LogLevel.Warning);
+                                                    }
                                                 }
                                                 break;
                                         }
