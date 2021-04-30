@@ -14,74 +14,126 @@
 @inject ISettingsManager settingsManager
 @inject ISonarrService sonarrService
 
+<MudContainer MaxWidth="MaxWidth.Large">
 
-<div class="col-md-6 offset-md-3">
-    <h1 title="It's easy to make good decisions when there are no bad options">Options</h1>
-    <div id="divRadarrOptions">
-        <h2>Radarr</h2>
-        @*@if (settingsManager.HasSetting(Settings.SettingType.RadarrURL))*@
-        @if (settingsManager.RadarrSettings?.APIURL != null)
-        {
-            @*<span>Radarr: @settingsManager.Settings[Settings.SettingType.RadarrURL]</span>*@
-            <span>Radarr: @settingsManager.RadarrSettings.APIURL</span>
-            <button @onclick="toggleRadarrStatus"><i class="fas @(string.IsNullOrWhiteSpace(radarrTestResponse) && radarrConnected ? "fa-spinner fa-spin" : "fa-check")"></i></button>
-            <button @onclick="@(() => deleteSetting(Settings.SettingType.RadarrURL))"><i class="fas fa-trash-alt"></i></button>
-        }
-        else
-        {
-            <div class="input-group">
-                <input @bind="radarrURL" placeholder="Radarr URL" class="form-control" />
-            </div>
-            <div class="input-group">
-                <input @bind="radarrAPIKey" placeholder="Radarr API key" class="form-control" />
-            </div>
-            <button @onclick="saveRadarrSettings" disabled="@(string.IsNullOrWhiteSpace(radarrURL) || string.IsNullOrWhiteSpace(radarrAPIKey))"><i class="fas fa-save"></i> Save</button>
-        }
+    <MudPaper Class="px-4">
+        <MudText Typo="Typo.h1" title="It's easy to make good decisions when there are no bad options">Options</MudText>
+        <MudCard Class="mb-4">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h2">Radarr</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (settingsManager.RadarrSettings?.APIURL != null)
+                {
+                    @if (string.IsNullOrWhiteSpace(radarrTestResponse))
+                    {
+                        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-7" />
+                    }
+                    else
+                    {
+                        <MudText>
+                            Radarr: @settingsManager.RadarrSettings.APIURL
+                            <MudIconButton Color="@(radarrConnected ? Color.Success : Color.Error)" OnClick="toggleRadarrStatus" Icon="@(radarrConnected ? Icons.Material.Outlined.Check : Icons.Material.Outlined.Error )" />
+                        </MudText>
+                    }
 
-        @if (showRadarrStatus)
-        {
-            <pre>@radarrTestResponse</pre>
-        }
-    </div>
+                }
+                else
+                {
+                    <MudList Dense="true">
+                        <MudListItem>
+                            <MudTextField @bind-Value="radarrURL" Label="Radarr URL" />
+                        </MudListItem>
+                        <MudListItem>
+                            <MudTextField @bind-Value="radarrAPIKey" Label="Radarr API key" />
+                        </MudListItem>
+                    </MudList>
+                }
 
-    <div id="divSonarrOptions">
-        <h2>Sonarr</h2>
-        @*@if (settingsManager.HasSetting(Settings.SettingType.SonarrURL))*@
-        @if (settingsManager.SonarrSettings?.APIURL != null)
-        {
-            @*<span>Sonarr: @settingsManager.Settings[Settings.SettingType.SonarrURL]</span>*@
-            <span>Sonarr: @settingsManager.SonarrSettings.APIURL</span>
-            <button @onclick="toggleSonarrStatus"><i class="fas @(string.IsNullOrWhiteSpace(sonarrTestResponse) ? "fa-spinner fa-spin" : "fa-check")"></i></button>
-            <button @onclick="@(() => deleteSetting(Settings.SettingType.SonarrURL))"><i class="fas fa-trash-alt"></i></button>
-        }
-        else
-        {
-            <div class="input-group">
-                <input @bind="sonarrURL" placeholder="Sonarr URL" class="form-control" />
-            </div>
-            <div class="input-group">
-                <input @bind="sonarrAPIKey" placeholder="Sonarr API key" class="form-control" />
-            </div>
-            <button @onclick="saveSonarrSettings" disabled="@(string.IsNullOrWhiteSpace(sonarrURL) || string.IsNullOrWhiteSpace(sonarrAPIKey))"><i class="fas fa-save"></i> Save</button>
-        }
+                @if (showRadarrStatus)
+                {
+                    <pre>@radarrTestResponse</pre>
+                }
+            </MudCardContent>
+            <MudCardActions>
+                @if (settingsManager.RadarrSettings?.APIURL != null)
+                {
+                    <MudButton Color="Color.Warning" OnClick="deleteRadarrSetting" StartIcon="@Icons.Outlined.Delete">Delete</MudButton>
+                }
+                else
+                {
+                    <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="saveRadarrSettings" Disabled="@(string.IsNullOrWhiteSpace(radarrURL) || string.IsNullOrWhiteSpace(radarrAPIKey))" StartIcon="@Icons.Material.Outlined.Save">Save</MudButton>
+                }
+            </MudCardActions>
+        </MudCard>
 
-        @if (showSonarrStatus)
-        {
-            <pre>@sonarrTestResponse</pre>
-        }
-    </div>
+        <MudCard Class="mb-4">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h2">Sonarr</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (settingsManager.SonarrSettings?.APIURL != null)
+                {
+                    @if (string.IsNullOrWhiteSpace(sonarrTestResponse))
+                    {
+                        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-7" />
+                    }
+                    else
+                    {
+                        <MudText>
+                            Sonarr: @settingsManager.SonarrSettings.APIURL
+                            <MudIconButton Color="@(sonarrConnected ? Color.Success : Color.Error)" OnClick="toggleSonarrStatus" Icon="@(sonarrConnected ? Icons.Material.Outlined.Check : Icons.Material.Outlined.Error )" />
+                        </MudText>
+                    }
 
-    <div id="divInfo">
-        <ul>
-            <li>Application: @System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString()</li>
-            <li>Runtime: @Environment.Version.ToString()</li>
-            <li>FFmpeg: @FFmpegInitialiser.Version</li>
-            <li>OS: @Environment.OSVersion.VersionString</li>
-            <li>OS 64bit: @Environment.Is64BitOperatingSystem</li>
-            <li>App 64bit: @Environment.Is64BitProcess</li>
-        </ul>
-    </div>
-</div>
+                }
+                else
+                {
+                    <MudList Dense="true">
+                        <MudListItem>
+                            <MudTextField @bind-Value="sonarrURL" Label="Sonarr URL" />
+                        </MudListItem>
+                        <MudListItem>
+                            <MudTextField @bind-Value="sonarrAPIKey" Label="Sonarr API key" />
+                        </MudListItem>
+                    </MudList>
+                }
+
+                @if (showSonarrStatus)
+                {
+                    <pre>@sonarrTestResponse</pre>
+                }
+            </MudCardContent>
+            <MudCardActions>
+                @if (settingsManager.SonarrSettings?.APIURL != null)
+                {
+                    <MudButton Color="Color.Warning" OnClick="deleteSonarrSetting" StartIcon="@Icons.Outlined.Delete">Delete</MudButton>
+                }
+                else
+                {
+                    <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="saveSonarrSettings" Disabled="@(string.IsNullOrWhiteSpace(sonarrURL) || string.IsNullOrWhiteSpace(sonarrAPIKey))" StartIcon="@Icons.Material.Outlined.Save">Save</MudButton>
+                }
+            </MudCardActions>
+        </MudCard>
+
+        <MudCard>
+            <MudCardContent>
+                <MudList Dense="true">
+                    <MudListItem>Application: @System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString()</MudListItem>
+                    <MudListItem>Runtime: @Environment.Version.ToString()</MudListItem>
+                    <MudListItem>FFmpeg: @FFmpegInitialiser.Version</MudListItem>
+                    <MudListItem>OS: @Environment.OSVersion.VersionString</MudListItem>
+                    <MudListItem>OS 64bit: @Environment.Is64BitOperatingSystem</MudListItem>
+                    <MudListItem>App 64bit: @Environment.Is64BitProcess</MudListItem>
+                </MudList>
+            </MudCardContent>
+        </MudCard>
+    </MudPaper>
+</MudContainer>
 
 @code {
     private string radarrURL { get; set; }
@@ -127,9 +179,16 @@
 
 
 
-    private void deleteSetting(Compressarr.Settings.SettingType setting)
+    private void deleteRadarrSetting()
     {
-        //settingsManager.DeleteSetting(setting);
+        settingsManager.RadarrSettings = null;
+        _ = settingsManager.SaveAppSetting();
+    }
+
+    private void deleteSonarrSetting()
+    {
+        settingsManager.SonarrSettings = null;
+        _ = settingsManager.SaveAppSetting();
     }
 
     private async void saveRadarrSettings()
@@ -147,9 +206,6 @@
 
                 _ = settingsManager.SaveAppSetting();
 
-                //_ = settingsManager.AddSetting(Settings.SettingType.RadarrURL, radarrURL);
-                //_ = settingsManager.AddSetting(Settings.SettingType.RadarrAPIKey, radarrAPIKey);
-
                 radarrConnected = ss.Success;
 
                 radarrTestResponse = JsonConvert.SerializeObject(ss, new JsonSerializerSettings() { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
@@ -163,6 +219,7 @@
                 radarrTestResponse = ss.ErrorMessage;
                 showRadarrStatus = true;
             }
+            StateHasChanged();
         }
     }
 
@@ -177,9 +234,6 @@
 
             if (ss.Success)
             {
-                //settingsManager.AddSetting(Settings.SettingType.SonarrURL, sonarrURL);
-                //settingsManager.AddSetting(Settings.SettingType.SonarrAPIKey, sonarrAPIKey);
-
                 settingsManager.SonarrSettings = sonarrServiceSettings;
 
                 _ = settingsManager.SaveAppSetting();
@@ -195,6 +249,7 @@
                 sonarrTestResponse = ss.ErrorMessage;
                 showSonarrStatus = true;
             }
+            StateHasChanged();
         }
     }
 
