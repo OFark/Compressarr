@@ -261,7 +261,8 @@ namespace Compressarr.Services
         {
             using (logger.BeginScope("Test Connection"))
             {
-                if(settings == null) {
+                if (settings == null || !settings.Ok)
+                {
                     logger.LogDebug("Test aborted, due to insufficient settings");
                     return new() { Success = false, ErrorMessage = "Radarr Settings are missing" };
                 }

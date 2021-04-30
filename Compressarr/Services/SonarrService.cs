@@ -23,6 +23,11 @@ namespace Compressarr.Services
         {
             using (logger.BeginScope("Test Connection"))
             {
+                if (settings == null || !settings.Ok)
+                {
+                    logger.LogDebug("Test aborted, due to insufficient settings");
+                    return new() { Success = false, ErrorMessage = "Sonarr Settings are missing" };
+                }
 
                 logger.LogInformation($"Test Sonarr Connection.");
                 SystemStatus ss = new SystemStatus();

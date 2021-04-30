@@ -9,5 +9,7 @@ namespace Compressarr.Settings
     {
         public string APIURL { get; set; }
         public string APIKey { get; set; }
+
+        public bool Ok => !string.IsNullOrWhiteSpace(APIKey) && !string.IsNullOrWhiteSpace(APIURL);
     }
 }

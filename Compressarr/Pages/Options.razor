@@ -25,7 +25,7 @@
                 </CardHeaderContent>
             </MudCardHeader>
             <MudCardContent>
-                @if (settingsManager.RadarrSettings?.APIURL != null)
+                @if (settingsManager.RadarrSettings != null && settingsManager.RadarrSettings.Ok)
                 {
                     @if (string.IsNullOrWhiteSpace(radarrTestResponse))
                     {
@@ -76,7 +76,7 @@
                 </CardHeaderContent>
             </MudCardHeader>
             <MudCardContent>
-                @if (settingsManager.SonarrSettings?.APIURL != null)
+                @if (settingsManager.SonarrSettings != null && settingsManager.SonarrSettings.Ok)
                 {
                     @if (string.IsNullOrWhiteSpace(sonarrTestResponse))
                     {
