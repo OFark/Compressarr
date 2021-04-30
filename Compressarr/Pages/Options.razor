@@ -1,26 +1,30 @@
 ﻿@page "/options"
-@using Compressarr.FFmpegFactory; 
+@using Compressarr.FFmpegFactory;
 @using Compressarr.Filtering;
 @using Compressarr.JobProcessing;
-@using Compressarr.Services; 
+@using Compressarr.Services;
 @using Compressarr.Settings;
 @using Newtonsoft.Json;
+@using Microsoft.Extensions.Options;
 
-@inject IFFmpegManager FFmpegManager
+@inject IFFmpegInitialiser FFmpegInitialiser
 @inject IFilterManager filterManager
 @inject IJobManager jobManager
 @inject IRadarrService radarrService
 @inject ISettingsManager settingsManager
 @inject ISonarrService sonarrService
 
+
 <div class="col-md-6 offset-md-3">
     <h1 title="It's easy to make good decisions when there are no bad options">Options</h1>
     <div id="divRadarrOptions">
         <h2>Radarr</h2>
-        @if (settingsManager.HasSetting(Settings.SettingType.RadarrURL))
+        @*@if (settingsManager.HasSetting(Settings.SettingType.RadarrURL))*@
+        @if (settingsManager.RadarrSettings?.APIURL != null)
         {
-            <span>Radarr: @settingsManager.GetSetting(Settings.SettingType.RadarrURL)</span>
-            <button @onclick="toggleRadarrStatus"><i class="fas @(string.IsNullOrWhiteSpace(radarrTestResponse) ? "fa-spinner fa-spin" : "fa-check")"></i></button>
+            @*<span>Radarr: @settingsManager.Settings[Settings.SettingType.RadarrURL]</span>*@
+            <span>Radarr: @settingsManager.RadarrSettings.APIURL</span>
+            <button @onclick="toggleRadarrStatus"><i class="fas @(string.IsNullOrWhiteSpace(radarrTestResponse) && radarrConnected ? "fa-spinner fa-spin" : "fa-check")"></i></button>
             <button @onclick="@(() => deleteSetting(Settings.SettingType.RadarrURL))"><i class="fas fa-trash-alt"></i></button>
         }
         else
@@ -42,9 +46,11 @@
 
     <div id="divSonarrOptions">
         <h2>Sonarr</h2>
-        @if (settingsManager.HasSetting(Settings.SettingType.SonarrURL))
+        @*@if (settingsManager.HasSetting(Settings.SettingType.SonarrURL))*@
+        @if (settingsManager.SonarrSettings?.APIURL != null)
         {
-            <span>Sonarr: @settingsManager.GetSetting(Settings.SettingType.SonarrURL)</span>
+            @*<span>Sonarr: @settingsManager.Settings[Settings.SettingType.SonarrURL]</span>*@
+            <span>Sonarr: @settingsManager.SonarrSettings.APIURL</span>
             <button @onclick="toggleSonarrStatus"><i class="fas @(string.IsNullOrWhiteSpace(sonarrTestResponse) ? "fa-spinner fa-spin" : "fa-check")"></i></button>
             <button @onclick="@(() => deleteSetting(Settings.SettingType.SonarrURL))"><i class="fas fa-trash-alt"></i></button>
         }
@@ -69,7 +75,7 @@
         <ul>
             <li>Application: @System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString()</li>
             <li>Runtime: @Environment.Version.ToString()</li>
-            <li>FFmpeg: @FFmpegManager.GetFFmpegVersion()</li>
+            <li>FFmpeg: @FFmpegInitialiser.Version</li>
             <li>OS: @Environment.OSVersion.VersionString</li>
             <li>OS 64bit: @Environment.Is64BitOperatingSystem</li>
             <li>App 64bit: @Environment.Is64BitProcess</li>
@@ -78,8 +84,6 @@
 </div>
 
 @code {
-    private string AlertMessage = null;
-
     private string radarrURL { get; set; }
     private string radarrAPIKey { get; set; }
     private string radarrTestResponse { get; set; }
@@ -92,58 +96,64 @@
     private bool sonarrConnected { get; set; }
     private bool showSonarrStatus { get; set; }
 
-    protected override void OnInitialized()
+    protected async override Task OnInitializedAsync()
     {
-        if (settingsManager.HasSetting(Settings.SettingType.RadarrURL))
+        //if (settingsManager.HasSetting(Settings.SettingType.RadarrURL))
+        if (settingsManager.RadarrSettings != null)
         {
             radarrTestResponse = null;
-            var ss = radarrService.TestConnection(settingsManager.GetSetting(Settings.SettingType.RadarrURL), settingsManager.GetSetting(Settings.SettingType.RadarrAPIKey));
+            //var ss = await radarrService.TestConnection(settingsManager.Settings[Settings.SettingType.RadarrURL], settingsManager.Settings[Settings.SettingType.RadarrAPIKey]);
+            var ss = await radarrService.TestConnection(settingsManager.RadarrSettings);
 
             radarrConnected = ss.Success;
 
             radarrTestResponse = JsonConvert.SerializeObject(ss, new JsonSerializerSettings() { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
         }
 
-        if (settingsManager.HasSetting(Settings.SettingType.SonarrURL))
+        //if (settingsManager.HasSetting(Settings.SettingType.SonarrURL))
+        if (settingsManager.SonarrSettings != null)
         {
             sonarrTestResponse = null;
-            var ss = sonarrService.TestConnection(settingsManager.GetSetting(Settings.SettingType.SonarrURL), settingsManager.GetSetting(Settings.SettingType.SonarrAPIKey));
+            //var ss = sonarrService.TestConnection(settingsManager.Settings[Settings.SettingType.SonarrURL], settingsManager.Settings[Settings.SettingType.SonarrAPIKey]);
+            var ss = await sonarrService.TestConnection(settingsManager.SonarrSettings);
 
             sonarrConnected = ss.Success;
 
             sonarrTestResponse = JsonConvert.SerializeObject(ss, new JsonSerializerSettings() { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
         }
 
-        if (!sonarrConnected && !radarrConnected)
-        {
-            AlertMessage = "Need at least one service connected to get started.";
-        }
-
-        base.OnInitialized();
+        _ = base.OnInitializedAsync();
     }
+
+
 
     private void deleteSetting(Compressarr.Settings.SettingType setting)
     {
-        settingsManager.DeleteSetting(setting);
+        //settingsManager.DeleteSetting(setting);
     }
 
-    private void saveRadarrSettings()
+    private async void saveRadarrSettings()
     {
         if (!string.IsNullOrWhiteSpace(radarrURL) && !string.IsNullOrWhiteSpace(radarrAPIKey))
         {
             radarrURL = radarrURL.TrimEnd('/');
             radarrTestResponse = null;
-            var ss = radarrService.TestConnection(radarrURL, radarrAPIKey);
+            var radarrServiceSettings = new APISettings() { APIURL = radarrURL, APIKey = radarrAPIKey };
+            var ss = await radarrService.TestConnection(radarrServiceSettings);
 
             if (ss.Success)
             {
-                settingsManager.AddSetting(Settings.SettingType.RadarrURL, radarrURL);
-                settingsManager.AddSetting(Settings.SettingType.RadarrAPIKey, radarrAPIKey);
+                settingsManager.RadarrSettings = radarrServiceSettings;
+
+                _ = settingsManager.SaveAppSetting();
+
+                //_ = settingsManager.AddSetting(Settings.SettingType.RadarrURL, radarrURL);
+                //_ = settingsManager.AddSetting(Settings.SettingType.RadarrAPIKey, radarrAPIKey);
 
                 radarrConnected = ss.Success;
 
                 radarrTestResponse = JsonConvert.SerializeObject(ss, new JsonSerializerSettings() { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
-                
+
                 radarrService.ClearCache();
 
                 showRadarrStatus = false;
@@ -156,18 +166,23 @@
         }
     }
 
-    private void saveSonarrSettings()
+    private async void saveSonarrSettings()
     {
         if (!string.IsNullOrWhiteSpace(sonarrURL) && !string.IsNullOrWhiteSpace(sonarrAPIKey))
         {
             sonarrURL = sonarrURL.TrimEnd('/');
             sonarrTestResponse = null;
-            var ss = sonarrService.TestConnection(sonarrURL, sonarrAPIKey);
+            var sonarrServiceSettings = new APISettings() { APIURL = radarrURL, APIKey = radarrAPIKey };
+            var ss = await sonarrService.TestConnection(sonarrServiceSettings);
 
             if (ss.Success)
             {
-                settingsManager.AddSetting(Settings.SettingType.SonarrURL, sonarrURL);
-                settingsManager.AddSetting(Settings.SettingType.SonarrAPIKey, sonarrAPIKey);
+                //settingsManager.AddSetting(Settings.SettingType.SonarrURL, sonarrURL);
+                //settingsManager.AddSetting(Settings.SettingType.SonarrAPIKey, sonarrAPIKey);
+
+                settingsManager.SonarrSettings = sonarrServiceSettings;
+
+                _ = settingsManager.SaveAppSetting();
 
                 sonarrConnected = ss.Success;
 

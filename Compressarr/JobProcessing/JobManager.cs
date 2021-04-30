@@ -7,7 +7,7 @@ using Compressarr.Services;
 using Compressarr.Services.Models;
 using Compressarr.Settings;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
+using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -18,26 +18,30 @@ namespace Compressarr.JobProcessing
 {
     public class JobManager : IJobManager
     {
-        private const string jobsFile = "jobs.json";
         private readonly IFFmpegManager fFmpegManager;
         private readonly IFilterManager filterManager;
         private readonly ILogger<JobManager> logger;
+        private readonly IOptionsMonitor<HashSet<Job>> jobsSnapshot;
         private readonly IProcessManager processManager;
         private readonly IRadarrService radarrService;
         private readonly ISettingsManager settingsManager;
         private readonly ISonarrService sonarrService;
-        public JobManager(ILogger<JobManager> logger, ISettingsManager settingsManager, IRadarrService radarrService, ISonarrService sonarrService, IFilterManager filterManager, IFFmpegManager fFmpegManager, IProcessManager processManager)
+
+
+        public JobManager(IFFmpegManager fFmpegManager, IFilterManager filterManager, ISettingsManager settingsManager, ILogger<JobManager> logger, IOptionsMonitor<HashSet<Job>> jobsMonitor, IProcessManager processManager, IRadarrService radarrService, ISonarrService sonarrService)
         {
-            this.logger = logger;
-            this.settingsManager = settingsManager;
-            this.radarrService = radarrService;
-            this.sonarrService = sonarrService;
-            this.filterManager = filterManager;
             this.fFmpegManager = fFmpegManager;
+            this.filterManager = filterManager;
+            this.jobsSnapshot = jobsMonitor;
+            this.logger = logger;
             this.processManager = processManager;
+            this.radarrService = radarrService;
+            this.settingsManager = settingsManager;
+            this.sonarrService = sonarrService;
         }
 
-        public HashSet<Job> Jobs { get; set; }
+        public HashSet<Job> Jobs => settingsManager.Jobs;
+        
         public async Task<bool> AddJob(Job newJob)
         {
             using (logger.BeginScope("Adding Job"))
@@ -53,9 +57,6 @@ namespace Compressarr.JobProcessing
                     if (Jobs.Contains(newJob))
                     {
                         logger.LogDebug($"Updating Existing Job.");
-                        //job.AutoImport = newJob.AutoImport;
-                        //job.BaseFolder = newJob.BaseFolder;
-                        //job.DestinationFolder = newJob.DestinationFolder;
                     }
                     else
                     {
@@ -65,7 +66,7 @@ namespace Compressarr.JobProcessing
                         Jobs.Add(job);
                     }
 
-                    SaveJobs();
+                    _ = settingsManager.SaveAppSetting();
                     return true;
                 }
                 return false;
@@ -82,15 +83,15 @@ namespace Compressarr.JobProcessing
                 if (job.Process != null)
                 {
                     logger.LogDebug($"Job Process needs stopping.");
-                    processManager.Stop(job);
+                    Stop(job);
                     logger.LogDebug($"Job Process Stopped.");
                 }
 
-                UpdateJobState(job, JobState.Finished);
+                job.UpdateState(JobState.Finished);
             }
         }
 
-        public async Task DeleteJob(Job job)
+        public Task DeleteJob(Job job)
         {
             using (logger.BeginScope("Delete Job"))
             {
@@ -106,7 +107,7 @@ namespace Compressarr.JobProcessing
                 }
 
                 job = null;
-                SaveJobs();
+                return settingsManager.SaveAppSetting();
             }
         }
 
@@ -120,7 +121,7 @@ namespace Compressarr.JobProcessing
 
                     var filter = filterManager.ConstructFilterQuery(job.Filter.Filters, out var filterVals);
 
-                    var getMoviesResult = await radarrService.GetMoviesFiltered(filter, filterVals);
+                    var getMoviesResult = await radarrService.GetMoviesFilteredAsync(filter, filterVals);
 
                     if (!getMoviesResult.Success)
                     {
@@ -138,32 +139,23 @@ namespace Compressarr.JobProcessing
             }
         }
 
-        public void Init()
-        {
-            using (logger.BeginScope("JobManager Initialisation"))
-            {
-                logger.LogInformation("JobManager Initialising");
-
-                Jobs = LoadJobs();
-
-                foreach (var job in Jobs)
-                {
-                    _ = InitialiseJob(job);
-                }
-            }
-        }
         public async Task InitialiseJob(Job job, bool force = false)
         {
-            using (logger.BeginScope("Initialise Job"))
+            using (logger.BeginScope("Initialise Job: {job}", job))
             {
                 logger.LogInformation($"Job name: {job.Name}");
+
+                job.LogAction = (level, message) =>
+                {
+                    logger.Log(level, message);
+                };
 
                 Log(job, LogLevel.Information, "Begin Initialisation");
 
                 if ((job.JobState == JobState.New) || force)
                 {
                     logger.LogDebug($"Job will initialise.");
-                    UpdateJobState(job, JobState.Initialising);
+                    job.UpdateState(JobState.Initialising);
                     job.Filter = filterManager.GetFilter(job.FilterName);
                     job.Preset = fFmpegManager.GetPreset(job.PresetName);
                     logger.LogDebug($"Job using filter: {job.FilterName} and preset: {job.PresetName}.");
@@ -172,7 +164,7 @@ namespace Compressarr.JobProcessing
                     {
                         job.Preset.ContainerExtension = fFmpegManager.ConvertContainerToExtension(job.Preset.Container);
                         logger.LogDebug($"Container Extension set to {job.Preset.ContainerExtension}");
-                        UpdateJobState(job, JobState.Added);
+                        job.UpdateState(JobState.Added);
                         job.Cancel = false;
 
                         Log(job, LogLevel.Debug, "Begin Testing");
@@ -180,10 +172,10 @@ namespace Compressarr.JobProcessing
                         if (job.Filter.MediaSource == Filtering.MediaSource.Radarr)
                         {
                             Log(job, LogLevel.Debug, "Job is for Movies, Connecting to Radarr");
-                            var radarrURL = settingsManager.GetSetting(SettingType.RadarrURL);
-                            var radarrAPIKey = settingsManager.GetSetting(SettingType.RadarrAPIKey);
+                            //var radarrURL = settingsManager.Settings[SettingType.RadarrURL];
+                            //var radarrAPIKey =settingsManager.Settings[SettingType.RadarrAPIKey];
 
-                            var systemStatus = radarrService.TestConnection(radarrURL, radarrAPIKey);
+                            var systemStatus = await radarrService.TestConnection(settingsManager.RadarrSettings);
 
                             if (!systemStatus.Success)
                             {
@@ -250,7 +242,9 @@ namespace Compressarr.JobProcessing
 
                             try
                             {
-                                File.WriteAllText(testFilePath, "This is a write test");
+                                await settingsManager.WriteTextFileAsync(testFilePath, "This is a write test");
+
+                                //todo FileManager this 
                                 File.Delete(testFilePath);
                             }
                             catch (Exception ex)
@@ -277,17 +271,15 @@ namespace Compressarr.JobProcessing
         {
             using (logger.BeginScope("Reload Job"))
             {
-                var fileJobs = LoadJobs();
-
                 logger.LogInformation($"Job ID: {job.ID}");
 
-                var fileJob = fileJobs.FirstOrDefault(j => j.ID == job.ID);
+                var fileJobs = jobsSnapshot?.CurrentValue;
+
+                var fileJob = fileJobs?.FirstOrDefault(j => j.ID == job.ID);
 
                 if (fileJob != null)
                 {
-                    job.AutoImport = fileJob.AutoImport;
-                    job.BaseFolder = fileJob.BaseFolder;
-                    job.DestinationFolder = fileJob.DestinationFolder;
+                    job = fileJob.Clone();
                 }
                 else
                 {
@@ -302,13 +294,13 @@ namespace Compressarr.JobProcessing
 
         public async void RunJob(Job job)
         {
-            using (logger.BeginScope("Run Job"))
+            using (logger.BeginScope("Run Job: {job}", job))
             {
 
-                if (job.JobState == JobState.TestedOK || job.JobState == JobState.Waiting || job.JobState == JobState.Finished)
+                if (job.JobState == JobState.TestedOK ||  job.JobState == JobState.Finished)
                 {
-                    UpdateJobState(job, JobState.Running);
-                    Log(job, LogLevel.Information, $"Started Running at: {DateTime.Now}");
+                    job.UpdateState(JobState.Waiting);
+                    Log(job, LogLevel.Information, $"Started Job at: {DateTime.Now}");
 
                     try
                     {
@@ -318,7 +310,7 @@ namespace Compressarr.JobProcessing
                             {
                                 wi.Success = false;
                                 //WorkItem Duration is the current process time frame, MediaInfo Duration is the movie length.
-                                var mediaInfo = await fFmpegManager.GetMediaInfo(wi.SourceFile);
+                                var mediaInfo = await fFmpegManager.GetMediaInfoAsync(wi.SourceFile);
                                 if (mediaInfo != null)
                                 {
                                     wi.TotalLength = TimeSpan.FromSeconds((long)Math.Round(mediaInfo.Duration.TotalSeconds, 0));
@@ -379,24 +371,37 @@ namespace Compressarr.JobProcessing
                     }
                     finally
                     {
-                        UpdateJobState(job, JobState.Finished);
+                        job.UpdateState(JobState.Finished);
                     }
+                }
+            }
+        }
+
+        public void Stop(Job job)
+        {
+            using (logger.BeginScope("Stop Processing"))
+            {
+                if (job.Process != null)
+                {
+                    job.Process.cont = false;
+                    job.Log("Job Stop requested", LogLevel.Information);
+                    if (job.Process.Converter != null)
+                    {
+                        logger.LogDebug("Cancellation Token Set");
+                        job.Process.cancellationTokenSource.Cancel();
+                    }
+                }
+                else
+                {
+                    logger.LogWarning("Job process cannot be stopped, Process is null");
                 }
             }
         }
 
         private void Fail(Job job)
         {
-            UpdateJobState(job, JobState.TestedFail);
+            job.UpdateState(JobState.TestedFail);
             job.Log("Test failed", LogLevel.Warning);
-        }
-
-        private HashSet<Job> LoadJobs()
-        {
-            using (logger.BeginScope("Load Jobs"))
-            {
-                return settingsManager.LoadSettingFile<HashSet<Job>>(jobsFile) ?? new();
-            }
         }
 
         private void Log(Job job, LogLevel level, params string[] messages)
@@ -408,25 +413,12 @@ namespace Compressarr.JobProcessing
             }
         }
 
-        private void SaveJobs()
-        {
-            using (logger.BeginScope("Save Jobs"))
-            {
-                settingsManager.SaveSettingFile(jobsFile, Jobs);
-            }
-        }
-
         private void Succeed(Job job)
         {
             job.ID ??= Guid.NewGuid();
 
-            UpdateJobState(job, JobState.TestedOK);
+            job.UpdateState(JobState.TestedOK);
             job.Log("Test succeeded", LogLevel.Information);
-        }
-        private void UpdateJobState(Job job, JobState state)
-        {
-            logger.LogInformation($"Job {job.Name} changed from {job.JobState} to {state}.");
-            job.UpdateState(state);
         }
     }
 }

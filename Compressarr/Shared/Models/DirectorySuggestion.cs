@@ -9,8 +9,26 @@ namespace Compressarr.Shared.Models
 
         public DirectorySuggestion(DirectoryInfo directoryInfo)
         {
-            Name = directoryInfo.Name;
-            Suggestion = directoryInfo.FullName;
+            if (directoryInfo != null)
+            {
+                Name = directoryInfo.Name;
+                Suggestion = directoryInfo.FullName;
+            }
+        }
+
+        public DirectorySuggestion(string path)
+        {
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                var directoryInfo = new DirectoryInfo(path);
+                Name = directoryInfo.Name;
+                Suggestion = directoryInfo.FullName;
+            }
+        }
+
+        public override string ToString()
+        {
+            return Suggestion;
         }
     }
 }

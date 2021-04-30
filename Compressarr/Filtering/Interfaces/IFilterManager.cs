@@ -1,6 +1,7 @@
 ﻿using Compressarr.Filtering.Models;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Compressarr.Filtering
 {
@@ -14,9 +15,9 @@ namespace Compressarr.Filtering
         List<FilterProperty> RadarrFilterProperties { get; }
         List<FilterProperty> RadarrTableColumns { get; }
 
-        void AddFilter(List<DynamicLinqFilter> dlFilters, string filterName, MediaSource filterType);
+        Task AddFilter(List<DynamicLinqFilter> dlFilters, string filterName, MediaSource filterType);
         string ConstructFilterQuery(List<DynamicLinqFilter> dlFilters, out string[] vals);
-        void DeleteFilter(string filterName);
+        Task DeleteFilter(string filterName);
         List<FilterComparitor> GetComparitors(FilterProperty property);
         Filter GetFilter(string filterName);
         IOrderedEnumerable<Filter> GetFilters(MediaSource filterType);

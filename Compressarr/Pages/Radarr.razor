@@ -167,7 +167,6 @@
     private int pageNumber = 0;
     private int pageCount = 0;
 
-    private bool showFilterText = false;
     private bool showSaveDialog = false;
     private bool showingMovies = false;
 
@@ -197,7 +196,7 @@
             var filter = filterManager.GetFilter(filterName);
             if (filter != null)
             {
-                dlFilters = filter.Filters.Clone();
+                dlFilters = filter.Filters.ToList().Clone();
                 showSaveDialog = true;
                 LoadMovies();
             }
@@ -405,11 +404,11 @@
 
             if (string.IsNullOrWhiteSpace(filter))
             {
-                _result = await radarrService.GetMovies();
+                _result = await radarrService.GetMoviesAsync();
             }
             else
             {
-                _result = await radarrService.GetMoviesFiltered(filter, filterValues);
+                _result = await radarrService.GetMoviesFilteredAsync(filter, filterValues);
             }
 
             if (_result.Success)

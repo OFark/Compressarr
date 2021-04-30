@@ -14,9 +14,11 @@ namespace Compressarr.JobProcessing.Models
     {
         [JsonIgnore]
         private List<JobEvent> _events = new();
-       
+
 
         public event EventHandler StatusUpdate;
+        public Action<LogLevel, string> LogAction { get; set; }
+
         public bool AutoImport { get; set; }
         public string BaseFolder { get; set; }
         [JsonIgnore]
@@ -46,7 +48,7 @@ namespace Compressarr.JobProcessing.Models
         public string Name => $"{FilterName}|{PresetName}";
 
         [JsonIgnore]
-        public IFFmpegPreset Preset { get; internal set; }
+        public FFmpegPreset Preset { get; internal set; }
 
         public string PresetName { get; set; }
 
@@ -67,6 +69,11 @@ namespace Compressarr.JobProcessing.Models
         {
             if (!string.IsNullOrWhiteSpace(message))
             {
+                if(LogAction != null )
+                {
+                    LogAction.Invoke(level, message);
+                }
+
                 _events.Add(new JobEvent(level, message));
                 StatusUpdate?.Invoke(this, EventArgs.Empty);
             }
@@ -74,12 +81,14 @@ namespace Compressarr.JobProcessing.Models
 
         public void UpdateState(JobState state)
         {
+            Log($"Job {Name} changed from {JobState} to {state}.", LogLevel.Information);
+
             JobState = state;
             StatusUpdate?.Invoke(this, EventArgs.Empty);
         }
         public void UpdateStatus(object sender, string message = null)
         {
-            if(!string.IsNullOrWhiteSpace(message))
+            if (!string.IsNullOrWhiteSpace(message))
             {
                 Log(message, LogLevel.Debug);
             }

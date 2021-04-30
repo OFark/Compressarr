@@ -2,22 +2,38 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 
-@inject Compressarr.Pages.Services.ILayoutService layoutService 
+@inject Compressarr.Pages.Services.ILayoutService layoutService
 
+<MudThemeProvider Theme="@MyCustomTheme" />
+<MudDialogProvider />
+<MudSnackbarProvider />
 
-<LayoutEngine @ref="layoutEngine" OnStateChanged="LayoutEngineStateChanged">
-    <div class="topbar">
+<MudLayout>
+    <MudAppBar Elevation="2">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
+        <MudText Typo="Typo.h5" Class="ml-3">Compressarr</MudText>
+        <MudAppBarSpacer />
         <NavMenu />
-    </div>
-
-    <div class="main">
-        <div id="content">
-            <CascadingValue Value=layoutEngine>
-                @Body
-            </CascadingValue>
-        </div>
-    </div>
-</LayoutEngine>
+    </MudAppBar>
+    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+        <MudNavMenu>
+            <MudNavLink Match="NavLinkMatch.All" Href="/" title="Security isn't a dirty word, Blackadder. 'Crevice' is a dirty word, but 'security' isn't.">Jobs</MudNavLink>
+            <MudNavLink href="radarr">Radarr</MudNavLink>
+            <MudNavLink href="sonarr">Sonarr</MudNavLink>
+            <MudNavLink href="ffmpeg">FFmpeg</MudNavLink>
+            <MudNavLink Href="options">Options</MudNavLink>
+        </MudNavMenu>
+    </MudDrawer>
+    <MudMainContent>
+        <LayoutEngine @ref="layoutEngine" OnStateChanged="LayoutEngineStateChanged">
+            <MudContainer MaxWidth="MaxWidth.Large" Fixed="true" id="content">
+                <CascadingValue Value=layoutEngine>
+                    @Body
+                </CascadingValue>
+            </MudContainer>
+        </LayoutEngine>
+    </MudMainContent>
+</MudLayout>
 
 @code {
     protected LayoutEngineBase layoutEngine = new();
@@ -26,4 +42,32 @@
     {
         InvokeAsync(StateHasChanged);
     }
+
+    bool _drawerOpen = false;
+
+    void DrawerToggle()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+
+    MudTheme MyCustomTheme = new MudTheme()
+    {
+        Palette = new Palette()
+        {
+            Primary = Colors.DeepPurple.Default,
+            Secondary = Colors.DeepPurple.Accent1,
+            AppbarText = "#fff",
+            AppbarBackground = Colors.BlueGrey.Default
+        },
+
+        LayoutProperties = new LayoutProperties()
+        {
+            DrawerWidthLeft = "260px",
+            DrawerWidthRight = "300px"
+        },
+        Typography = new Typography()
+        {
+            H1 = new() { FontSize = "4rem", FontFamily = new string[] { "Roboto", "Helvetica", "Arial", "sans-serif" }, FontWeight = 300, LineHeight = 1.5 }
+        }
+    };
 }

@@ -2,6 +2,7 @@
 @using Compressarr.Filtering;
 @using Compressarr.JobProcessing;
 @using Compressarr.Pages.Services;
+@using Compressarr.Helpers;
 
 @inject IFFmpegManager fFmpegManager
 @inject IFilterManager filterManager
@@ -9,184 +10,164 @@
 @inject ILayoutService layoutService
 
 
-<div class="job">
-    <div class="jobTitle">
-        @if (!NewJob)
-        {
-            <h3 @onclick="() => { expand = !expand; }">
-                <img src="@FilterImageSrc" />@job.FilterName
-                <i class="fas fa-arrow-right"></i>
-                @job.PresetName
-                <i class="fas fa-sign-out-alt" aria-hidden="true"></i>
-                @job.BaseFolder
-                <i class="fas fa-sign-in-alt" aria-hidden="true"></i>
-                @job.WriteFolder
-                @if (!expand)
-                {
-                    @: -
-                    @buttonText
-                }
-            </h3>
-        }
-        else
-        {
-            <h3>New Job</h3>
-        }
-        <div class="commands">
-            @if (expand || editing)
-            {
-                @if (canReload && !NewJob)
-                {
-                    <button @onclick="reloadJob"><i class="fas fa-sync-alt"></i></button>
-                }
-                @if (editing)
-                {
-                    <button @onclick="saveJob"><i class="fas fa-save"></i></button>
-                    @if (!NewJob)
-                    {
-                        <button @onclick="deleteJob"><i class="fas fa-trash-alt"></i></button>
-                    }
-                }
-                @if (!NewJob)
-                {
-                    if (job.JobState != JobState.Running)
-                    {
-                        <button @onclick="reInitialise" title="Re-Initialise"><i class="fas fa-redo"></i></button>
-                    }
-                    <button @onclick="() => { editJob = !editJob; }"><i class="fas fa-edit"></i></button>
-                }
-            }
-        </div>
-    </div>
-    @if (expand || editing)
-    {
-        if (editing)
-        {
-            <div class="editJob">
-                <h3>Settings</h3>
-                <div class="editJobWrapper">
-                    <div class="input-group">
-                        <label class="col-form-label">Filter:</label>
-                        <div class="">
-                            <select @bind="job.FilterName" class="form-control">
-                                <option value="">Select...</option>
-                                @foreach (var c in filterManager.Filters)
-                                {
-                                    <option value="@c.Name">@c.Name - @c.MediaSource</option>
-                                }
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="input-group">
-                        <label class="col-form-label">Preset:</label>
-                        <div class="">
-                            <select @bind="job.PresetName" class="form-control">
-                                <option value="">Select...</option>
-                                @foreach (var c in fFmpegManager.Presets)
-                                {
-                                    <option value="@c.Name">@c.Name</option>
-                                }
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="input-group">
-                        <label class="col-form-label">Base Folder:</label>
-                        <div class="">
-                            <DirectoryLookup @bind-Folder="@job.BaseFolder"></DirectoryLookup>
-                        </div>
-                    </div>
-
-                    <div class="input-group">
-                        <label class="col-form-label">Destination Folder:</label>
-                        <div class="">
-                            <DirectoryLookup @bind-Folder="@job.DestinationFolder"></DirectoryLookup>
-                        </div>
-                    </div>
-
-                    <div class="input-group">
-                        <label class="col-form-label">Automatically Import:</label>
-                        <div class="">
-                            <input type="checkbox" @bind="job.AutoImport" class="form-control">
-                        </div>
-                    </div>
-
-                    @if (job.AutoImport)
-                    {
-                        <div class="AutoImportOptions">
-                            <div class="input-group">
-                                <label class="col-form-label">Minimum SSIM:</label>
-                                <div class="percent">
-                                    <input type="number" @bind="minSSIM" class="form-control">
-                                </div>
-                            </div>
-                            <div class="input-group">
-                                <label class="col-form-label">Maximum File Compression:</label>
-                                <div class="percent">
-                                    <input type="number" @bind="maxComp" class="form-control">
-                                </div>
-                            </div>
-                        </div>
-                    }
-                </div>
-            </div>
-        }
-        else
-        {
-            @if (job.WorkLoad != null)
-            {
-                <div class="workLoad">
-                    <h4>Workload</h4>
-                    <div class="workLoadItems">
-                        @foreach (var wi in job.WorkLoad)
+<MudExpansionPanel Class="job">
+    <TitleContent>
+        <MudAvatar Image="@FilterImageSrc" />
+        <MudText>@(NewJob ? "New Job" : $"{@job.FilterName} | {@job.PresetName} - {@job.BaseFolder} {@job.WriteFolder}")</MudText>
+    </TitleContent>
+    <ChildContent>
+        <MudGrid>
+            <MudItem xs="12">
+                <MudCard>
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="@Typo.h6">@(editing ? "Settings" : "Workload")</MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            @if (!NewJob)
+                            {
+                                <MudIconButton Color="Color.Primary" Icon="@Icons.Material.Outlined.Edit" @onclick="() => { editJob = !editJob; }" />
+                            }
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        @if (editing)
                         {
-                            <div class="workitem">
-                                <span class="fileName">@wi.SourceFileName</span>
-                                @if (wi.Running)
+                            <MudForm>
+                                <MudSelect T="string" Required="true" Label="Filter" @bind-Value="job.FilterName">
+                                    @foreach (var c in filterManager.Filters)
+                                    {
+                                        <MudSelectItem Value="@c.Name">@c.Name - @c.MediaSource</MudSelectItem>
+                                    }
+                                </MudSelect>
+                                <MudSelect T="string" Required="true" Label="Preset" @bind-Value="job.PresetName">
+                                    @foreach (var c in fFmpegManager.Presets)
+                                    {
+                                        <MudSelectItem Value="@c.Name">@c.Name</MudSelectItem>
+                                    }
+                                </MudSelect>
+                                <DirectoryLookup @bind-Folder="@job.BaseFolder" Label="Base Folder" />
+
+                                <DirectoryLookup @bind-Folder="@job.DestinationFolder" Label="Destination Folder" Required="true" />
+
+                                <MudCheckBox @bind-Checked="job.AutoImport" Label="Auto Import"></MudCheckBox>
+
+                                @if (job.AutoImport)
                                 {
-                                    <span class="badge-pill badge-secondary">@wi.Percent%</span>
-                                    <span class="badge-pill badge-secondary">Frame: @wi.Frame</span>
-                                    <span class="badge-pill badge-secondary">FPS: @wi.FPS</span>
-                                    <span class="badge-pill badge-secondary">Q: @wi.Q</span>
-                                    <span class="badge-pill badge-secondary">Size: @wi.Size</span>
-                                    <span class="badge-pill badge-secondary">Time: @wi.Duration</span>
-                                    <span class="badge-pill badge-secondary">Length: @wi.TotalLength</span>
-                                    <span class="badge-pill badge-secondary">Bitrate: @wi.Bitrate</span>
-                                    <span class="badge-pill badge-secondary">Speed: @wi.Speed</span>
+                                    <MudNumericField Style="" @bind-Value="minSSIM" Label="Minimum SSIM" Min="0" Max="100" Adornment="Adornment.End" AdornmentText="%" />
+                                    <MudNumericField @bind-Value="maxComp" Label="Maximum Compression" Min="0" Max="100" Adornment="Adornment.End" AdornmentText="%" />
                                 }
-                                <span class="badge-pill badge-secondary">Finished: @wi.Finished</span>
-                                @if (wi.Finished)
-                                {
-                                    <span class="badge-pill badge-secondary">Success: @wi.Success</span>
-                                    <span class="badge-pill badge-secondary">SSIM: @(Math.Round((wi.SSIM ?? 0) * 100, 3))</span>
-                                    <span class="badge-pill badge-secondary">Compression: @(Math.Round((wi.Compression ?? 0) * 100, 3))</span>
-                                }
-                            </div>
+                            </MudForm>
                         }
-                    </div>
-                </div>
-            }
-        }
-        <div class="jobLog">
-            <h4>Log</h4>
-            <div class="jobEventsScrollWrapper">
-                <div class="jobEvents">
-                    @foreach (var e in job.Events)
-                    {
-                        <div class="event @e.Level">
-                            @e.Date.ToString("HH:mm:ss") - @e.Message
-                        </div>
-                    }
-                </div>
-            </div>
-        </div>
-        @if (!editing)
-        {
-            <button class="btn btn-block @buttonClass" @onclick="startJob" @onmouseover="() => { mouseOnButton = true; }" @onmouseout="() => { mouseOnButton = false; }">@buttonText</button>
-        }
-    }
-</div>
+                        else
+                        {
+                            @if (job.WorkLoad != null)
+                            {
+                                <MudTable Items="job.WorkLoad" Striped="true" Dense="true">
+                                    <HeaderContent>
+                                        <MudTh>Name</MudTh>
+                                        <MudTh>Percent</MudTh>
+                                        <MudTh>Frame</MudTh>
+                                        <MudTh>FPS</MudTh>
+                                        <MudTh>Q</MudTh>
+                                        <MudTh>Size</MudTh>
+                                        <MudTh>Time</MudTh>
+                                        <MudTh>Length</MudTh>
+                                        <MudTh>Bitrate</MudTh>
+                                        <MudTh>Speed</MudTh>
+                                        <MudTh>Finished</MudTh>
+                                        <MudTh>SSIM</MudTh>
+                                        <MudTh>Compression</MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate>
+                                        <MudTd DataLabel="Name">@context.SourceFileName</MudTd>
+                                        <MudTd DataLabel="Percent"><MudText Align="Align.Center">@context.Percent.Adorn("%")</MudText></MudTd>
+                                        <MudTd DataLabel="Frame"><MudText Align="Align.Center">@context.Frame</MudText></MudTd>
+                                        <MudTd DataLabel="FPS"><MudText Align="Align.Center">@context.FPS</MudText></MudTd>
+                                        <MudTd DataLabel="Q"><MudText Align="Align.Center">@context.Q</MudText></MudTd>
+                                        <MudTd DataLabel="Size"><MudText Align="Align.Center">@context.Size</MudText></MudTd>
+                                        <MudTd DataLabel="Time"><MudText Align="Align.Center">@context.Duration</MudText></MudTd>
+                                        <MudTd DataLabel="Length"><MudText Align="Align.Center">@context.TotalLength</MudText></MudTd>
+                                        <MudTd DataLabel="Bitrate"><MudText Align="Align.Center">@context.Bitrate</MudText></MudTd>
+                                        <MudTd DataLabel="Speed"><MudText Align="Align.Center">@context.Speed</MudText></MudTd>
+                                        <MudTd DataLabel="Finished">
+                                            <MudText Align="Align.Center">
+                                                @if (context.Finished)
+                                                        {
+                                                            if (context.Success)
+                                                            {
+                                                        <MudIcon Color="Color.Success" Icon="@Icons.Material.Outlined.Check" />
+                                                            }
+                                                            else
+                                                            {
+                                                        <MudIcon Color="Color.Error" Icon="@Icons.Material.Outlined.Error" />
+                                                            }
+                                                        }
+                                            </MudText>
+                                        </MudTd>
+                                        <MudTd DataLabel="SSIM"><MudText Align="Align.Center">@context.SSIM.Adorn("%")</MudText></MudTd>
+                                        <MudTd DataLabel="Compression"><MudText Align="Align.Center">@context.Compression.Adorn("%")</MudText></MudTd>
+                                    </RowTemplate>
+                                    <PagerContent>
+                                        <MudTablePager PageSizeOptions="new int[]{5, 10, 50, 100}" />
+                                    </PagerContent>
+                                </MudTable>
+                            }
+                        }
+                    </MudCardContent>
+                    <MudCardActions>
+                        @if (editing)
+                        {
+                            <MudButton @onclick="saveJob" Disabled="@(!saveEnabled)" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Save">Save</MudButton>
+                            @if (!NewJob)
+                            {
+                                <MudButton @onclick="deleteJob" Color="Color.Error" StartIcon="@Icons.Material.Outlined.Delete">Delete</MudButton>
+                                @if (canReload)
+                                {
+                                    <MudButton StartIcon="@Icons.Material.Outlined.Refresh" Color="Color.Secondary" @onclick="reloadJob">Reload</MudButton>
+                                }
+                            }
+                        }
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12">
+                <MudCard>
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="@Typo.h6">Log</MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            @if (!NewJob)
+                            {
+                                if (job.JobState != JobState.Running)
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Sync" @onclick="reInitialise" title="Re-Initialise" />
+                                }
+
+                            }
+                        </CardHeaderActions>
+                    </MudCardHeader>
+
+                    <MudCardContent class="jobEventsScrollWrapper">
+                        <MudPaper Class="mud-theme-dark pa-2 jobEvents">
+                            @foreach (var e in job.Events)
+                            {
+                                <MudText Class="event" Color="e.Color" Typo="Typo.body2">@e.Date.ToString("HH:mm:ss") - @e.Message</MudText>
+                            }
+                        </MudPaper>
+                    </MudCardContent>
+                    <MudCardActions>
+                        @if (!NewJob)
+                        {
+                            <MudButton Variant="Variant.Filled" FullWidth="true" Color="@buttonColour" @onclick="startJob" @onmouseover="() => { mouseOnButton = true; }" @onmouseout="() => { mouseOnButton = false; }">@buttonText</MudButton>
+                        }
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+    </ChildContent>
+</MudExpansionPanel>
 
 @code {
     [Parameter]
@@ -199,39 +180,27 @@
     public EventCallback OnAdd { get; set; }
 
 
-    private bool canReload;
-    private bool editJob;
-    private bool expand;
-    private bool mouseOnButton;
+    private bool canReload, editJob, mouseOnButton;
 
     private bool editing => editJob || NewJob;
 
-    private string fileCount;
-
-    private string testingStatus;
+    private bool saveEnabled => (editing || NewJob) && job?.FilterName != null && job?.PresetName != null && job?.DestinationFolder != null;
 
     private string FilterImageSrc => $"https://raw.githubusercontent.com/{FilterType}/{FilterType}.github.io/master/logo/{FilterType}.svg";
 
     private string FilterType => job?.Filter?.MediaSource == Filtering.MediaSource.Radarr ? "radarr" : "sonarr" ?? "";
 
-    private string minSSIM
+    private int? minSSIM
     {
         get
         {
-            return job.MinSSIM.HasValue ? (job.MinSSIM * 100).ToString() : null;
+            return job.MinSSIM.HasValue ? (int)(job.MinSSIM * 100) : null;
         }
         set
         {
-            if (!string.IsNullOrWhiteSpace(value))
+            if (value.HasValue)
             {
-                if (decimal.TryParse(value, out var num))
-                {
-                    job.MinSSIM = num / 100;
-                }
-                else
-                {
-                    job.MinSSIM = null;
-                }
+                job.MinSSIM = (decimal)value / 100;
             }
             else
             {
@@ -240,24 +209,17 @@
         }
     }
 
-    private string maxComp
+    private int? maxComp
     {
         get
         {
-            return job.MaxCompression.HasValue ? (job.MaxCompression * 100).ToString() : null;
+            return job.MaxCompression.HasValue ? (int)(job.MaxCompression * 100) : null;
         }
         set
         {
-            if (!string.IsNullOrWhiteSpace(value))
+            if (value.HasValue)
             {
-                if (decimal.TryParse(value, out var num))
-                {
-                    job.MaxCompression = num / 100;
-                }
-                else
-                {
-                    job.MaxCompression = null;
-                }
+                job.MaxCompression = (decimal)value / 100;
             }
             else
             {
@@ -281,15 +243,16 @@
                 case JobState.TestedFail:
                     return mouseOnButton ? "Re-Initialise" : "Test Failed";
                 case JobState.TestedOK:
-                case JobState.Waiting:
                     return mouseOnButton ? "GO!" : "Ready";
+                case JobState.Waiting:
+                    return mouseOnButton ? "Stop" : "Waiting";
             }
 
             return "";
         }
     }
 
-    private string buttonClass
+    private Color buttonColour
     {
         get
         {
@@ -298,27 +261,19 @@
                 case JobState.Added:
                 case JobState.Running:
                 case JobState.TestedFail:
-                    return "btn-warning";
+                    return Color.Warning;
 
             }
 
-            return "btn-success";
+            return Color.Primary;
         }
     }
 
     private bool running => job.JobState == JobState.Running;
 
-    private bool? Ok;
-
     protected override void OnInitialized()
     {
         job.StatusUpdate += jobStatusUpdate;
-
-        //This should be done on startup
-        //if (job.JobStatus == JobStatus.Added)
-        //{
-        //    jobManager.InitialiseJob(job);
-        //}
     }
 
     private void jobStatusUpdate(object caller, EventArgs args)
@@ -376,7 +331,6 @@
         switch (job.JobState)
         {
             case JobState.TestedOK:
-            case JobState.Waiting:
                 {
                     jobManager.RunJob(job);
                 }
@@ -388,6 +342,7 @@
                 }
                 break;
             case JobState.Running:
+            case JobState.Waiting:
                 {
                     jobManager.CancelJob(job);
                 }

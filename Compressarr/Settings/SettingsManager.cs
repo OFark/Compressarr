@@ -1,177 +1,224 @@
-﻿using Microsoft.Extensions.Hosting;
+﻿using Compressarr.FFmpegFactory;
+using Compressarr.FFmpegFactory.Models;
+using Compressarr.Filtering.Models;
+using Compressarr.JobProcessing.Models;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.IO;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Compressarr.Settings
 {
+    public enum AppDir
+    {
+        CodecOptions,
+        Config,
+        Debug,
+        FFmpeg,
+        Logs
+    }
+
+    public enum AppFile
+    {
+        ffmpegVersion,
+        appsettings
+    }
+
     public class SettingsManager : ISettingsManager
     {
-        private const string settingsFile = "settings.json";
+        private readonly CancellationToken cancellationToken;
         private readonly ILogger<SettingsManager> logger;
-        public SettingsManager(ILogger<SettingsManager> logger)
+
+        private Dictionary<string, ReaderWriterLockSlim> locks = new();
+
+        public SettingsManager(ILogger<SettingsManager> logger, IOptions<APIServiceSettings> appSettings, IOptions<HashSet<FFmpegPreset>> presets, IOptions<HashSet<Filter>> filters, IOptions<HashSet<Job>> jobs, IHostApplicationLifetime lifetime)
         {
+            Filters = filters?.Value ?? new();
+            Jobs = jobs?.Value ?? new();
+            Presets = presets?.Value ?? new();
+            RadarrSettings = appSettings?.Value?.RadarrSettings ?? new();
+            SonarrSettings = appSettings?.Value.SonarrSettings ?? new();
+
             this.logger = logger;
-        }
 
-        public static string CodecOptionsDirectory => IsDevelopment ? "CodecOptions" : Path.Combine(ConfigDirectory, "CodecOptions");
-        public static string ConfigDirectory => InDocker ? "/config" : IsDevelopment ? "config" : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config");
-        public static string DebugDirectory => Path.Combine(ConfigDirectory, "debug");
-        public static string dockerAppSettings => Path.Combine(ConfigDirectory, "appsettings.json");
-        public static string Group => Environment.GetEnvironmentVariable("PUID");
-        public static bool InDocker => Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true";
+            cancellationToken = lifetime.ApplicationStopping;
 
-        public static bool IsDevelopment => !InDocker && Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == Environments.Development;
-
-        public static string User => Environment.GetEnvironmentVariable("PUID");
-        public Dictionary<string, string> Settings => _settings ?? LoadSettings();
-        private Dictionary<string, string> _settings { get; set; }
-        public void AddSetting(SettingType setting, string value)
-        {
-            using (logger.BeginScope("Add Setting"))
+            foreach (var ad in Enum.GetValues(typeof(AppDir)).Cast<AppDir>())
             {
-                logger.LogDebug($"Setting Type: {setting}");
-
-                var name = setting.ToString();
-
-                if (Settings.ContainsKey(name))
-                {
-                    Settings[name] = value;
-                }
-                else
-                {
-                    Settings.Add(name, value);
-                }
-
-                SaveSettings();
+                logger.LogDebug($"Application Directory ({ad}) set to: {GetAppDirPath(ad)}");
             }
         }
 
-        public void DeleteSetting(SettingType setting)
+        public static string ConfigDirectory => GetAppDirPath(AppDir.Config);
+        public Dictionary<CodecType, SortedDictionary<string, string>> Codecs { get; set; }
+        public SortedDictionary<string, string> Containers { get; set; }
+
+        public HashSet<Filter> Filters { get; set; }
+        public HashSet<Job> Jobs { get; set; }
+        public HashSet<FFmpegPreset> Presets { get; }
+        public APISettings RadarrSettings { get; set; }
+        public APISettings SonarrSettings { get; set; }
+
+        public static string GetAppDirPath(AppDir dir) => dir switch
         {
-            using (logger.BeginScope("Delete Setting"))
-            {
-                logger.LogDebug($"Setting Type: {setting}");
-                var name = setting.ToString();
+            AppDir.CodecOptions => AppEnvironment.IsDevelopment ? "CodecOptions" : Path.Combine(ConfigDirectory, "CodecOptions"),
+            AppDir.Config => AppEnvironment.InDocker ? "/config" : AppEnvironment.IsDevelopment ? "config" : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config"),
+            AppDir.Debug => Path.Combine(ConfigDirectory, "debug"),
+            AppDir.FFmpeg => Path.Combine(ConfigDirectory, "FFmpeg"),
+            AppDir.Logs => Path.Combine(ConfigDirectory, "logs"),
+            _ => Path.Combine(ConfigDirectory, dir.ToString())
+        };
 
-                if (Settings.ContainsKey(name))
-                {
-                    Settings.Remove(name);
-                }
+        public static string GetAppFilePath(AppFile file) => file switch
+        {
+            AppFile.ffmpegVersion => Path.Combine(GetAppDirPath(AppDir.FFmpeg), "version.json"),
+            AppFile.appsettings => AppEnvironment.InDocker ? Path.Combine(ConfigDirectory, $"{file.ToString().ToLower()}.json") : AppEnvironment.IsDevelopment ? $"{file.ToString().ToLower()}.json" : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{file.ToString().ToLower()}.json"),
+            _ => Path.Combine(ConfigDirectory, $"{file.ToString().ToLower()}.json")
+        };
 
-                SaveSettings();
-            }
+        public static string GetFilePath(AppDir dir, string filename)
+        {
+            return Path.Combine(GetAppDirPath(dir), filename);
         }
 
-        public async void DumpDebugFile(string fileName, string content)
+        public static bool HasFile(string filePath) => File.Exists(filePath);
+
+        public static bool HasFile(AppFile file) => File.Exists(GetAppFilePath(file));
+
+        public static bool HasFile(AppDir dir, string fileName) => File.Exists(Path.Combine(GetAppDirPath(dir), fileName));
+
+        public Task DumpDebugFile(string fileName, string content) => WriteTextFileAsync(Path.Combine(GetAppDirPath(AppDir.Debug), fileName), content);
+        public Task<T> ReadJsonFileAsync<T>(AppFile file) where T : class => ReadJsonFileAsync<T>(GetAppFilePath(file));
+
+        public async Task<T> ReadJsonFileAsync<T>(string path) where T : class
         {
-            if (!Directory.Exists(DebugDirectory))
+            using (logger.BeginScope("ReadJsonFileAsync"))
             {
-                Directory.CreateDirectory(DebugDirectory);
-            }
+                var json = await ReadTextFileAsync(path);
 
-            var dumpFile = Path.Combine(DebugDirectory, fileName);
-
-            await File.WriteAllTextAsync(dumpFile, content);
-        }
-
-        public string GetSetting(SettingType setting)
-        {
-            using (logger.BeginScope("Get Setting"))
-            {
-                logger.LogDebug($"Setting Type: {setting}");
-                var name = setting.ToString();
-
-                if (Settings.ContainsKey(name))
-                {
-                    return Settings[name];
-                }
-
-                return null;
-            }
-        }
-
-        public bool HasSetting(SettingType setting) => Settings.ContainsKey(setting.ToString());
-
-        public T LoadSettingFile<T>(string fileName)
-        {
-            using (logger.BeginScope("Loading a Setting file"))
-            {
-                var filePath = ConfigFile(fileName);
-
-                logger.LogInformation($"File name: {filePath}");
-
-                if (File.Exists(filePath))
+                if (!string.IsNullOrWhiteSpace(json))
                 {
                     try
                     {
-                        var json = File.ReadAllText(filePath);
-
-                        if (!string.IsNullOrWhiteSpace(json))
-                        {
-                            return JsonConvert.DeserializeObject<T>(json);
-                        }
+                        logger.LogDebug($"Converting string to {typeof(T)}");
+                        return JsonConvert.DeserializeObject<T>(json);
                     }
-                    catch (Exception ex)
+                    catch (JsonSerializationException jsex)
                     {
-                        logger.LogError(ex, "Cannot load file");
+                        logger.LogError($"JSON parsing error: {jsex}.");
                     }
-                    logger.LogWarning("Settings file is empty");
                 }
                 else
                 {
-                    logger.LogInformation("Settings file does not exist");
+                    logger.LogWarning($"File empty: {path}.");
                 }
 
                 return default;
             }
         }
 
-        public void SaveSettingFile(string fileName, object content)
+        public Task<string> ReadTextFileAsync(AppFile file) => ReadTextFileAsync(GetAppFilePath(file));
+
+        public Task<string> ReadTextFileAsync(string path)
         {
-            using (logger.BeginScope("Saving a Setting file"))
+            using (logger.BeginScope("ReadTextFileAsync from {path}", path))
             {
-                var filePath = ConfigFile(fileName);
+                if (File.Exists(path))
+                {
+                    return Task.Run(() =>
+                    {
+                        GetLock(path).EnterReadLock();
+                        try
+                        {
+                            logger.LogDebug($"Reading all text from file: {path}");
+                            return File.ReadAllText(path);
+                        }
+                        finally
+                        {
+                            GetLock(path).ExitReadLock();
+                        }
+                    }, cancellationToken);
+                }
 
-                logger.LogInformation($"File name: {filePath}");
+                logger.LogWarning("File does not exist");
+                return new(() => null);
+            }
+        }
 
-                var fileDir = Path.GetDirectoryName(filePath);
-                if (!Directory.Exists(fileDir))
+        public async Task SaveAppSetting()
+        {
+            try
+            {
+                var jsonObj = await ReadJsonFileAsync<dynamic>(AppFile.appsettings);
+
+                var serviceSettings = new APIServiceSettings() {RadarrSettings = RadarrSettings, SonarrSettings = SonarrSettings };
+                jsonObj["Services"] = JToken.FromObject(serviceSettings);
+                jsonObj["Filters"] = JToken.FromObject(Filters);
+                jsonObj["Presets"] = JToken.FromObject(Presets);
+                jsonObj["Jobs"] = JToken.FromObject(Jobs);
+
+                await WriteJsonFileAsync(AppFile.appsettings, jsonObj);
+
+            }
+            catch (ConfigurationErrorsException)
+            {
+                logger.LogError("Error writing app settings");
+            }
+        }
+
+        public Task WriteJsonFileAsync(AppFile file, object content) => WriteJsonFileAsync(GetAppFilePath(file), content);
+        public Task WriteJsonFileAsync(string path, object content) =>
+            WriteTextFileAsync(path, JsonConvert.SerializeObject(content, new JsonSerializerSettings() { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore }));
+
+
+        public Task WriteTextFileAsync(AppFile file, string content) => WriteTextFileAsync(GetAppFilePath(file), content);
+
+        public Task WriteTextFileAsync(string path, string content)
+        {
+            using (logger.BeginScope("WriteFileAsyncfrom {path}", path))
+            {
+                var fileDir = Path.GetDirectoryName(path);
+                if (!string.IsNullOrWhiteSpace(fileDir) && !Directory.Exists(fileDir))
                 {
                     logger.LogDebug($"Creating Directory: {fileDir}");
                     Directory.CreateDirectory(fileDir);
-
-
                 }
 
-                var json = JsonConvert.SerializeObject(content, new JsonSerializerSettings() { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
-
-                File.WriteAllText(filePath, json);
+                return Task.Run(() =>
+                {
+                    GetLock(path).EnterWriteLock();
+                    {
+                        try
+                        {
+                            logger.LogDebug($"Writing all text to file: {path}");
+                            File.WriteAllText(path, content);
+                        }
+                        finally
+                        {
+                            GetLock(path).ExitWriteLock();
+                        }
+                    }
+                }, cancellationToken);
             }
         }
-
-        private string ConfigFile(string fileName) => Path.Combine(ConfigDirectory, fileName);
-        private Dictionary<string, string> LoadSettings()
+        private ReaderWriterLockSlim GetLock(string path)
         {
-            using (logger.BeginScope("Load Settings"))
+            logger.LogDebug($"Getting lock for: {path}");
+            if (!locks.ContainsKey(path))
             {
-                _settings = new Dictionary<string, string>();
-
-                _settings = LoadSettingFile<Dictionary<string, string>>(settingsFile) ?? new();
-
-                return _settings;
+                logger.LogTrace("Creating new Lock");
+                locks.Add(path, new());
             }
-        }
-
-        private void SaveSettings()
-        {
-            using (logger.BeginScope("Save Settings"))
-            {
-                SaveSettingFile(settingsFile, Settings);
-            }
+            return locks[path];
         }
     }
 }

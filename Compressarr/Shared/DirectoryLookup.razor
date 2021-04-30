@@ -1,131 +1,80 @@
 ﻿@using System.IO;
 @using Compressarr.Shared.Models
 
-<folder>
-    <input type="text" @bind="Folder" @oninput="dirInput" @onkeydown="keyPress" @onblur="dirBlur" class="form-control" />
-    <ol>
-        @foreach (var s in suggestions)
-        {
-            <li class="@(selectedSuggestion >= 0 && suggestions[selectedSuggestion].Name == s.Name ? "active" : "")" @onclick="(() => sugClicked(s))">@s.Name</li>
-        }
-    </ol>
-</folder>
+<MudAutocomplete T="DirectorySuggestion" Required="@Required" Label="@Label" @bind-Value="_folder" ResetValueOnEmptyText="true" SearchFunc="dirInput">
+    <ItemTemplate Context="e">
+        <MudText>@(e.Name)</MudText>
+    </ItemTemplate>
+</MudAutocomplete>
 
 @code {
 
-    private List<DirectorySuggestion> suggestions { get; set; } = new();
+    [ParameterAttribute]
+    public string Folder { get; set; }
 
     [ParameterAttribute]
-    public string Folder
+    public string Label { get; set; }
+
+    [ParameterAttribute]
+    public bool Required { get; set; }
+
+
+    private DirectorySuggestion _folder
     {
-        get => _folder;
+        get => new DirectorySuggestion(Folder);
         set
         {
-            if (_folder == value) return;
+            if (Folder == value?.Suggestion || value == null || string.IsNullOrEmpty(value.Suggestion)) return;
 
-            _folder = value;
-            FolderChanged.InvokeAsync(value);
+
+            Folder = value.Suggestion;
+            FolderChanged.InvokeAsync(value.Suggestion);
         }
     }
-
-    private string _folder;
 
     [Parameter]
     public EventCallback<string> FolderChanged { get; set; }
 
-    private int selectedSuggestion = -1;
 
-    private async void dirBlur(FocusEventArgs args)
+    private async Task<IEnumerable<DirectorySuggestion>> dirInput(string path)
     {
-        await Task.Delay(200);
-        suggestions = new();
-    }
-
-    private void dirInput(ChangeEventArgs args)
-    {
-        selectedSuggestion = -1;
-        var path = args.Value as string;
-        if (!string.IsNullOrEmpty(path))
+        var suggestions = new List<DirectorySuggestion>();
+        await Task.Run(() =>
         {
-            try
+            if (!string.IsNullOrEmpty(path))
             {
-                if (Directory.Exists(path))
+                try
                 {
-                    suggestions = new DirectoryInfo(path).GetDirectories().Select(di => new DirectorySuggestion(di)).ToList();
-                }
-                else
-                {
-                    var parent = Path.GetDirectoryName(path);
-                    if (!string.IsNullOrEmpty(parent))
+                    if (Directory.Exists(path))
                     {
-                        suggestions = new DirectoryInfo(parent).GetDirectories().Where(di => di.FullName.Contains(path, StringComparison.OrdinalIgnoreCase))
-                                                                                .Select(di => new DirectorySuggestion(di))
-                                                                                .ToList();
+                        suggestions = new DirectoryInfo(path).GetDirectories().Select(di => new DirectorySuggestion(di)).ToList();
                     }
                     else
                     {
-                        suggestions = new();
+                        var parent = Path.GetDirectoryName(path);
+                        if (!string.IsNullOrEmpty(parent))
+                        {
+                            suggestions = new DirectoryInfo(parent).GetDirectories().Where(di => di.FullName.Contains(path, StringComparison.OrdinalIgnoreCase))
+                                                                                    .Select(di => new DirectorySuggestion(di))
+                                                                                    .ToList();
+                        }
+                        else
+                        {
+                            suggestions = new();
+                        }
                     }
                 }
-            }
-            catch (Exception ex) when (
-                ex is DirectoryNotFoundException ||
-                ex is UnauthorizedAccessException)
-            {
-                suggestions = new();
-            }
-        }
-    }
-
-    private void keyPress(KeyboardEventArgs args)
-    {
-        switch (args.Code)
-        {
-            case "ArrowDown":
+                catch (Exception ex) when (
+                    ex is DirectoryNotFoundException ||
+                    ex is UnauthorizedAccessException)
                 {
-                    selectedSuggestion++;
-                    if (selectedSuggestion >= suggestions.Count)
-                    {
-                        selectedSuggestion = 0;
-                    }
-
-                    selectSuggection();
-                }
-                break;
-            case "ArrowUp":
-                {
-                    selectedSuggestion--;
-                    if (selectedSuggestion < 0)
-                    {
-                        selectedSuggestion = suggestions.Count - 1;
-                    }
-                    selectSuggection();
-                }
-                break;
-            case "Enter":
-            case "NumpadEnter":
-            case "Tab":
-                {
-                    selectSuggection();
                     suggestions = new();
                 }
-                break;
-        }
+            }
+        });
+
+        return suggestions;
     }
 
-    private void selectSuggection()
-    {
-        if (selectedSuggestion >= 0 && selectedSuggestion < suggestions.Count)
-        {
-            Folder = suggestions[selectedSuggestion].Suggestion;
-        }
-    }
-
-    private void sugClicked(DirectorySuggestion suggestion)
-    {
-        Folder = suggestion.Suggestion;
-        suggestions = new();
-        selectedSuggestion = -1;
-    }
 
 }

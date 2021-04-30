@@ -12,7 +12,7 @@ namespace Compressarr.FFmpegFactory.Models
     {
         internal IConversion Converter;
 
-        internal CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
+        internal CancellationTokenSource cancellationTokenSource = new ();
 
         internal bool cont = false;
 

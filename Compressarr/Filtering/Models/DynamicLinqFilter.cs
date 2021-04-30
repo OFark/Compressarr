@@ -6,6 +6,10 @@ namespace Compressarr.Filtering.Models
 {
     public class DynamicLinqFilter
     {
+        public DynamicLinqFilter()
+        {
+
+        }
         public DynamicLinqFilter(FilterProperty property, FilterComparitor comparitor, string value)
         {
             Property = property;

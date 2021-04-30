@@ -6,6 +6,11 @@ namespace Compressarr.Helpers
 {
     public static class ExtensionMethods
     {
+
+        public static string Adorn(this object text, string adornment)
+        {
+            return string.IsNullOrWhiteSpace(text?.ToString()) ? string.Empty : $"{text}{adornment}";
+        }
         public static string ToFileSize(this long l)
         {
             return String.Format(new FileSizeFormatProvider(), "{0:fs}", l);
@@ -40,9 +45,9 @@ namespace Compressarr.Helpers
         public static T Clone<T>(this T source)
         {
             // Don't serialize a null object, simply return the default for that object
-            if (Object.ReferenceEquals(source, null))
+            if (source is null)
             {
-                return default(T);
+                return default;
             }
 
             // initialize inner objects individually

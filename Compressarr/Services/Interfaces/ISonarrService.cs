@@ -1,9 +1,11 @@
 ﻿using Compressarr.Services.Models;
+using Compressarr.Settings;
+using System.Threading.Tasks;
 
 namespace Compressarr.Services
 {
     public interface ISonarrService
     {
-        public SystemStatus TestConnection(string radarrURL, string radarrAPIKey);
+        public Task<SystemStatus> TestConnection(APISettings settings);
     }
 }

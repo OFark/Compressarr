@@ -1,8 +1,6 @@
 ﻿using Compressarr.JobProcessing.Models;
 using Compressarr.Services.Models;
 using Compressarr.Settings;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
@@ -11,7 +9,6 @@ using System.IO;
 using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Net.Http;
-using System.Net.Http.Json;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web;
@@ -20,58 +17,56 @@ namespace Compressarr.Services
 {
     public class RadarrService : IRadarrService
     {
+        
         private readonly ILogger<RadarrService> logger;
         private readonly ISettingsManager settingsManager;
-        private readonly IWebHostEnvironment env;
 
-        private HashSet<Movie> cachedMovies = null;
-        private DateTime lastCached;
+        private ServiceResult<HashSet<Movie>> cachedGetMoviesResult = null;
 
-        public RadarrService(ISettingsManager _settingsManager, ILogger<RadarrService> logger, IWebHostEnvironment env)
+        private int previousResultsHash;
+
+        public RadarrService(ILogger<RadarrService> logger, ISettingsManager settingsManager)
         {
-            settingsManager = _settingsManager;
             this.logger = logger;
-            this.env = env;
+            this.settingsManager = settingsManager;
         }
 
-        public long MovieCount => cachedMovies?.Count ?? 0;
-        public async Task<ServiceResult<HashSet<Movie>>> GetMovies()
+        public long MovieCount => cachedGetMoviesResult?.Results?.Count ?? 0;
+        public void ClearCache()
+        {
+            cachedGetMoviesResult = null;
+        }
+
+        public async Task<ServiceResult<HashSet<Movie>>> GetMoviesAsync()
         {
             using (logger.BeginScope("Get Movies"))
             {
                 logger.LogInformation($"Fetching Movies");
 
-                if (cachedMovies == null)
+                if (cachedGetMoviesResult == null || !cachedGetMoviesResult.Success)
                 {
                     logger.LogDebug($"No cached movies, interrogate Radarr.");
-                    await RequestMovies();
+                    return await RequestMovies();
                 }
-                else if ((DateTime.Now - lastCached).TotalMinutes > 1)
+                else if (cachedGetMoviesResult.HasExpired)
                 {
                     logger.LogDebug($"Cache has expired, interrogate Radarr.");
                     // we will update in the background, return the stale results for now.
                     _ = RequestMovies();
                 }
 
-                return new ServiceResult<HashSet<Movie>>(true, cachedMovies);
+                return cachedGetMoviesResult;
             }
         }
 
-        public void ClearCache()
-        {
-            cachedMovies = null;
-        }
-
-        public ServiceResult<HashSet<Movie>> GetMoviesByJSON(string json) => throw new NotImplementedException();
-
-        public async Task<ServiceResult<HashSet<Movie>>> GetMoviesFiltered(string filter, string[] filterValues)
+        public async Task<ServiceResult<HashSet<Movie>>> GetMoviesFilteredAsync(string filter, string[] filterValues)
         {
             using (logger.BeginScope("Get Filtered Movies"))
             {
                 logger.LogDebug("Filtering Movies");
                 logger.LogDebug($"Filter: {filter}");
                 logger.LogDebug($"Filter Values: {string.Join(", ", filterValues)}");
-                var movies = await GetMovies();
+                var movies = await GetMoviesAsync();
 
                 if (movies.Success)
                 {
@@ -88,7 +83,7 @@ namespace Compressarr.Services
             {
                 logger.LogDebug($"Property name: {property}");
 
-                var movies = await GetMovies();
+                var movies = await GetMoviesAsync();
 
                 if (movies.Success)
                 {
@@ -138,7 +133,7 @@ namespace Compressarr.Services
 
                 var destinationFolder = Path.GetDirectoryName(workItem.DestinationFile);
 
-                var link = $"{settingsManager.GetSetting(SettingType.RadarrURL)}/api/manualimport?folder={HttpUtility.UrlEncode(destinationFolder)}&filterExistingFiles=true&apikey={settingsManager.GetSetting(SettingType.RadarrAPIKey)}";
+                var link = $"{settingsManager.RadarrSettings?.APIURL}/api/manualimport?folder={HttpUtility.UrlEncode(destinationFolder)}&filterExistingFiles=true&apikey={settingsManager.RadarrSettings?.APIKey}";
                 logger.LogDebug($"Link: {link}");
 
                 ManualImportResponse mir = null;
@@ -149,13 +144,13 @@ namespace Compressarr.Services
                     {
                         logger.LogDebug("Requesting ManualImport");
 
-                        var hrm = hc.GetAsync(link).Result;
+                        var hrm = await hc.GetAsync(link);
 
-                        var manualImportJSON = hrm.Content.ReadAsStringAsync().Result;
+                        var manualImportJSON = await hrm.Content.ReadAsStringAsync();
 
-                        if (env.IsDevelopment())
+                        if (AppEnvironment.IsDevelopment)
                         {
-                            settingsManager.DumpDebugFile("manualImport.json", manualImportJSON);
+                            _ = settingsManager.DumpDebugFile("manualImport.json", manualImportJSON).ConfigureAwait(false);
                         }
 
                         if (hrm.IsSuccessStatusCode)
@@ -219,7 +214,7 @@ namespace Compressarr.Services
 
                 payload.files = new() { file };
 
-                link = $"{settingsManager.GetSetting(SettingType.RadarrURL)}/api/command?apikey={settingsManager.GetSetting(SettingType.RadarrAPIKey)}";
+                link = $"{settingsManager.RadarrSettings?.APIURL}/api/command?apikey={settingsManager.RadarrSettings?.APIKey}";
                 logger.LogDebug($"Link: {link}");
 
 
@@ -233,10 +228,10 @@ namespace Compressarr.Services
 
                         var result = await hc.PostAsync(link, new StringContent(payloadJson, Encoding.UTF8, "application/json"));
 
-                        if (env.IsDevelopment())
+                        if (AppEnvironment.IsDevelopment)
                         {
-                            settingsManager.DumpDebugFile("importMoviePayload.json", payloadJson);
-                            settingsManager.DumpDebugFile("importMovieResponse.json", await result.Content.ReadAsStringAsync());
+                            _= settingsManager.DumpDebugFile("importMoviePayload.json", payloadJson);
+                            _= settingsManager.DumpDebugFile("importMovieResponse.json", await result.Content.ReadAsStringAsync());
                         }
 
                         if (result.IsSuccessStatusCode)
@@ -248,7 +243,7 @@ namespace Compressarr.Services
                         else
                         {
                             logger.LogWarning($"Failed: {result.ReasonPhrase}");
-                            settingsManager.DumpDebugFile("importMovieResponse.json", await result.Content.ReadAsStringAsync());
+                            _ = settingsManager.DumpDebugFile("importMovieResponse.json", await result.Content.ReadAsStringAsync());
                             return new ServiceResult<object>(false, result.StatusCode.ToString(), result.ReasonPhrase);
                         }
 
@@ -262,15 +257,18 @@ namespace Compressarr.Services
             }
         }
 
-        public SystemStatus TestConnection(string radarrURL, string radarrAPIKey)
+        public async Task<SystemStatus> TestConnection(APISettings settings)
         {
             using (logger.BeginScope("Test Connection"))
             {
-
+                if(settings == null) {
+                    logger.LogDebug("Test aborted, due to insufficient settings");
+                    return new() { Success = false, ErrorMessage = "Radarr Settings are missing" };
+                }
                 logger.LogInformation($"Test Radarr Connection.");
                 SystemStatus ss = new SystemStatus();
 
-                var link = $"{radarrURL}/api/system/status?apikey={radarrAPIKey}";
+                var link = $"{settings.APIURL}/api/system/status?apikey={settings.APIKey}";
 
                 logger.LogDebug($"LinkURL: {link}");
 
@@ -280,13 +278,13 @@ namespace Compressarr.Services
                 try
                 {
                     logger.LogDebug($"Connecting.");
-                    var hrm = hc.GetAsync(link).Result;
+                    var hrm = await hc.GetAsync(link);
 
-                    statusJSON = hrm.Content.ReadAsStringAsync().Result;
+                    statusJSON = await hrm.Content.ReadAsStringAsync();
 
-                    if (env.IsDevelopment())
+                    if (AppEnvironment.IsDevelopment)
                     {
-                        settingsManager.DumpDebugFile("testConnection.json", statusJSON);
+                        _ = settingsManager.DumpDebugFile("testConnection.json", statusJSON);
                     }
 
                     if (hrm.IsSuccessStatusCode)
@@ -320,12 +318,18 @@ namespace Compressarr.Services
             }
         }
 
-        private async Task<ServiceResult<object>> RequestMovies()
+        private async Task<ServiceResult<HashSet<Movie>>> RequestMovies()
         {
             using (logger.BeginScope("Requesting Movies"))
             {
-                var radarrURL = settingsManager.GetSetting(SettingType.RadarrURL);
-                var radarrAPIKey = settingsManager.GetSetting(SettingType.RadarrAPIKey);
+                if(settingsManager.RadarrSettings == null)
+                {
+                    logger.LogWarning($"No Radarr settings.");
+                    return new(false, "404", "Radarr settings not found. In Options. Go there");
+                }
+
+                var radarrURL = settingsManager.RadarrSettings?.APIURL;// settingsManager.Settings[SettingType.RadarrURL];
+                var radarrAPIKey = settingsManager.RadarrSettings?.APIKey; // settingsManager.Settings[SettingType.RadarrAPIKey];
 
                 var link = $"{radarrURL}/api/movie?apikey={radarrAPIKey}";
                 logger.LogDebug($"Link: {link}");
@@ -352,17 +356,30 @@ namespace Compressarr.Services
                         logger.LogDebug($"Downlading Movie List.");
                         movieJSON = await hc.GetStringAsync(link);
 
-                        if (env.IsDevelopment())
+                        if (AppEnvironment.IsDevelopment)
                         {
-                            settingsManager.DumpDebugFile("movies.json", movieJSON);
+                            _ = settingsManager.DumpDebugFile("movies.json", movieJSON);
+                        }
+
+                        if (previousResultsHash != 0)
+                        {
+                            var newHash = movieJSON.GetHashCode();
+                            if(newHash != previousResultsHash)
+                            {
+                                //snackbar.Add("Movie List updated", Severity.Info);
+                                previousResultsHash = newHash;
+                            }
+                        }
+                        else
+                        {
+                            previousResultsHash = movieJSON.GetHashCode();
                         }
 
                         var moviesArr = JsonConvert.DeserializeObject<Movie[]>(movieJSON);
 
-                        cachedMovies = moviesArr.Where(m => m.downloaded && m.movieFile != null && m.movieFile.mediaInfo != null).OrderBy(m => m.title).ToHashSet();
-                        lastCached = DateTime.Now;
+                        cachedGetMoviesResult = new(true, moviesArr.Where(m => m.downloaded && m.movieFile != null && m.movieFile.mediaInfo != null).OrderBy(m => m.title).ToHashSet(), new(0,1,0));
                         logger.LogDebug($"Success.");
-                        return new(true, null);
+                        return cachedGetMoviesResult;
                     }
                 }
                 catch (Exception ex)

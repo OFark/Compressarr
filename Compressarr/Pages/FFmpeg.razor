@@ -2,6 +2,7 @@
 @using Compressarr.Helpers
 @using Compressarr.FFmpegFactory.Models
 
+
 @inject Compressarr.FFmpegFactory.IFFmpegManager FFmpegManager
 <h1>Presets</h1>
 @if (FFmpegManager.Presets.Any())
@@ -203,7 +204,7 @@
         set
         {
             _newPresetVideoCodec = value;
-            codecOptions = FFmpegManager.GetOptions(value);
+            codecOptions = FFmpegManager.GetOptionsAsync(value).Result;
         }
     }
     private int? newPresetVideoBitrate { get; set; }
@@ -218,9 +219,9 @@
 
     private List<string> ffmpegExecutionString => generateFFmpegArguments();
 
-    private Compressarr.FFmpegFactory.IFFmpegPreset presetBuilder()
+    private FFmpegPreset presetBuilder()
     {
-        FFmpegFactory.IFFmpegPreset preset = new FFmpegFactory.Models.FFmpegPreset();
+        var preset = new FFmpegPreset();
 
         preset.AudioBitRate = newPresetAudioBitrate;
         preset.AudioCodec = newPresetAudioCodec;
@@ -246,21 +247,21 @@
         return preset.Arguments;
     }
 
-    private void addPreset()
+    private async void addPreset()
     {
         if (!string.IsNullOrWhiteSpace(newPresetName))
         {
-            FFmpegManager.AddPreset(presetBuilder());
+            await FFmpegManager.AddPresetAsync(presetBuilder());
             resetPresetInputs();
         }
     }
 
-    private void deletePreset(Compressarr.FFmpegFactory.IFFmpegPreset preset)
+    private async void deletePreset(FFmpegPreset preset)
     {
-        FFmpegManager.DeletePreset(preset.Name);
+        await FFmpegManager.DeletePresetAsync(preset.Name);
     }
 
-    private void loadPreset(Compressarr.FFmpegFactory.IFFmpegPreset preset)
+    private void loadPreset(FFmpegPreset preset)
     {
         newPresetAudioBitrate = preset.AudioBitRate;
         newPresetAudioCodec = preset.AudioCodec;
@@ -293,12 +294,5 @@
 
         newIsEdit = false;
         showNew = false;
-
-        //ffmpegExecutionString = null;
-    }
-
-    private void videoCodecChanged()
-    {
-        codecOptions = FFmpegManager.GetOptions(newPresetVideoCodec);
     }
 }

@@ -13,10 +13,13 @@ namespace Compressarr.JobProcessing.Models
         public string Bitrate { get; internal set; }
         public decimal? Compression { get; internal set; }
         public string DestinationFile { get; set; }
+        public string DestinationFileName => Path.GetFileName(DestinationFile);
         public TimeSpan? Duration { get; internal set; }
         public bool Finished { get; internal set; } = false;
         public decimal? FPS { get; internal set; }
         public long? Frame { get; internal set; }
+        public string MovieName { get; set; }
+        public string Name => MovieName ?? SourceFileName;
         public int? Percent { get; internal set; }
         public decimal? Q { get; internal set; }
         public bool Running { get; internal set; } = false;
@@ -29,6 +32,5 @@ namespace Compressarr.JobProcessing.Models
         public decimal? SSIM { get; set; }
         public bool Success { get; internal set; } = false;
         public TimeSpan? TotalLength { get; internal set; }
-        public string DestinationFileName => Path.GetFileName(DestinationFile);
     }
 }

@@ -7,6 +7,5 @@ namespace Compressarr.JobProcessing
     public interface IProcessManager
     {
         Task Process(Job job);
-        void Stop(Job job);
     }
 }

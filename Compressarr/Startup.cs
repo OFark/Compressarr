@@ -1,6 +1,9 @@
 using Compressarr.FFmpegFactory;
+using Compressarr.FFmpegFactory.Models;
 using Compressarr.Filtering;
+using Compressarr.Filtering.Models;
 using Compressarr.JobProcessing;
+using Compressarr.JobProcessing.Models;
 using Compressarr.Pages.Services;
 using Compressarr.Services;
 using Compressarr.Settings;
@@ -9,6 +12,8 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using MudBlazor.Services;
+using System.Collections.Generic;
 
 namespace Compressarr
 {
@@ -27,15 +32,27 @@ namespace Compressarr
         {
             services.AddRazorPages();
             services.AddServerSideBlazor();
-            services.AddSingleton<IFFmpegManager, FFmpegManager>();
-            services.AddSingleton<IFilterManager, FilterManager>();
-            services.AddSingleton<IJobManager, JobManager>();
-            services.AddSingleton<IProcessManager, ProcessManager>();
-            services.AddSingleton<IRadarrService, RadarrService>();
+
+            services.Configure<APIServiceSettings>(options => Configuration.GetSection("Services").Bind(options));
+            services.Configure<HashSet<Filter>>(options => Configuration.GetSection("Filters").Bind(options));
+            services.Configure<HashSet<FFmpegPreset>>(options => Configuration.GetSection("Presets").Bind(options));
+            services.Configure<HashSet<Job>>(options => Configuration.GetSection("Jobs").Bind(options));
+
+
             services.AddSingleton<ISettingsManager, SettingsManager>();
-            services.AddSingleton<ISonarrService, SonarrService>();
+            services.AddSingleton<IFFmpegInitialiser, FFmpegInitialiser>();
+            services.AddSingleton<IProcessManager, ProcessManager>();
 
             services.AddScoped<ILayoutService, LayoutService>();
+            
+            services.AddTransient<IFFmpegManager, FFmpegManager>();
+            services.AddTransient<IFilterManager, FilterManager>();
+            services.AddTransient<IJobManager, JobManager>();
+            services.AddTransient<IRadarrService, RadarrService>();
+            services.AddTransient<ISonarrService, SonarrService>();
+
+
+            services.AddMudServices();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -53,12 +70,8 @@ namespace Compressarr
                 app.UseHsts();
             }
 
-            appLifetime.ApplicationStarted.Register(() =>
-            {
-                //FFmpegManager = app.ApplicationServices.GetService<FFmpegManager>();
-                //FFmpegManager.Start();
-            }
-            );
+            
+            app.UseMiddleware<AsyncInitializationMiddleware>();
 
             //app.UseHttpsRedirection();
             app.UseStaticFiles();

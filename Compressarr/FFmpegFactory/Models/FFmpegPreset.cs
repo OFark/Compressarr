@@ -6,13 +6,13 @@ using System.Text;
 
 namespace Compressarr.FFmpegFactory.Models
 {
-    public class FFmpegPreset : IFFmpegPreset
+    public class FFmpegPreset
     {
         public List<string> Arguments
         {
             get
             {
-                List<string> args = new List<string>();
+                List<string> args = new ();
 
                 var audioBitrate = AudioBitRate.HasValue ? $" -b:a {AudioBitRate}k" : "";
                 var frameRate = FrameRate.HasValue ? $" -r {FrameRate}" : "";
@@ -31,12 +31,12 @@ namespace Compressarr.FFmpegFactory.Models
 
                     var part1Ending = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "NUL" : @"/dev/null";
 
-                    args.Add($"-y -i \"{{0}}\" -c:v {VideoCodec}{videoCodecOptions} -b:v {VideoBitRate}k{frameRate}{passStr} -an -f null {part1Ending}".Replace("%passnum%", "1"));
-                    args.Add($"-y -i \"{{0}}\" -c:v {VideoCodec}{videoCodecOptions} -b:v {VideoBitRate}k{frameRate}{passStr} -c:a {AudioCodec}{audioBitrate}{opArgsStr} \"{{1}}\"".Replace("%passnum%", "2"));
+                    args.Add($"-y -i \"{{0}}\" -c:v {VideoCodec}{VideoCodecParams} -b:v {VideoBitRate}k{frameRate}{passStr} -an -f null {part1Ending}".Replace("%passnum%", "1"));
+                    args.Add($"-y -i \"{{0}}\" -c:v {VideoCodec}{VideoCodecParams} -b:v {VideoBitRate}k{frameRate}{passStr} -c:a {AudioCodec}{audioBitrate}{opArgsStr} \"{{1}}\"".Replace("%passnum%", "2"));
                 }
                 else
                 {
-                    args.Add($"-y -i \"{{0}}\" -c:v {VideoCodec}{frameRate}{videoCodecOptions} -c:a {AudioCodec}{audioBitrate}{opArgsStr} \"{{1}}\"");
+                    args.Add($"-y -i \"{{0}}\" -c:v {VideoCodec}{frameRate}{VideoCodecParams} -c:a {AudioCodec}{audioBitrate}{opArgsStr} \"{{1}}\"");
                 }
 
                 return args;
@@ -55,8 +55,7 @@ namespace Compressarr.FFmpegFactory.Models
 
         public HashSet<CodecOptionValue> VideoCodecOptions { get; set; }
 
-
-        private string videoCodecOptions
+        private string VideoCodecParams
         {
             get
             {

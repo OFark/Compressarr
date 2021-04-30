@@ -11,19 +11,16 @@ namespace Compressarr.FFmpegFactory
     {
         SortedDictionary<string, string> AudioCodecs { get; }
         SortedDictionary<string, string> Containers { get; }
-        HashSet<IFFmpegPreset> Presets { get; }
-        FFmpegStatus Status { get; }
+        HashSet<FFmpegPreset> Presets { get; }
         SortedDictionary<string, string> SubtitleCodecs { get; }
         SortedDictionary<string, string> VideoCodecs { get; }
-
-        void AddPreset(IFFmpegPreset newPreset);
+        Task AddPresetAsync(FFmpegPreset newPreset);
         Task<WorkItemCheckResult> CheckResult(Job job);
         string ConvertContainerToExtension(string container);
-        void DeletePreset(string presetName);
-        string GetFFmpegVersion();
-        Task<IMediaInfo> GetMediaInfo(string filepath);
-        HashSet<CodecOptionValue> GetOptions(string codec);
-        IFFmpegPreset GetPreset(string presetName);
-        void Init();
+        Task DeletePresetAsync(string presetName);
+        Task<IMediaInfo> GetMediaInfoAsync(string filepath);
+        Task<HashSet<CodecOptionValue>> GetOptionsAsync(string codec);
+        FFmpegPreset GetPreset(string presetName);
+        Task InitialisePreset(FFmpegPreset preset);
     }
 }

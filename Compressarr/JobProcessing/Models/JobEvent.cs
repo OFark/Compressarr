@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using MudBlazor;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,6 +12,14 @@ namespace Compressarr.JobProcessing.Models
         public DateTime Date { get; set; }
         public LogLevel Level { get; set; }
         public string Message { get; set; }
+
+        public Color Color=> Level switch
+                {
+                    LogLevel.Information => Color.Info,
+                    LogLevel.Warning => Color.Warning,
+                    LogLevel.Error or LogLevel.Critical => Color.Error,
+                    _ => Color.Default,
+                };
 
         public JobEvent(LogLevel level, string message)
         {

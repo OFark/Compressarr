@@ -7,24 +7,9 @@
 @using Compressarr.Settings
 @using JobProcessing.Models;
 
-@inject IFFmpegManager FFmpegManager
-@inject IFilterManager filterManager
-@inject IJobManager jobManager
-@inject ILayoutService layoutService
-@inject IRadarrService radarrService
-@inject ISettingsManager settingsManager
-@inject ISonarrService sonarrService
-@inject NavigationManager NavManager
 
-@if (!string.IsNullOrWhiteSpace(AlertMessage))
-{
-    <div class="alert alert-danger">@AlertMessage</div>
-}
-
-
-<h1 title="Security isn't a dirty word, Blackadder. 'Crevice' is a dirty word, but 'security' isn't.">Jobs</h1>
 @{
-    if (!filterManager.Filters.Any())
+    if (!FilterManager.Filters.Any())
     {
         <p>So you need to define a filter for either Radarr, Sonarr or both.</p>
     }
@@ -35,72 +20,16 @@
     else
     {
         <div id="divJobList">
-            @foreach (var job in jobManager.Jobs)
-            {
-                <JobView job="job"></JobView>
+            <MudExpansionPanels>
 
-            }
-            @if (showNewJob)
-            {
+                @foreach (var job in JobManager.Jobs)
+                {
+                    <JobView job="job"></JobView>
+
+                }
                 <JobView job="@newJob" NewJob="true" OnAdd="addJob"></JobView>
-            }
-            else
-            {
-                <div id="divAddJobWrapper">
-                    <i @onclick="() => { showNewJob = true; }" class="fas fa-plus fa-7x"></i>
-                </div>
-            }
+            </MudExpansionPanels>
         </div>
     }
 
-}
-
-@code {
-
-    private string AlertMessage = null;
-
-    private bool showNewJob;
-
-    private Compressarr.JobProcessing.Models.Job newJob = new Job();
-
-    protected override void OnInitialized()
-    {
-        if (!settingsManager.HasSetting(Settings.SettingType.RadarrURL) && !settingsManager.HasSetting(Settings.SettingType.SonarrURL))
-        {
-            NavManager.NavigateTo("options");
-        }
-
-        layoutService.OnStateChanged += LayoutService_OnStateChanged;
-
-        base.OnInitialized();
-    }
-
-    private async void LayoutService_OnStateChanged(object sender, EventArgs e)
-    {
-        await InvokeAsync(StateHasChanged);
-    }
-
-    private void addJob()
-    {
-        showNewJob = false;
-        newJob = new();
-        //var job = new Job()
-        //{
-        //    AutoImport = newJob.AutoImport,
-        //    BaseFolder = newJob.BaseFolder,
-        //    DestinationFolder = newJob.DestinationFolder,
-        //    FilterName = newJob.FilterName,
-        //    PresetName = newJob.PresetName
-        //};
-
-        //job.StatusUpdate += newJobTestStatusUpdate;
-
-        //if(await jobManager.AddJob(job))
-        //{
-        //    job.StatusUpdate -= newJobTestStatusUpdate;
-        //    newJob = new();
-        //    showNewJob = false;
-        //    await InvokeAsync(() => StateHasChanged());
-        //}
-    }
 }

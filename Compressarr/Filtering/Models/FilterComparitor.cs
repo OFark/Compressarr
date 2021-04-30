@@ -19,10 +19,17 @@ namespace Compressarr.Filtering.Models
             {"more than or equal", ">=" }
         };
 
+        public FilterComparitor()
+        {
+
+        }
         public FilterComparitor(string value)
         {
             Value = value;
         }
+
+        [JsonIgnore]
+        public bool IsParamMethod => new Regex(@"\w").IsMatch(Value);
 
         [JsonIgnore]
         public string Key
@@ -40,22 +47,12 @@ namespace Compressarr.Filtering.Models
             }
         }
 
-        public string Value { get; set; }
-
-        [JsonIgnore]
-        public bool IsParamMethod
-        {
-            get
-            {
-                var reg = new Regex(@"\w");
-                return reg.IsMatch(Value);
-            }
-        }
-
         [JsonIgnore]
         public bool Not => Value.StartsWith("!");
 
         [JsonIgnore]
         public string Operator => $"{(IsParamMethod ? "." : " ")}{Value}{(IsParamMethod ? "(@)" : " ")}";
+
+        public string Value { get; set; } = string.Empty;
     }
 }
