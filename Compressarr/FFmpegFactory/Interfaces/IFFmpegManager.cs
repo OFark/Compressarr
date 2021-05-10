@@ -1,26 +1,26 @@
 ﻿using Compressarr.FFmpegFactory.Models;
 using Compressarr.JobProcessing;
 using Compressarr.JobProcessing.Models;
+using Compressarr.Services.Base;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Xabe.FFmpeg;
 
 namespace Compressarr.FFmpegFactory
 {
-    public interface IFFmpegManager
+    public interface IFFmpegManager : IJobDependency
     {
-        SortedDictionary<string, string> AudioCodecs { get; }
+        SortedSet<Codec> AudioCodecs { get; }
         SortedDictionary<string, string> Containers { get; }
         HashSet<FFmpegPreset> Presets { get; }
-        SortedDictionary<string, string> SubtitleCodecs { get; }
-        SortedDictionary<string, string> VideoCodecs { get; }
+        SortedSet<Codec> SubtitleCodecs { get; }
+        SortedSet<Codec> VideoCodecs { get; }
         Task AddPresetAsync(FFmpegPreset newPreset);
         Task<WorkItemCheckResult> CheckResult(Job job);
         string ConvertContainerToExtension(string container);
-        Task DeletePresetAsync(string presetName);
+        Task DeletePresetAsync(FFmpegPreset preset);
+        Codec GetCodec(CodecType type, string name);
         Task<IMediaInfo> GetMediaInfoAsync(string filepath);
-        Task<HashSet<CodecOptionValue>> GetOptionsAsync(string codec);
         FFmpegPreset GetPreset(string presetName);
-        Task InitialisePreset(FFmpegPreset preset);
     }
 }

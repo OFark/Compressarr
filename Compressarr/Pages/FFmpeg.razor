@@ -1,298 +1,66 @@
 ﻿@page "/FFmpeg"
-@using Compressarr.Helpers
-@using Compressarr.FFmpegFactory.Models
 
+@inject IFFmpegManager FFmpegManager
+@inject IFFmpegInitialiser FFmpegInitialiser
+@inject ILayoutService LayoutService
 
-@inject Compressarr.FFmpegFactory.IFFmpegManager FFmpegManager
-<h1>Presets</h1>
-@if (FFmpegManager.Presets.Any())
+@if (FFmpegInitialiser.Ready)
 {
-    @foreach (var preset in FFmpegManager.Presets)
-    {
-        <div class="preset">
-            <h4>@preset.Name</h4>
-            <div class="commands">
-                <button @onclick="@(() => loadPreset(@preset))"><i class="fas fa-edit"></i></button>
-                <button @onclick="@(() => deletePreset(@preset))"><i class="fas fa-trash-alt"></i></button>
-            </div>
-        </div>
-    }
+    <MudExpansionPanels>
+
+        @foreach (var preset in FFmpegManager.Presets)
+        {
+            <PresetView preset="preset" />
+
+        }
+        <PresetView preset="@newPreset" NewPreset="true" OnAdd="addPreset"></PresetView>
+    </MudExpansionPanels>
+}
+else
+{
+    
+    <MudContainer MaxWidth="MaxWidth.Medium">
+        <MudSkeleton Width="30%" Height="42px;" />
+        <MudSkeleton Width="80%" />
+        <MudSkeleton Width="100%" />
+        <MudSkeleton Width="100%" />
+        <MudSkeleton Width="100%" />
+    </MudContainer>
 }
 
-<div id="divNewPreset">
-    @if (showNew)
-    {
-        <h3>@(newIsEdit ? "Edit" : "New") Preset</h3>
-        <div class="input-group">
-            <label class="col-form-label">Name:</label>
-            <div class="col-sm">
-                <input type="text" @bind="newPresetName" class="form-control" placeholder="New Preset" />
-            </div>
-        </div>
-        <div class="input-group">
-            <label class="col-form-label">Container:</label>
-            <div class="col-sm">
-                <select @bind="newPresetContainer" class="form-control">
-                    @foreach (var c in FFmpegManager.Containers)
-                    {
-                        <option value="@c.Key">@c.Key - @c.Value</option>
-                    }
-                </select>
-            </div>
-        </div>
-        <div class="row">
-            <div class="col-md-6">
-                <div class="input-group">
-                    <label class="col-form-label">Video Codec:</label>
-                    <div class="col-sm">
-                        <select @bind="newPresetVideoCodec" class="form-control">
-                            <option value="copy">Copy - No change</option>
-                            @foreach (var c in FFmpegManager.VideoCodecs)
-                            {
-                                <option value="@c.Key">@c.Key - @c.Value</option>
-                            }
-                        </select>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="input-group">
-                    <label class="col-form-label">Audio Codec:</label>
-                    <div class="col-sm">
-                        <select @bind="newPresetAudioCodec" class="form-control">
-                            <option value="copy">Copy - No change</option>
-                            @foreach (var c in FFmpegManager.AudioCodecs)
-                            {
-                                <option value="@c.Key">@c.Key - @c.Value</option>
-                            }
-                        </select>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <h4>Optional arguments:</h4>
-        <div class="row">
-            <div class="col-md-6 pl-4">
-                <div class="input-group" data-affix="kbps">
-                    <label class="col-form-label">Video Bitrate:</label>
-                    <div class="col-sm">
-                        <input type="text" @bind="newPresetVideoBitrate" class="form-control" disabled=@disabledNoVideo />
-                    </div>
-                </div>
-                <div class="input-group">
-                    <label class="col-form-label">Framerate:</label>
-                    <div class="col-sm">
-                        <input type="number" @bind="newPresetFrameRate" class="form-control" placeholder="Same as source" disabled=@disabledNoVideo />
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="input-group" data-affix="kbps">
-                    <label class="col-form-label">Audio Bitrate:</label>
-                    <div class="col-sm">
-                        <input type="text" @bind="newPresetAudioBitrate" class="form-control" disabled=@disabledNoAudio />
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        @if (newPresetVideoCodec != "copy")
-        {
-            <div class="codecOptions">
-                <p>Additional codec based options</p>
-                <div class="row">
-                    <div class="col-md-6 pl-5">
-                        @if (codecOptions != null)
-                        {
-                            foreach (var option in codecOptions)
-                            {
-                                switch (option.Type)
-                                {
-                                    case FFmpegFactory.CodecOptionType.Number:
-                                        {
-                                            <div class="form-group">
-                                                <label>@option.Name:</label>
-                                                <input type="number" @bind="option.Value" class="form-control" />
-                                            </div>
-                                        }
-                                        break;
-                                    case FFmpegFactory.CodecOptionType.Range:
-                                        {
-                                            <div class="form-group">
-                                                <label>@option.Name: @option.Value</label>
-                                                <input type="range" max="51" min="0" @bind="option.Value" @oninput="@(args => { option.Value = args.Value as string; StateHasChanged(); })" class="form-control" disabled="@(option.DisabledByVideoBitRate && disabledVideoBitrate)" />
-                                            </div>
-                                        }
-                                        break;
-                                    case FFmpegFactory.CodecOptionType.Select:
-                                        {
-
-                                            <div class="form-group">
-                                                <label>@option.Name:</label>
-                                                <select @bind="option.Value" class="form-control">
-                                                    <option value=""></option>
-                                                    @foreach (var c in option.Values)
-                                                    {
-                                                        <option value="@c">@c</option>
-                                                    }
-                                                </select>
-                                            </div>
-                                        }
-                                        break;
-                                    case FFmpegFactory.CodecOptionType.String:
-                                        {
-                                            <div class="form-group">
-                                                <label>@option.Name:</label>
-                                                <input type="text" @bind="option.Value" class="form-control" />
-                                            </div>
-                                        }
-                                        break;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            <p>... err nope. We, err, have nothing for you.</p>
-                        }
-                    </div>
-                </div>
-            </div>
-        }
-
-        <div class="row">
-            <div class="form-group col pl-4">
-                <label>Additional arguments</label>
-                <input type="text" @bind="newPresetOptionalArguments" class="form-control" />
-            </div>
-        </div>
-
-        <div class="ffmpegPreview">
-            <h4>FFMPEG Preview:</h4>
-            <pre>
-                @foreach (var str in ffmpegExecutionString)
-                { @((MarkupString)str)<br /> }
-            </pre>
-        </div>
-
-        <button @onclick="addPreset"><i class="fas fa-save"></i> Save</button>
-    }
-    else
-    {
-        <div id="divAddPresetWrapper">
-            <i @onclick="() => { showNew = true; }" class="fas fa-plus fa-7x"></i>
-        </div>
-    }
-</div>
 
 @code {
 
-    private bool showNew;
-    private bool newIsEdit;
+    private FFmpegPreset newPreset = new();
 
-    private string newPresetName { get; set; }
-    private string newPresetAudioCodec { get; set; } = "copy";
-    private string newPresetContainer { get; set; } = "mkv";
-    private int? newPresetAudioBitrate { get; set; }
+    //todo: option to keep current container
 
-    private string _newPresetVideoCodec;
-    private string newPresetVideoCodec
+    protected override void OnInitialized()
     {
-        get
-        {
-            return _newPresetVideoCodec ?? "copy";
-        }
-        set
-        {
-            _newPresetVideoCodec = value;
-            codecOptions = FFmpegManager.GetOptionsAsync(value).Result;
-        }
-    }
-    private int? newPresetVideoBitrate { get; set; }
-    private double? newPresetFrameRate { get; set; }
-    private string newPresetOptionalArguments { get; set; }
+        FFmpegInitialiser.OnReady += FFmpegInitialiser_OnReady;
 
-    private bool disabledNoAudio => string.IsNullOrWhiteSpace(newPresetAudioCodec) || newPresetAudioCodec == "copy";
-    private bool disabledNoVideo => string.IsNullOrWhiteSpace(newPresetVideoCodec) || newPresetVideoCodec == "copy";
-    private bool disabledVideoBitrate => newPresetVideoBitrate != null;
-
-    private HashSet<CodecOptionValue> codecOptions;
-
-    private List<string> ffmpegExecutionString => generateFFmpegArguments();
-
-    private FFmpegPreset presetBuilder()
-    {
-        var preset = new FFmpegPreset();
-
-        preset.AudioBitRate = newPresetAudioBitrate;
-        preset.AudioCodec = newPresetAudioCodec;
-        preset.Container = newPresetContainer;
-        preset.FrameRate = newPresetFrameRate;
-        preset.Name = newPresetName;
-        preset.OptionalArguments = newPresetOptionalArguments.NullIfEmpty();
-        preset.VideoBitRate = newPresetVideoBitrate;
-        preset.VideoCodec = newPresetVideoCodec;
-
-        if (codecOptions != null)
-        {
-            preset.VideoCodecOptions = codecOptions;
-        }
-
-        return preset;
+        base.OnInitialized();
     }
 
-    private List<string> generateFFmpegArguments()
+    protected async override Task OnInitializedAsync()
     {
-        var preset = presetBuilder();
+        LayoutService.OnStateChanged += LayoutService_OnStateChanged;
 
-        return preset.Arguments;
+        await base.OnInitializedAsync();
     }
 
-    private async void addPreset()
+    private void FFmpegInitialiser_OnReady(object sender, EventArgs e)
     {
-        if (!string.IsNullOrWhiteSpace(newPresetName))
-        {
-            await FFmpegManager.AddPresetAsync(presetBuilder());
-            resetPresetInputs();
-        }
+        LayoutService.RaiseChange();
     }
 
-    private async void deletePreset(FFmpegPreset preset)
+    private async void LayoutService_OnStateChanged(object sender, EventArgs e)
     {
-        await FFmpegManager.DeletePresetAsync(preset.Name);
+        await InvokeAsync(StateHasChanged);
     }
 
-    private void loadPreset(FFmpegPreset preset)
+    private void addPreset()
     {
-        newPresetAudioBitrate = preset.AudioBitRate;
-        newPresetAudioCodec = preset.AudioCodec;
-        newPresetContainer = preset.Container;
-        newPresetFrameRate = preset.FrameRate;
-        newPresetName = preset.Name;
-        newPresetOptionalArguments = preset.OptionalArguments;
-        newPresetVideoBitrate = preset.VideoBitRate;
-        newPresetVideoCodec = preset.VideoCodec;
-
-        codecOptions = preset.VideoCodecOptions;
-
-
-        newIsEdit = true;
-        showNew = true;
-    }
-
-
-    private void resetPresetInputs()
-    {
-        newPresetName = null;
-        newPresetAudioCodec = "copy";
-        newPresetAudioBitrate = null;
-        newPresetContainer = null;
-        newPresetVideoCodec = "copy";
-        newPresetVideoBitrate = null;
-        newPresetFrameRate = null;
-        newPresetOptionalArguments = null;
-        codecOptions = null;
-
-        newIsEdit = false;
-        showNew = false;
+        newPreset = new();
     }
 }

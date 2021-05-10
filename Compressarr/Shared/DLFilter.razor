@@ -5,7 +5,7 @@
     <td>
         @if (!string.IsNullOrWhiteSpace(filter.LogicalOperator))
         {
-            <button @onclick="SwapLogicalOperator">@filter.LogicalOperator</button>
+        <MudButton Size="Size.Small" Color="Color.Tertiary" OnClick="SwapLogicalOperator">@filter.LogicalOperator</MudButton>
         }
     </td>
 }
@@ -28,7 +28,7 @@ else
         <span>@filter.Value</span>
     </td>
     <td class="text-right">
-        <button class="icon" @onclick="DeleteThisFilter"><i class="fas fa-trash-alt"></i></button>
+        <MudIconButton Size="Size.Small" Icon="@Icons.Outlined.Delete" OnClick="DeleteThisFilter" />
     </td>
 }
 

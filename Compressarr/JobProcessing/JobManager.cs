@@ -1,6 +1,7 @@
 ﻿using Compressarr.FFmpegFactory;
 using Compressarr.FFmpegFactory.Models;
 using Compressarr.Filtering;
+using Compressarr.Filtering.Models;
 using Compressarr.Helpers;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Services;
@@ -16,7 +17,7 @@ using System.Threading.Tasks;
 
 namespace Compressarr.JobProcessing
 {
-    public class JobManager : IJobManager
+    public class JobManager : FFmpegReliant, IJobManager
     {
         private readonly IFFmpegManager fFmpegManager;
         private readonly IFilterManager filterManager;
@@ -28,7 +29,7 @@ namespace Compressarr.JobProcessing
         private readonly ISonarrService sonarrService;
 
 
-        public JobManager(IFFmpegManager fFmpegManager, IFilterManager filterManager, ISettingsManager settingsManager, ILogger<JobManager> logger, IOptionsMonitor<HashSet<Job>> jobsMonitor, IProcessManager processManager, IRadarrService radarrService, ISonarrService sonarrService)
+        public JobManager(IFFmpegInitialiser fFmpegInitialiser, IFFmpegManager fFmpegManager, IFilterManager filterManager, ISettingsManager settingsManager, ILogger<JobManager> logger, IOptionsMonitor<HashSet<Job>> jobsMonitor, IProcessManager processManager, IRadarrService radarrService, ISonarrService sonarrService)
         {
             this.fFmpegManager = fFmpegManager;
             this.filterManager = filterManager;
@@ -38,11 +39,13 @@ namespace Compressarr.JobProcessing
             this.radarrService = radarrService;
             this.settingsManager = settingsManager;
             this.sonarrService = sonarrService;
+
+            WhenReady(fFmpegInitialiser, InitialiseJobs);
         }
 
         public HashSet<Job> Jobs => settingsManager.Jobs;
-        
-        public async Task<bool> AddJob(Job newJob)
+
+        public async Task<bool> AddJobAsync(Job newJob)
         {
             using (logger.BeginScope("Adding Job"))
             {
@@ -61,9 +64,7 @@ namespace Compressarr.JobProcessing
                     else
                     {
                         logger.LogDebug($"Adding Job ({newJob.Name}).");
-                        var job = newJob.Clone();
-                        _ = InitialiseJob(job);
-                        Jobs.Add(job);
+                        Jobs.Add(newJob);
                     }
 
                     _ = settingsManager.SaveAppSetting();
@@ -139,6 +140,20 @@ namespace Compressarr.JobProcessing
             }
         }
 
+        public void InitialiseJobs()
+        {
+            using (logger.BeginScope("Initialising Jobs"))
+            {
+                if (Jobs != null)
+                {
+                    foreach (var job in Jobs.Where(j => !j.Initialised))
+                    {
+                        _ = InitialiseJob(job);
+                    }
+                }
+            }
+        }
+
         public async Task InitialiseJob(Job job, bool force = false)
         {
             using (logger.BeginScope("Initialise Job: {job}", job))
@@ -150,10 +165,10 @@ namespace Compressarr.JobProcessing
                     logger.Log(level, message);
                 };
 
-                Log(job, LogLevel.Information, "Begin Initialisation");
-
                 if ((job.JobState == JobState.New) || force)
                 {
+                    Log(job, LogLevel.Information, "Begin Initialisation");
+
                     logger.LogDebug($"Job will initialise.");
                     job.UpdateState(JobState.Initialising);
                     job.Filter = filterManager.GetFilter(job.FilterName);
@@ -164,7 +179,7 @@ namespace Compressarr.JobProcessing
                     {
                         job.Preset.ContainerExtension = fFmpegManager.ConvertContainerToExtension(job.Preset.Container);
                         logger.LogDebug($"Container Extension set to {job.Preset.ContainerExtension}");
-                        job.UpdateState(JobState.Added);
+                        job.UpdateState(JobState.Testing);
                         job.Cancel = false;
 
                         Log(job, LogLevel.Debug, "Begin Testing");
@@ -233,7 +248,11 @@ namespace Compressarr.JobProcessing
                                     }
                                 }
 
-                                wi.DestinationFile = Path.ChangeExtension(Path.Combine(destinationpath, file.Name), job.Preset.ContainerExtension);
+                                wi.DestinationFile = Path.Combine(destinationpath, file.Name);
+                                if(!string.IsNullOrWhiteSpace(job.Preset.ContainerExtension))
+                                {
+                                    wi.DestinationFile = Path.ChangeExtension(wi.DestinationFile, job.Preset.ContainerExtension);
+                                }
                             }
 
                             Log(job, LogLevel.Debug, "Workload complied", "Checking Destination Folder", "Writing Test.txt file");
@@ -267,6 +286,17 @@ namespace Compressarr.JobProcessing
                 }
             }
         }
+
+        public bool FilterInUse(string filterName)
+        {
+            return Jobs.Any(j => j.FilterName == filterName);
+        }
+
+        public bool PresetInUse(FFmpegPreset preset)
+        {
+            return Jobs.Any(j => j.Preset == preset);
+        }
+
         public Job ReloadJob(Job job)
         {
             using (logger.BeginScope("Reload Job"))
@@ -297,7 +327,7 @@ namespace Compressarr.JobProcessing
             using (logger.BeginScope("Run Job: {job}", job))
             {
 
-                if (job.JobState == JobState.TestedOK ||  job.JobState == JobState.Finished)
+                if (job.JobState == JobState.TestedOK || job.JobState == JobState.Finished)
                 {
                     job.UpdateState(JobState.Waiting);
                     Log(job, LogLevel.Information, $"Started Job at: {DateTime.Now}");
@@ -327,7 +357,7 @@ namespace Compressarr.JobProcessing
                                     var checkResult = await fFmpegManager.CheckResult(job);
                                     if (checkResult != null)
                                     {
-                                        if(checkResult.AllGood)
+                                        if (checkResult.AllGood)
                                         {
                                             job.Log(checkResult.Result, LogLevel.Debug);
                                         }
@@ -340,18 +370,18 @@ namespace Compressarr.JobProcessing
                                     {
                                         job.Log("Cannot complete checks, Workitem or Process missing", LogLevel.Error);
                                     }
-                                    
+
                                     wi.Success = wi.Success && checkResult.AllGood;
 
-                                    if(wi.Success && job.AutoImport)
+                                    if (wi.Success && job.AutoImport)
                                     {
-                                        switch(job.Filter.MediaSource)
+                                        switch (job.Filter.MediaSource)
                                         {
                                             case MediaSource.Radarr:
                                                 {
                                                     job.Log("Auto Import - Importing into Radarr", LogLevel.Information);
                                                     var response = await radarrService.ImportMovie(wi);
-                                                    if(response.Success)
+                                                    if (response.Success)
                                                     {
                                                         job.Log("Movie Imported", LogLevel.Information);
                                                     }
@@ -416,6 +446,7 @@ namespace Compressarr.JobProcessing
         private void Succeed(Job job)
         {
             job.ID ??= Guid.NewGuid();
+            job.Initialised = true;
 
             job.UpdateState(JobState.TestedOK);
             job.Log("Test succeeded", LogLevel.Information);

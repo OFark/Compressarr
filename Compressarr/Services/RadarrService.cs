@@ -1,6 +1,8 @@
 ﻿using Compressarr.JobProcessing.Models;
+using Compressarr.Services.Base;
 using Compressarr.Services.Models;
 using Compressarr.Settings;
+using Microsoft.AspNetCore.Html;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
@@ -17,10 +19,11 @@ namespace Compressarr.Services
 {
     public class RadarrService : IRadarrService
     {
-        
+
         private readonly ILogger<RadarrService> logger;
         private readonly ISettingsManager settingsManager;
 
+        private StatusResult _status = null;
         private ServiceResult<HashSet<Movie>> cachedGetMoviesResult = null;
 
         private int previousResultsHash;
@@ -70,11 +73,43 @@ namespace Compressarr.Services
 
                 if (movies.Success)
                 {
-                    movies.Results = movies.Results.AsQueryable().Where(filter, filterValues).ToHashSet();
+                    return new(true, movies.Results.AsQueryable().Where(filter, filterValues).ToHashSet());
                 }
-
-                return movies;
+                else
+                {
+                    return movies;
+                }
             }
+        }
+
+        public async Task<StatusResult> GetStatus()
+        {
+            if (_status == null)
+            {
+                _status = new();
+
+                if (!string.IsNullOrWhiteSpace(settingsManager.RadarrSettings?.APIURL))
+                {
+                    if ((await TestConnection(settingsManager.RadarrSettings)).Success)
+                    {
+                        _status.Status = ServiceStatus.Ready;
+                        _status.Message = new("Ready");
+                    }
+                    else
+                    {
+                        _status.Status = ServiceStatus.Partial;
+                        _status.Message = new("Connection details are available, but connection cannot be completed. Check <a href=\"/options\">options</a>");
+                    }
+                }
+                else
+                {
+                    _status.Status = ServiceStatus.Incomplete;
+                    _status.Message = new("Connection details are missing. Use the <a href=\"/options\">options</a> page to enter them");
+
+                }
+            }
+
+            return _status;
         }
 
         public async Task<ServiceResult<List<string>>> GetValuesForProperty(string property)
@@ -197,7 +232,7 @@ namespace Compressarr.Services
                 logger.LogInformation("Importing into Radarr");
 
                 var payload = new ImportMoviePayload();
-                
+
 
                 logger.LogDebug("Get FileInfo");
 
@@ -209,7 +244,7 @@ namespace Compressarr.Services
                     path = mir.path,
                     movieId = workItem.SourceID,
                     quality = mir.quality,
-                    languages = new() { new Language() { id = 1, name = "English" } }                    
+                    languages = new() { new Language() { id = 1, name = "English" } }
                 };
 
                 payload.files = new() { file };
@@ -230,8 +265,8 @@ namespace Compressarr.Services
 
                         if (AppEnvironment.IsDevelopment)
                         {
-                            _= settingsManager.DumpDebugFile("importMoviePayload.json", payloadJson);
-                            _= settingsManager.DumpDebugFile("importMovieResponse.json", await result.Content.ReadAsStringAsync());
+                            _ = settingsManager.DumpDebugFile("importMoviePayload.json", payloadJson);
+                            _ = settingsManager.DumpDebugFile("importMovieResponse.json", await result.Content.ReadAsStringAsync());
                         }
 
                         if (result.IsSuccessStatusCode)
@@ -267,22 +302,18 @@ namespace Compressarr.Services
                     return new() { Success = false, ErrorMessage = "Radarr Settings are missing" };
                 }
                 logger.LogInformation($"Test Radarr Connection.");
-                SystemStatus ss = new SystemStatus();
+                SystemStatus ss = new();
 
                 var link = $"{settings.APIURL}/api/system/status?apikey={settings.APIKey}";
 
                 logger.LogDebug($"LinkURL: {link}");
-
-                string statusJSON = null;
-
                 var hc = new HttpClient();
                 try
                 {
                     logger.LogDebug($"Connecting.");
                     var hrm = await hc.GetAsync(link);
 
-                    statusJSON = await hrm.Content.ReadAsStringAsync();
-
+                    var statusJSON = await hrm.Content.ReadAsStringAsync();
                     if (AppEnvironment.IsDevelopment)
                     {
                         _ = settingsManager.DumpDebugFile("testConnection.json", statusJSON);
@@ -323,7 +354,7 @@ namespace Compressarr.Services
         {
             using (logger.BeginScope("Requesting Movies"))
             {
-                if(settingsManager.RadarrSettings == null)
+                if (settingsManager.RadarrSettings == null)
                 {
                     logger.LogWarning($"No Radarr settings.");
                     return new(false, "404", "Radarr settings not found. In Options. Go there");
@@ -365,7 +396,7 @@ namespace Compressarr.Services
                         if (previousResultsHash != 0)
                         {
                             var newHash = movieJSON.GetHashCode();
-                            if(newHash != previousResultsHash)
+                            if (newHash != previousResultsHash)
                             {
                                 //snackbar.Add("Movie List updated", Severity.Info);
                                 previousResultsHash = newHash;
@@ -378,7 +409,7 @@ namespace Compressarr.Services
 
                         var moviesArr = JsonConvert.DeserializeObject<Movie[]>(movieJSON);
 
-                        cachedGetMoviesResult = new(true, moviesArr.Where(m => m.downloaded && m.movieFile != null && m.movieFile.mediaInfo != null).OrderBy(m => m.title).ToHashSet(), new(0,1,0));
+                        cachedGetMoviesResult = new(true, moviesArr.Where(m => m.downloaded && m.movieFile != null && m.movieFile.mediaInfo != null).OrderBy(m => m.title).ToHashSet(), new(0, 1, 0));
                         logger.LogDebug($"Success.");
                         return cachedGetMoviesResult;
                     }
@@ -399,7 +430,7 @@ namespace Compressarr.Services
                         logger.LogCritical(ex.ToString());
                     }
 
-                    return new(false, ex.Message, ex.InnerException?.ToString());
+                    return new(false, null, ex.Message);
                 }
             }
         }

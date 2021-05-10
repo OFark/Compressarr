@@ -6,17 +6,19 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 
 namespace Compressarr.JobProcessing.Models
 {
     public class Job
     {
-        [JsonIgnore]
-        private List<JobEvent> _events = new();
-
-
         public event EventHandler StatusUpdate;
+
+        [JsonIgnore]
+        public bool Initialised { get; set; }
+
+        [JsonIgnore]
         public Action<LogLevel, string> LogAction { get; set; }
 
         public bool AutoImport { get; set; }
@@ -26,13 +28,7 @@ namespace Compressarr.JobProcessing.Models
 
         public string DestinationFolder { get; set; }
         [JsonIgnore]
-        public IEnumerable<JobEvent> Events
-        {
-            get
-            {
-                return _events.ToList().OrderBy(e => e.Date);
-            }
-        }
+        public ImmutableSortedSet<JobEvent> Events { get; set; }
 
         [JsonIgnore]
         public Filter Filter { get; internal set; }
@@ -69,21 +65,24 @@ namespace Compressarr.JobProcessing.Models
         {
             if (!string.IsNullOrWhiteSpace(message))
             {
-                if(LogAction != null )
+                if (LogAction != null)
                 {
                     LogAction.Invoke(level, message);
                 }
 
-                _events.Add(new JobEvent(level, message));
+                Events = (Events ?? ImmutableSortedSet.Create<JobEvent>()).Add(new JobEvent(level, message));
                 StatusUpdate?.Invoke(this, EventArgs.Empty);
             }
         }
 
         public void UpdateState(JobState state)
         {
-            Log($"Job {Name} changed from {JobState} to {state}.", LogLevel.Information);
+            if (JobState != state)
+            {
+                Log($"Job {Name} changed from {JobState} to {state}.", LogLevel.Information);
+                JobState = state;
+            }
 
-            JobState = state;
             StatusUpdate?.Invoke(this, EventArgs.Empty);
         }
         public void UpdateStatus(object sender, string message = null)

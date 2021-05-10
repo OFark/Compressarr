@@ -43,6 +43,10 @@
                 }
             }
         }*/ }
+    body app a {
+      color: var(--mud-palette-primary); }
+      body app a:hover {
+        text-decoration: underline; }
     body app .modal {
       background: rgba(0, 0, 0, 0.5);
       position: fixed;
@@ -73,25 +77,17 @@
       body app .mud-toolbar-appbar nav a svg {
         vertical-align: middle; }
     body app #content {
-      height: 100%;
-      overflow: auto;
-      padding-left: 2rem !important;
-      padding-right: 1.5rem !important;
-      padding-top: 1.1rem;
-      position: relative; }
+      padding-top: 1.1rem; }
       body app #content #divRadarr .filterList .filterTableWrapper {
         border-collapse: separate; }
-        body app #content #divRadarr .filterList .filterTableWrapper thead th:not(.hide) {
-          border: 2px solid #666;
-          border-radius: 4px;
-          background: white; }
-          body app #content #divRadarr .filterList .filterTableWrapper thead th:not(.hide) select, body app #content #divRadarr .filterList .filterTableWrapper thead th:not(.hide) input[type=text] {
-            padding: 3px;
-            border: none;
-            background: transparent;
-            color: #333; }
-          body app #content #divRadarr .filterList .filterTableWrapper thead th:not(.hide) option {
-            /*                    background-color: $overBackground*/ }
+        body app #content #divRadarr .filterList .filterTableWrapper thead th:not(.hide) select, body app #content #divRadarr .filterList .filterTableWrapper thead th:not(.hide) select:focus-visible {
+          padding: 4px 0 6px;
+          border: none;
+          outline: none; }
+        body app #content #divRadarr .filterList .filterTableWrapper thead th:not(.hide) option {
+          /*                    background-color: $overBackground*/ }
+        body app #content #divRadarr .filterList .filterTableWrapper tbody {
+          color: var(--mud-palette-secondary); }
         body app #content #divRadarr .filterList .filterTableWrapper td:not(:first-child) {
           padding: 5px 10px; }
         body app #content #divRadarr .filterList .filterTableWrapper td:first-child {
@@ -139,13 +135,6 @@
         grid-template-columns: auto max-content; }
       body app #content #divRadarrOptions, body app #content #divSonarrOptions {
         margin-bottom: 1em; }
-    body app table {
-      color: #ededed !important; }
-      body app table#tableMovies thead {
-        font-weight: bold;
-        white-space: nowrap; }
-        body app table#tableMovies thead tr {
-          background: rgba(0, 0, 0, 0.2); }
     body app folder {
       position: relative;
       display: block; }

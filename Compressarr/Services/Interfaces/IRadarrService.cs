@@ -1,4 +1,5 @@
 ﻿using Compressarr.JobProcessing.Models;
+using Compressarr.Services.Base;
 using Compressarr.Services.Models;
 using Compressarr.Settings;
 using System.Collections.Generic;
@@ -6,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Compressarr.Services
 {
-    public interface IRadarrService
+    public interface IRadarrService : IJobDependency
     {
         public Task<ServiceResult<HashSet<Movie>>> GetMoviesAsync();
 

@@ -6,160 +6,161 @@
 
 @inject Compressarr.Services.IRadarrService radarrService
 @inject IFilterManager filterManager
+@inject IJobManager JobManager  
 @inject ILayoutService layoutService
-@inject IJSRuntime js
+@inject IDialogService DialogService
 
-<div id="divRadarr">
+<MudPaper id="divRadarr">
     @if (!string.IsNullOrWhiteSpace(AlertMessage))
     {
-        <div class="alert alert-danger">@AlertMessage</div>
+        <MudAlert Severity="Severity.Error">@AlertMessage</MudAlert>
     }
-    <div class="my-2 filterList">
-        <table class="filterTableWrapper">
-            <thead>
-                <tr>
-                    <th class="hide">
-                    </th>
-                    <th>
-                        <select @bind="filterPropertyStr" required>
-                            @foreach (var fp in filterManager.RadarrFilterProperties.OrderBy(f => f.Key))
-                            {
-                                <option value="@fp.Value">@fp.Key</option>
-                            }
-                        </select>
-                    </th>
-                    <th>
-                        <select @bind="filterComparitorStr" required>
-                            <option value="" disabled selected hidden>is...</option>
-                            @if (FilterProperty != null)
-                            {
-                                foreach (var fc in filterManager.GetComparitors(FilterProperty))
-                                {
-                                    <option value="@fc.Value">@fc.Key</option>
-                                }
-                            }
-                        </select>
-                    </th>
-                    <th colspan="2">
-                        @switch (FilterProperty.PropertyType)
-                        {
-                            case FilterPropertyType.Boolean:
-                                {
-                                    <select @bind="filterValue" required>
-                                        <option value="" disabled selected hidden>something...</option>
-                                        <option value="true">True</option>
-                                        <option value="false">False</option>
-                                    </select>
-                                }
-                                break;
-                            case FilterPropertyType.DateTime:
-                                {
-                                    <input type="Date" @bind="filterValue" placeholder="something" />
-                                }
-                                break;
-                            case FilterPropertyType.String:
-                                {
-                                    <input type="text" @bind="filterValue" placeholder="something" />
-                                }
-                                break;
-                            case FilterPropertyType.Number:
-                                {
-                                    <input type="number" @bind="filterValue" placeholder="something" />
-                                }
-                                break;
-                            case FilterPropertyType.Enum:
-                                {
-                                    var filterValueResults = radarrService.GetValuesForProperty(filterPropertyStr).Result;
 
-                                    if (filterValueResults.Success)
-                                    {
-                                        <select @bind="filterValue" required>
-                                            <option value="" disabled selected hidden>something...</option>
-                                            @foreach (var key in filterValueResults.Results)
+    <MudGrid Spacing="1">
+        <MudItem sm="11">
+            <div class="my-2 filterList">
+                <table class="filterTableWrapper">
+                    <thead valign="baseline">
+                        <tr>
+                            <th class="hide">
+                            </th>
+                            <th>
+                                <div class="mud-input-control mud-input-input-control">
+                                    <div class="mud-input-control-input-container">
+                                        <div class="mud-input mud-input-text mud-input-underline mud-shrink">
+                                            <select @bind="filterPropertyStr" required>
+                                                @foreach (var fp in filterManager.RadarrFilterProperties.OrderBy(f => f.Key))
+                                                {
+                                                    <option value="@fp.Value">@fp.Key</option>
+                                                }
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                            <th>
+                                <div class="mud-input-control mud-input-input-control">
+                                    <div class="mud-input-control-input-container">
+                                        <div class="mud-input mud-input-text mud-input-underline mud-shrink">
+                                            <select @bind="filterComparitorStr" required>
+                                                <option value="" disabled selected hidden>is...</option>
+                                                @if (FilterProperty != null)
+                                                {
+                                                    foreach (var fc in filterManager.GetComparitors(FilterProperty))
+                                                    {
+                                                        <option value="@fc.Value">@fc.Key</option>
+                                                    }
+                                                }
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                            <th colspan="2">
+                                @switch (FilterProperty.PropertyType)
+                                {
+                                    case FilterPropertyType.Boolean:
+                                        {
+                                            <MudSelect Value="filterValue" OffsetY="true">
+                                                <MudSelectItem Value="@("True")" />
+                                                <MudSelectItem Value="@("False")" />
+                                            </MudSelect>
+                                        }
+                                        break;
+                                    case FilterPropertyType.DateTime:
+                                        {
+                                            <MudDatePicker @bind-Text="filterValue" placeholder="something" />
+                                        }
+                                        break;
+                                    case FilterPropertyType.String:
+                                        {
+                                            <MudTextField T="string" @bind-Text="filterValue" Placeholder="something" />
+
+                                        }
+                                        break;
+                                    case FilterPropertyType.Number:
+                                        {
+                                            <MudNumericField T="int" @bind-Value="filterIntValue" Placeholder="something" />
+                                        }
+                                        break;
+                                    case FilterPropertyType.Enum:
+                                        {
+                                            var filterValueResults = radarrService.GetValuesForProperty(filterPropertyStr).Result;
+
+                                            if (filterValueResults.Success)
                                             {
-                                                <option>@key</option>
+                                                <MudSelect @bind-Value="filterValue" Required="true">
+                                                    @foreach (var key in filterValueResults.Results)
+                                                                    {
+                                                        <MudSelectItem Value="@key" />
+                                                                    }
+                                                </MudSelect>
                                             }
-                                        </select>
-                                    }
-                                    else
-                                    {
-                                        <span>@filterValueResults.ErrorString</span>
-                                    }
+                                            else
+                                            {
+                                                <MudText Color="Color.Error">@filterValueResults.ErrorString</MudText>
+                                            }
 
-                                    break;
+                                            break;
+                                        }
                                 }
+                            </th>
+                            <th class="hide">
+                                <MudButton OnClick="addFilter" Color="Color.Primary" StartIcon="@Icons.Outlined.Add">@newFilterTextButton</MudButton>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var dlf in dlFilters)
+                        {
+                            <tr>
+                                <DLFilter filter="dlf" OnDeleteFilter="deleteFilter" OnFilterUpdate="filterUpdate" />
+                                <td>
+                                    <MudButton OnClick="(() => groupFilter(dlf))" Color="Color.Primary" StartIcon="@Icons.Outlined.Add">or</MudButton>
+                                </td>
+                            </tr>
                         }
-                    </th>
-                    <th class="hide">
-                        <button @onclick="addFilter">@newFilterTextButton</button>
-                    </th>
-
-                    <th class="hide" width="99%">&nbsp;</th>
-                    <th>
-                        <select @bind="filterSelected">
-                            <option value="">Filters</option>
-                            @foreach (var filter in filterManager.GetFilters(MediaSource.Radarr))
-                            {
-                                <option value="@filter.Name">@filter.Name</option>
-                            }
-                        </select>
-                    </th>
-                </tr>
-            </thead>
-            @foreach (var dlf in dlFilters)
-            {
-                <tr>
-                    <DLFilter filter="dlf" OnDeleteFilter="deleteFilter" OnFilterUpdate="filterUpdate" />
-                    <td>
-                        <button @onclick="(() => groupFilter(dlf))">or</button>
-                    </td>
-                </tr>
-            }
-        </table>
-    </div>
+                    </tbody>
+                </table>
+            </div>
+        </MudItem>
+        <MudItem sm="1">
+            <MudSelect @bind-Value="filterSelected" Label="Filters" OffsetY="true" Immediate="true">
+                @foreach (var filter in filterManager.GetFilters(MediaSource.Radarr))
+                {
+                    <MudSelectItem Value="@filter.Name" />
+                }
+            </MudSelect>
+        </MudItem>
+    </MudGrid>
     @if (dlFilters.Any())
     {
-        <div id="divFilterOptions" class="input-group">
+        <MudToolBar>
             @if (showSaveDialog)
             {
-                <input type="text" @bind="filterName" placeholder="Name it" class="form-control" />
+                <MudTextField @bind-Value="filterName" Label="Name" />
             }
-            <button @onclick="saveFilter" class="mx-1"><i class="fas fa-save"></i> Save</button>
-            <button @onclick="clearFilters" class="mx-1"><i class="fas fa-ban"></i> Clear</button>
-            <button @onclick="deleteSavedFilter" class="mx-1"><i class="fas fa-trash-alt"></i> Delete</button>
-        </div>
+            <MudButton OnClick="saveFilter" Color="Color.Primary" StartIcon="@Icons.Outlined.Save">Save</MudButton>
+            <MudButton OnClick="clearFilters" Color="Color.Warning" StartIcon="@Icons.Outlined.Clear">Clear</MudButton>
+            <MudButton OnClick="deleteSavedFilter" Color="Color.Error" StartIcon="@Icons.Outlined.Delete" Disabled="JobManager.FilterInUse(filterName)">Delete</MudButton>
+            <MudToolBarSpacer></MudToolBarSpacer>
+        </MudToolBar>
     }
-    <table class="table-responsive-sm table my-2" id="tableMovies">
-        <thead>
-            <tr>
-                @foreach (var p in filterManager.RadarrTableColumns)
-                {
-                    <td title="@p.Key" @ondblclick="(() => filterPropertyStr = p.FilterOn)">@p.Name</td>
-                }
-
-            </tr>
-        </thead>
-        <tbody>
-            @if (Movies != null)
+    <MudTable Items="movies" Dense="true" Striped="true" Hover="true" @ref="table">
+        <HeaderContent>
+            @foreach (var p in filterManager.RadarrTableColumns)
             {
-                foreach (var movie in Movies)
-                {
-                    <Movie movie="@movie" filterManager="filterManager" />
-                }
+                <MudTh title="@p.Key" @ondblclick="@(() => filterOn(p.FilterOn))">@p.Name</MudTh>
             }
-        </tbody>
-    </table>
-    <div class="row small">
-        <div class="col-4">
-        </div>
-        <div class="col-4 text-center">
-            <Paging pageCount="pageCount" pageNumber="pageNumber" OnFirstPage="FirstPage" OnPreviousPage="PreviousPage" OnNextPage="NextPage" OnLastPage="LastPage" />
-        </div>
-        <div class="col-4 text-right">
-            <span>Total records: @movieCount</span>
-        </div>
-    </div>
-</div>
+        </HeaderContent>
+        <RowTemplate>
+            <MovieView movie="@context" filterManager="filterManager" OnFilterBy="filterBy" />
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new int[]{5, 10, 25, 50, 100}" />
+        </PagerContent>
+    </MudTable>
+</MudPaper>
 
 @code {
     private IEnumerable<Compressarr.Services.Models.Movie> Movies { get; set; }
@@ -182,6 +183,19 @@
     private string filterPropertyStr = "title";
     private string filterComparitorStr = "==";
     private string filterValue;
+
+    private int filterIntValue
+    {
+        get
+        {
+            return int.TryParse(filterValue, out var x) ? x : 0;
+        }
+        set
+        {
+            filterValue = value.ToString();
+        }
+    }
+
     private string filterName = "";
     private string filterStr = "";
     private string filterSelected
@@ -204,11 +218,11 @@
             {
                 clearFilters();
             }
-            FirstPage();
         }
     }
+    private MudTable<Movie> table;
 
-    private HashSet<Compressarr.Services.Models.Movie> movies;
+    private HashSet<Movie> movies = new();
 
     private FilterProperty FilterProperty => filterManager.RadarrFilterProperties.FirstOrDefault(x => x.Value == filterPropertyStr);
     private FilterComparitor FilterComparitor => filterManager.GetComparitors(FilterProperty).FirstOrDefault(x => x.Value == filterComparitorStr);
@@ -229,27 +243,11 @@
     {
         if (firstRender)
         {
-            LoadMovies();
+            await LoadMovies();
         }
-        else
-        {
-            if (showingMovies)
-            {
-                showingMovies = false;
-                var contentScrolling = await js.InvokeAsync<bool>("eval", "content.scrollHeight > content.clientHeight");
-
-                if (contentScrolling && pageSize > 5)
-                {
-                    pageSize = pageSize - 1;
-                    ShowMovies();
-                }
-                StateHasChanged();
-            }
-        }
-
     }
 
-    private void addFilter()
+    private async void addFilter()
     {
 
         if (FilterProperty != null && FilterComparitor != null && !string.IsNullOrWhiteSpace(filterValue))
@@ -268,19 +266,31 @@
             dlFilters.Add(dlFilter);
             resetFilterInputs();
 
-            LoadMovies();
+            await LoadMovies();
         }
 
     }
 
-    private void clearFilters()
+    private async void clearFilters()
     {
         dlFilters = new List<DynamicLinqFilter>();
         filterName = null;
-        LoadMovies();
+        await LoadMovies();
     }
 
-    private void groupFilter(DynamicLinqFilter filter)
+    private void filterBy(KeyValuePair<string, object> filter)
+    {
+        filterPropertyStr = filter.Key;
+        filterValue = filter.Value.ToString();
+    }
+
+    private void filterOn(string filter)
+    {
+        filterPropertyStr = filter;
+        filterValue = null;
+    }
+
+    private async void groupFilter(DynamicLinqFilter filter)
     {
 
         if (FilterProperty != null && FilterComparitor != null && !string.IsNullOrWhiteSpace(filterValue))
@@ -306,11 +316,11 @@
             }
 
             resetFilterInputs();
-            LoadMovies();
+            await LoadMovies();
         }
     }
 
-    private void deleteFilter(DynamicLinqFilter filter)
+    private async void deleteFilter(DynamicLinqFilter filter)
     {
         if (dlFilters.Contains(filter))
         {
@@ -339,17 +349,25 @@
             }
         }
 
-        LoadMovies();
+        await LoadMovies();
     }
 
-    private void deleteSavedFilter()
+    private async void deleteSavedFilter()
     {
-        if (!string.IsNullOrWhiteSpace(filterName))
+        bool? result = await DialogService.ShowMessageBox(
+            "Warning",
+            "Deleting can not be undone!",
+            yesText: "Delete!", cancelText: "Cancel");
+
+        if (result ?? false)
         {
-            filterManager.DeleteFilter(filterName);
-            filterName = null;
-            showSaveDialog = false;
-            clearFilters();
+            if (!string.IsNullOrWhiteSpace(filterName))
+            {
+                await filterManager.DeleteFilter(filterName);
+                filterName = null;
+                showSaveDialog = false;
+                clearFilters();
+            }
         }
     }
 
@@ -374,12 +392,12 @@
         pageNumber = 0;
     }
 
-    private void filterUpdate()
+    private async void filterUpdate()
     {
-        LoadMovies();
+        await LoadMovies();
     }
 
-    private async void LoadMovies()
+    private async Task LoadMovies()
     {
         pageSize = 20;
 
@@ -414,48 +432,13 @@
             if (_result.Success)
             {
                 movies = _result.Results;
-                ShowMovies();
             }
             else
             {
                 AlertMessage = _result.ErrorString;
             }
-            
+            StateHasChanged();
         }
     }
 
-    private void ShowMovies()
-    {
-        showingMovies = true;
-        movieCount = movies.Count();
-
-        Movies = movies.Skip(pageNumber * pageSize).Take(pageSize);
-
-        pageCount = (int)Math.Ceiling((decimal)movieCount / pageSize);
-        StateHasChanged();
-    }
-
-    private void FirstPage()
-    {
-        pageNumber = 0;
-        ShowMovies();
-    }
-
-    private void PreviousPage()
-    {
-        pageNumber = Math.Max(0, --pageNumber);
-        ShowMovies();
-    }
-
-    private void NextPage()
-    {
-        pageNumber = Math.Min(pageCount - 1, ++pageNumber);
-        ShowMovies();
-    }
-
-    private void LastPage()
-    {
-        pageNumber = pageCount - 1;
-        ShowMovies();
-    }
 }

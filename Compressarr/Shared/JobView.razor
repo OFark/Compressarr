@@ -8,12 +8,33 @@
 @inject IFilterManager filterManager
 @inject IJobManager jobManager
 @inject ILayoutService layoutService
+@inject IDialogService DialogService
 
 
 <MudExpansionPanel Class="job">
     <TitleContent>
-        <MudAvatar Image="@FilterImageSrc" />
-        <MudText>@(NewJob ? "New Job" : $"{@job.FilterName} | {@job.PresetName} - {@job.BaseFolder} {@job.WriteFolder}")</MudText>
+        <MudText>
+            @if (NewJob)
+            {
+                <MudFab Size="Size.Small" Icon="@Icons.Outlined.PlaylistAdd" Color="Color.Dark" Class="mr-3" />
+            }
+            else
+            {
+                @if (string.IsNullOrWhiteSpace(FilterType))
+                {
+                    <MudFab Size="Size.Small" Class="mr-3" Icon="@Icons.Outlined.Sync" Color="Color.Tertiary" />
+                }
+                else
+                {
+                    <MudAvatar Image="@FilterImageSrc" Style="vertical-align: middle;" Class="mr-3" />
+                }
+            }
+            @(NewJob ? "New Job" : $"{@job.FilterName} | {@job.Preset} - {@job.BaseFolder} {@job.WriteFolder}")
+            @if (!NewJob)
+            {
+                <MudChip Color="@buttonColour">@buttonText</MudChip>
+            }
+        </MudText>
     </TitleContent>
     <ChildContent>
         <MudGrid>
@@ -26,6 +47,10 @@
                         <CardHeaderActions>
                             @if (!NewJob)
                             {
+                                if (job.JobState != JobState.Running)
+                                {
+                                    <MudIconButton Color="Color.Warning" Icon="@Icons.Material.Outlined.Sync" @onclick="reInitialise" title="Re-Initialise" />
+                                }
                                 <MudIconButton Color="Color.Primary" Icon="@Icons.Material.Outlined.Edit" @onclick="() => { editJob = !editJob; }" />
                             }
                         </CardHeaderActions>
@@ -43,7 +68,7 @@
                                 <MudSelect T="string" Required="true" Label="Preset" @bind-Value="job.PresetName">
                                     @foreach (var c in fFmpegManager.Presets)
                                     {
-                                        <MudSelectItem Value="@c.Name">@c.Name</MudSelectItem>
+                                        <MudSelectItem Value="@c.Name">@c.ToString()</MudSelectItem>
                                     }
                                 </MudSelect>
                                 <DirectoryLookup @bind-Folder="@job.BaseFolder" Label="Base Folder" />
@@ -113,6 +138,14 @@
                                     </PagerContent>
                                 </MudTable>
                             }
+                            else
+                            {
+                                <MudSkeleton Width="100%" Height="30px" />
+                                <MudSkeleton Width="20%" />
+                                <MudSkeleton Width="30%" />
+                                <MudSkeleton Width="18%" />
+                                <MudSkeleton Width="35%" />
+                            }
                         }
                     </MudCardContent>
                     <MudCardActions>
@@ -132,38 +165,49 @@
                 </MudCard>
             </MudItem>
             <MudItem xs="12">
-                <MudCard>
-                    <MudCardHeader>
-                        <CardHeaderContent>
-                            <MudText Typo="@Typo.h6">Log</MudText>
-                        </CardHeaderContent>
-                        <CardHeaderActions>
-                            @if (!NewJob)
-                            {
-                                if (job.JobState != JobState.Running)
-                                {
-                                    <MudIconButton Icon="@Icons.Material.Outlined.Sync" @onclick="reInitialise" title="Re-Initialise" />
-                                }
+                @if (job.Events?.Any() ?? false)
+                {
+                    <MudTabs>
+                        <MudTabPanel Text="Log" Icon="@Icons.Outlined.Article">
+                            <MudPaper Outlined="false" Square="true" class="jobEventsScrollWrapper">
+                                <MudPaper Square="true" Class="mud-theme-dark pa-2 jobEvents">
+                                    @if (job.Events != null)
+                                    {
+                                        @foreach (var e in job.Events)
+                                        {
+                                            <MudText Class="event" Color="e.Color" Typo="Typo.body2">@e.Date.ToString("HH:mm:ss") - @e.Message</MudText>
+                                        }
+                                    }
+                                </MudPaper>
+                            </MudPaper>
 
-                            }
-                        </CardHeaderActions>
-                    </MudCardHeader>
-
-                    <MudCardContent class="jobEventsScrollWrapper">
-                        <MudPaper Class="mud-theme-dark pa-2 jobEvents">
-                            @foreach (var e in job.Events)
-                            {
-                                <MudText Class="event" Color="e.Color" Typo="Typo.body2">@e.Date.ToString("HH:mm:ss") - @e.Message</MudText>
-                            }
-                        </MudPaper>
-                    </MudCardContent>
-                    <MudCardActions>
-                        @if (!NewJob)
+                        </MudTabPanel>
+                        @if (job?.Process?.Console != null)
                         {
-                            <MudButton Variant="Variant.Filled" FullWidth="true" Color="@buttonColour" @onclick="startJob" @onmouseover="() => { mouseOnButton = true; }" @onmouseout="() => { mouseOnButton = false; }">@buttonText</MudButton>
+                            <MudTabPanel Text="Console" Icon="@Icons.Filled.Article">
+                                <MudPaper Outlined="false" Square="true" class="jobEventsScrollWrapper">
+                                    <MudPaper Square="true" Class="mud-theme-dark pa-2 jobEvents">
+                                        @foreach (var e in job.Process.Console)
+                                        {
+                                            <MudText Class="event" Color="e.Color" Typo="Typo.body2">@e.Message</MudText>
+                                        }
+                                    </MudPaper>
+                                </MudPaper>
+                            </MudTabPanel>
                         }
-                    </MudCardActions>
-                </MudCard>
+                    </MudTabs>
+                    @if (!NewJob)
+                    {
+                        <MudToolBar>
+                            <MudButton Variant="Variant.Filled" FullWidth="true" Color="@buttonColour" @onclick="startJob" @onmouseover="() => { mouseOnButton = true; }" @onmouseout="() => { mouseOnButton = false; }">@buttonText</MudButton>
+                        </MudToolBar>
+                    }
+                }
+                else if (!NewJob)
+                {
+                    <MudSkeleton Width="10%" />
+                    <MudSkeleton Width="100%" Height="195px" />
+                }
             </MudItem>
         </MudGrid>
     </ChildContent>
@@ -188,7 +232,7 @@
 
     private string FilterImageSrc => $"https://raw.githubusercontent.com/{FilterType}/{FilterType}.github.io/master/logo/{FilterType}.svg";
 
-    private string FilterType => job?.Filter?.MediaSource == Filtering.MediaSource.Radarr ? "radarr" : "sonarr" ?? "";
+    private string FilterType => job?.Filter?.MediaSource.ToString().ToLower();
 
     private int? minSSIM
     {
@@ -234,7 +278,7 @@
         {
             switch (job.JobState)
             {
-                case JobState.Added:
+                case JobState.Testing:
                     return "Initialising";
                 case JobState.Running:
                     return mouseOnButton ? "Stop" : "Running";
@@ -258,7 +302,7 @@
         {
             switch (job.JobState)
             {
-                case JobState.Added:
+                case JobState.Testing:
                 case JobState.Running:
                 case JobState.TestedFail:
                     return Color.Warning;
@@ -301,7 +345,7 @@
         using (layoutService.Working("Saving..."))
         {
 
-            var success = await jobManager.AddJob(job);
+            var success = await jobManager.AddJobAsync(job);
             editJob = !success;
             canReload = !success && !NewJob;
 
@@ -321,8 +365,16 @@
     {
         using (layoutService.Working("Deleting..."))
         {
-            await jobManager.DeleteJob(job);
-            StateHasChanged();
+            bool? result = await DialogService.ShowMessageBox(
+            "Warning",
+            "Deleting can not be undone!",
+            yesText: "Delete!", cancelText: "Cancel");
+
+            if (result ?? false)
+            {
+                await jobManager.DeleteJob(job);
+                StateHasChanged();
+            }
         }
     }
 

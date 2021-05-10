@@ -1,5 +1,6 @@
 ﻿using Compressarr.FFmpegFactory;
 using Compressarr.JobProcessing;
+using Compressarr.Pages.Services;
 using Compressarr.Settings;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
@@ -17,19 +18,13 @@ namespace Compressarr
         private Task _initializationTask;
 
         private readonly IFFmpegInitialiser fFmpegInitialiser;
-        private readonly IFFmpegManager fFmpegManager;
-        private readonly IJobManager jobManager;
-        private readonly ISettingsManager settingsManager;
-        
 
-        public AsyncInitializationMiddleware(RequestDelegate next, IFFmpegInitialiser fFmpegInitialiser, IFFmpegManager fFmpegManager, IHostApplicationLifetime lifetime, IJobManager jobManager, ILogger<AsyncInitializationMiddleware> logger, ISettingsManager settingsManager)
+
+        public AsyncInitializationMiddleware(RequestDelegate next, IFFmpegInitialiser fFmpegInitialiser, IHostApplicationLifetime lifetime, ILogger<AsyncInitializationMiddleware> logger, ISettingsManager settingsManager)
         {
             this.fFmpegInitialiser = fFmpegInitialiser;
-            this.fFmpegManager = fFmpegManager;
-            this.jobManager = jobManager;
             this.logger = logger;
             this.next = next;
-            this.settingsManager = settingsManager;
 
             // Start initialization when the app starts
             var startRegistration = default(CancellationTokenRegistration);
@@ -48,19 +43,12 @@ namespace Compressarr
                 {
                     logger.LogInformation("Initialization starting");
 
-                    await fFmpegInitialiser.Start();
+                    fFmpegInitialiser.OnReady += (o, e) => logger.LogInformation("FFmpeg Ready, Initialisation complete");
+                    _ = fFmpegInitialiser.Start();
 
-                    foreach (var job in settingsManager.Jobs)
-                    {
-                        _ = jobManager.InitialiseJob(job);
-                    }
+                    logger.LogDebug("Initialization started");
 
-                    foreach (var preset in settingsManager.Presets)
-                    {
-                        await fFmpegManager.InitialisePreset(preset);
-                    }
 
-                    logger.LogInformation("Initialization complete");
                 }
                 catch (Exception ex)
                 {

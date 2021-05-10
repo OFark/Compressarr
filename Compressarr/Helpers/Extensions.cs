@@ -1,5 +1,9 @@
-﻿using Newtonsoft.Json;
+﻿using Compressarr.FFmpegFactory.Models;
+using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using System.Text.RegularExpressions;
 
 namespace Compressarr.Helpers
@@ -11,31 +15,6 @@ namespace Compressarr.Helpers
         {
             return string.IsNullOrWhiteSpace(text?.ToString()) ? string.Empty : $"{text}{adornment}";
         }
-        public static string ToFileSize(this long l)
-        {
-            return String.Format(new FileSizeFormatProvider(), "{0:fs}", l);
-        }
-
-        public static string ToBitRate(this long l)
-        {
-            return String.Format(new FileSizeFormatProvider(), "{0:br}", l);
-        }
-
-        public static string ToFileSize(this int l)
-        {
-            return String.Format(new FileSizeFormatProvider(), "{0:fs}", l);
-        }
-
-        public static string ToBitRate(this int l)
-        {
-            return String.Format(new FileSizeFormatProvider(), "{0:br}", l);
-        }
-
-        public static string NullIfEmpty(this string text)
-        {
-            return string.IsNullOrWhiteSpace(text) ? null : text;
-        }
-
         /// <summary>
         /// Perform a deep Copy of the object, using Json as a serialization method. NOTE: Private members are not cloned using this method.
         /// </summary>
@@ -59,6 +38,51 @@ namespace Compressarr.Helpers
             return JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(source), deserializeSettings);
         }
 
+        public static T Clone<T>(this object source)
+        {
+            if (source is null)
+            {
+                return default;
+            }
+            var deserializeSettings = new JsonSerializerSettings { ObjectCreationHandling = ObjectCreationHandling.Replace };
+
+            return JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(source), deserializeSettings);
+        }
+
+        public static string NullIfEmpty(this string text)
+        {
+            return string.IsNullOrWhiteSpace(text) ? null : text;
+        }
+
+        public static string ToBitRate(this long l)
+        {
+            return String.Format(new FileSizeFormatProvider(), "{0:br}", l);
+        }
+
+        public static string ToBitRate(this int l)
+        {
+            return String.Format(new FileSizeFormatProvider(), "{0:br}", l);
+        }
+
+        public static HashSet<CodecOptionValue> WithValues(this HashSet<CodecOption> codecOptions, HashSet<CodecOptionValue> values = null)
+        {
+            var covs = codecOptions.Select(x => x.Clone<CodecOptionValue>()).ToHashSet();
+
+            foreach (var cov in covs)
+            {
+                cov.Value = values?.FirstOrDefault(x => x.Name == cov.Name)?.Value;
+            }
+            return covs;
+        }
+
+        public static string ToFileSize(this long l)
+        {
+            return String.Format(new FileSizeFormatProvider(), "{0:fs}", l);
+        }
+        public static string ToFileSize(this int l)
+        {
+            return String.Format(new FileSizeFormatProvider(), "{0:fs}", l);
+        }
         public static bool TryMatch(this Regex reg, string input, out Match match)
         {
             match = reg.Match(input);

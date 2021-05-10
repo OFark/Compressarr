@@ -1,23 +1,7 @@
 ﻿@page "/"
-@using Compressarr.FFmpegFactory;
-@using Compressarr.Filtering;
-@using Compressarr.JobProcessing;
-@using Compressarr.Pages.Services;
-@using Compressarr.Services
-@using Compressarr.Settings
-@using JobProcessing.Models;
-
 
 @{
-    if (!FilterManager.Filters.Any())
-    {
-        <p>So you need to define a filter for either Radarr, Sonarr or both.</p>
-    }
-    else if (!FFmpegManager.Presets.Any())
-    {
-        <p>So you need to define a preset for FFmpeg.</p>
-    }
-    else
+    if (AllGood)
     {
         <div id="divJobList">
             <MudExpansionPanels>
@@ -31,5 +15,29 @@
             </MudExpansionPanels>
         </div>
     }
-
+    else
+    {
+        <MudContainer MaxWidth="MaxWidth.Medium">
+            <MudSimpleTable >
+                <tbody>
+                    <tr>
+                        <td><MudText><MudAvatar Image="https://raw.githubusercontent.com/radarr/radarr.github.io/master/logo/radarr.svg" Size="Size.Medium" Class="mr-2" Style="vertical-align:middle" />Radarr connection:</MudText></td>
+                        <td><ServiceStatusResult Result="radarrStatus"></ServiceStatusResult></td>
+                    </tr>
+                    <tr>
+                        <td><MudText><MudAvatar Image="https://raw.githubusercontent.com/sonarr/sonarr.github.io/master/logo/sonarr.svg" Size="Size.Medium" Class="mr-2" Style="vertical-align:middle" />Sonarr connection:</MudText></td>
+                        <td><ServiceStatusResult Result="sonarrStatus"></ServiceStatusResult></td>
+                    </tr>
+                    <tr>
+                        <td><MudText><MudAvatar Size="Size.Medium" Class="mr-2" Style="vertical-align:middle"><MudIcon Icon="@Icons.Material.Outlined.FilterAlt" /></MudAvatar>Define Filters:</MudText></td>
+                        <td><ServiceStatusResult Result="filterStatus"></ServiceStatusResult></td>
+                    </tr>
+                    <tr>
+                        <td><MudText><MudAvatar Size="Size.Medium" Class="mr-2" Style="vertical-align:middle"><MudIcon Icon="@Icons.Material.Outlined.Article" /></MudAvatar>Define Presets:</MudText></td>
+                        <td><ServiceStatusResult Result="presetStatus"></ServiceStatusResult></td>
+                    </tr>
+                </tbody>
+            </MudSimpleTable>
+        </MudContainer>
+    }
 }

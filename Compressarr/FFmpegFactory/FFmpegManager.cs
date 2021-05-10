@@ -1,5 +1,7 @@
 ﻿using Compressarr.FFmpegFactory.Models;
+using Compressarr.Helpers;
 using Compressarr.JobProcessing.Models;
+using Compressarr.Services.Base;
 using Compressarr.Settings;
 using Microsoft.Extensions.Logging;
 using System;
@@ -12,26 +14,28 @@ using Xabe.FFmpeg;
 
 namespace Compressarr.FFmpegFactory
 {
-    public class FFmpegManager : IFFmpegManager
+    public class FFmpegManager : FFmpegReliant, IFFmpegManager
     {
 
         private readonly ILogger<FFmpegManager> logger;
         private readonly ISettingsManager settingsManager;
-        public FFmpegManager(ILogger<FFmpegManager> logger, ISettingsManager settingsManager)
+        public FFmpegManager(ILogger<FFmpegManager> logger, ISettingsManager settingsManager, IFFmpegInitialiser fFmpegInitialiser)
         {
             this.logger = logger;
             this.settingsManager = settingsManager;
 
             FFmpeg.SetExecutablesPath(SettingsManager.GetAppDirPath(AppDir.FFmpeg));
+
+            WhenReady(fFmpegInitialiser, () => InitialisePresets());
         }
 
-        public SortedDictionary<string, string> AudioCodecs => Codecs[CodecType.Audio];
-        private Dictionary<CodecType, SortedDictionary<string, string>> Codecs => settingsManager.Codecs;
+        public SortedSet<Codec> AudioCodecs => Codecs[CodecType.Audio];
+        private Dictionary<CodecType, SortedSet<Codec>> Codecs => settingsManager.Codecs;
         public SortedDictionary<string, string> Containers => settingsManager.Containers;
         public HashSet<FFmpegPreset> Presets => settingsManager.Presets;
 
-        public SortedDictionary<string, string> SubtitleCodecs => Codecs[CodecType.Subtitle];
-        public SortedDictionary<string, string> VideoCodecs => Codecs[CodecType.Video];
+        public SortedSet<Codec> SubtitleCodecs => Codecs[CodecType.Subtitle];
+        public SortedSet<Codec> VideoCodecs => Codecs[CodecType.Video];
         internal static string FFMPEG => RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? SettingsManager.GetFilePath(AppDir.FFmpeg, "ffmpeg.exe")
                                : RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? SettingsManager.GetFilePath(AppDir.FFmpeg, "ffmpeg")
                                : throw new NotSupportedException("Cannot Identify OS");
@@ -48,19 +52,15 @@ namespace Compressarr.FFmpegFactory
             {
                 logger.LogInformation($"Preset Name: {newPreset.Name}");
 
-                var preset = Presets.FirstOrDefault(x => x.Name == newPreset.Name);
-
-                if (preset == null)
+                if (Presets.Contains(newPreset))
                 {
-                    logger.LogDebug("Adding a new preset.");
-                    Presets.Add(newPreset);
+                    logger.LogDebug("Preset already exists, updating.");
                 }
                 else
                 {
-                    logger.LogDebug("Preset already exists, removing the old one.");
-                    Presets.Remove(preset);
-                    logger.LogDebug("Adding the new one.");
-                    Presets.Add(newPreset);
+                    logger.LogDebug("Adding a new preset.");
+                    newPreset.Initialised = true;
+                    settingsManager.Presets.Add(newPreset);
                 }
 
                 await settingsManager.SaveAppSetting();
@@ -107,6 +107,11 @@ namespace Compressarr.FFmpegFactory
             using (logger.BeginScope("Converting container to extension"))
             {
                 logger.LogInformation($"Container name: {container}");
+
+                if(container == "copy")
+                {
+                    return null;
+                }
 
                 var p = new Process();
                 p.StartInfo.UseShellExecute = false;
@@ -155,87 +160,91 @@ namespace Compressarr.FFmpegFactory
             }
         }
 
-        public async Task DeletePresetAsync(string presetName)
+        public async Task DeletePresetAsync(FFmpegPreset preset)
         {
 
-            using (logger.BeginScope("Deleting Preset"))
+            using (logger.BeginScope("Deleting Preset: {preset}", preset))
             {
-                logger.LogInformation($"Preset Name: {presetName}");
-
-                var preset = Presets.FirstOrDefault(x => x.Name == presetName);
-
-                if (preset != null)
+                if (Presets.Contains(preset))
                 {
+                    logger.LogInformation($"Removing");
                     Presets.Remove(preset);
+                    settingsManager.Presets.Remove(preset);
                 }
                 else
                 {
-                    logger.LogWarning($"Preset {presetName} not found.");
+                    logger.LogWarning($"Preset {preset.Name} not found.");
                 }
 
                 await settingsManager.SaveAppSetting();
             }
         }
 
+        public Codec GetCodec(CodecType type, string name)
+        {
+            if (Ready || ReadyEvent.WaitOne(new TimeSpan(0, 1, 0)))
+            {
 
+                var codec = Codecs[type].FirstOrDefault(c => c.Name == name);
+
+                return codec ?? new(); //New will be "Copy"
+            }
+            throw new TimeoutException("FFmpeg not ready in time");
+        }
 
         public async Task<IMediaInfo> GetMediaInfoAsync(string filepath)
         {
-            using (logger.BeginScope($"Getting MediaInfo"))
+            if (Ready || ReadyEvent.WaitOne(new TimeSpan(0, 1, 0)))
             {
-                logger.LogInformation("File Name: {filepath}");
-                try
+
+                using (logger.BeginScope($"Getting MediaInfo"))
                 {
-                    return await FFmpeg.GetMediaInfo(filepath);
-                }
-                catch (ArgumentException aex)
-                {
-                    logger.LogError(aex.ToString());
-                    return null;
+                    logger.LogInformation("File Name: {filepath}");
+                    try
+                    {
+                        return await FFmpeg.GetMediaInfo(filepath);
+                    }
+                    catch (ArgumentException aex)
+                    {
+                        logger.LogError(aex.ToString());
+                        return null;
+                    }
                 }
             }
-        }
 
-        public async Task<HashSet<CodecOptionValue>> GetOptionsAsync(string codec)
-        {
-            using (logger.BeginScope("Get Codec Options"))
-            {
-                var optionsFile = SettingsManager.GetFilePath(AppDir.CodecOptions, $"{codec}.json");
-
-                if (SettingsManager.HasFile(optionsFile))
-                {
-                    return await settingsManager.ReadJsonFileAsync<HashSet<CodecOptionValue>>(optionsFile);
-                }
-                else
-                {
-                    logger.LogDebug($"Codec Options file not found.");
-                }
-                return new();
-            }
+            throw new TimeoutException("FFmpeg not ready in time");
         }
 
         public FFmpegPreset GetPreset(string presetName) => Presets.FirstOrDefault(p => p.Name == presetName);
 
-        public async Task InitialisePreset(FFmpegPreset preset)
+        public Task<StatusResult> GetStatus()
         {
-            using (logger.BeginScope("Load Presets"))
+            return Task.Run(() =>
             {
-                if (preset.VideoCodecOptions != null && preset.VideoCodecOptions.Any())
+                return new StatusResult()
                 {
-                    var codecOptions = await GetOptionsAsync(preset.VideoCodec);
-                    if (codecOptions != null)
-                    {
-                        foreach (var co in codecOptions)
-                        {
-                            var val = preset.VideoCodecOptions.FirstOrDefault(x => x.Name == co.Name);
-                            if (val != null)
-                            {
-                                co.Value = val.Value;
-                            }
-                        }
-                    }
+                    Status = Presets.Any() ? ServiceStatus.Ready : ServiceStatus.Incomplete,
+                    Message = new(Presets.Any() ? "Ready" : "No presets have been defined, you can create some on the <a href=\"/ffmpeg\">FFmpeg</a> page")
+                };
+            });
+        }
 
-                    preset.VideoCodecOptions = codecOptions;
+        private void InitialisePresets()
+        {
+            using (logger.BeginScope("Initialising Presets"))
+            {
+                if (Presets != null)
+                {
+                    foreach (var preset in Presets.Where(p => !p.Initialised))
+                    {
+                        var codec = GetCodec(CodecType.Video, preset.VideoCodec.Name);
+                        if (codec != null)
+                        {
+                            preset.VideoCodec = codec;
+                        }
+
+                        preset.Initialised = true;
+                    }
                 }
             }
         }

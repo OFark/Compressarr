@@ -1,10 +1,13 @@
-﻿using Compressarr.Settings;
+﻿using Compressarr.FFmpegFactory.Models;
+using Compressarr.Settings;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Xabe.FFmpeg.Downloader;
 
@@ -13,30 +16,65 @@ namespace Compressarr.FFmpegFactory
     public class FFmpegInitialiser : IFFmpegInitialiser
     {
 
-        private readonly ISettingsManager settingsManager;
         private readonly ILogger<FFmpegInitialiser> logger;
-
-        public string Version { get; private set; }
-
-        public bool Ready { get; private set; }
-
+        private readonly ISettingsManager settingsManager;
         public FFmpegInitialiser(ILogger<FFmpegInitialiser> logger, ISettingsManager settingsManager)
         {
             this.logger = logger;
             this.settingsManager = settingsManager;
         }
 
+        public event EventHandler OnReady;
+        public event EventHandler<string> OnBroadcast;
+
+        public bool Ready { get; private set; }
+        public string Version { get; private set; }
         public async Task Start()
         {
             using (logger.BeginScope("Initialising FFMPEG"))
             {
-                logger.LogInformation("Getting latest version");
+                string existingVersion = null;
+
+                var ffmpegAlreadyExists = SettingsManager.HasFile(FFmpegManager.FFMPEG);
+                if (!ffmpegAlreadyExists)
+                {
+                    logger.LogInformation("Downloading FFmpeg");
+                    OnBroadcast?.Invoke(this, "Downloading FFmpeg");
+                }
+                else
+                {
+                    existingVersion = await GetFFmpegVersionAsync();
+                    logger.LogInformation("Checking for FFmpeg update");
+                    OnBroadcast?.Invoke(this, "Checking for FFmpeg update");
+                }
+
                 await FFmpegDownloader.GetLatestVersion(FFmpegVersion.Official, SettingsManager.GetAppDirPath(AppDir.FFmpeg));
+                logger.LogDebug("FFmpeg latest version check finished.");
+
+                if (!SettingsManager.HasFile(FFmpegManager.FFMPEG))
+                {
+                    throw new FileNotFoundException("FFmpeg not found, download must have failed.");
+                }
+
+                Version = await GetFFmpegVersionAsync();
+
+                if (!ffmpegAlreadyExists)
+                {
+                    logger.LogInformation("FFmpeg downloaded.");
+                    OnBroadcast?.Invoke(this, "FFmpeg finished Downloading ");
+                }
+                else
+                {
+                    if(existingVersion != Version && Version != null)
+                    {
+                        logger.LogInformation("FFmpeg updated.");
+                        OnBroadcast?.Invoke(this, $"FFmpeg updated to: {Version}");
+                    }
+                }
 
                 var codecLoader = GetAvailableCodecsAsync();
                 var containerLoader = GetAvailableContainersAsync();
-                var versionLoader = GetFFmpegVersionAsync();
-
+                
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 {
                     logger.LogDebug("Running on Linux, CHMOD required");
@@ -55,7 +93,7 @@ namespace Compressarr.FFmpegFactory
                             };
                             p.StartInfo.RedirectStandardOutput = true;
                             p.StartInfo.RedirectStandardError = true;
-                            p.OutputDataReceived += (sender, args) => Console.WriteLine(args.Data);
+                            p.OutputDataReceived += (sender, args) => logger.LogInformation(args.Data);
                             logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
                             p.Start();
                             var error = p.StandardError.ReadToEnd();
@@ -69,40 +107,40 @@ namespace Compressarr.FFmpegFactory
                         };
                     }
                 }
-                logger.LogDebug("FFmpeg downloaded.");
+                
 
-                Version = await versionLoader;
                 settingsManager.Codecs = await codecLoader;
                 settingsManager.Containers = await containerLoader;
 
                 Ready = true;
+                OnReady?.Invoke(this, null);
+                OnBroadcast?.Invoke(this, "FFmpeg Initialisation complete");
             }
         }
 
-        private Task<Dictionary<CodecType, SortedDictionary<string, string>>> GetAvailableCodecsAsync()
+        private async Task<Dictionary<CodecType, SortedSet<Codec>>> GetAvailableCodecsAsync()
         {
             logger.LogDebug($"Get available codecs.");
 
-            var codecs = new Dictionary<CodecType, SortedDictionary<string, string>>();
-            var p = new Process();
-            p.StartInfo.UseShellExecute = false;
-            p.StartInfo.RedirectStandardOutput = true;
-            p.StartInfo.RedirectStandardError = true;
-            p.StartInfo.FileName = FFmpegManager.FFMPEG;
-            p.StartInfo.Arguments = "-encoders -v 1";
-
-            logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
-
-            return Task.Run(() =>
+            var codecs = new Dictionary<CodecType, SortedSet<Codec>>();
+            using (var p = new Process())
             {
+                p.StartInfo.UseShellExecute = false;
+                p.StartInfo.RedirectStandardOutput = true;
+                p.StartInfo.RedirectStandardError = true;
+                p.StartInfo.FileName = FFmpegManager.FFMPEG;
+                p.StartInfo.Arguments = "-encoders -v 1";
+
+                logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
                 p.Start();
                 var output = p.StandardOutput.ReadToEnd();
                 var error = p.StandardError.ReadToEnd();
-                p.WaitForExit();
+                await p.WaitForExitAsync();
 
                 if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(error))
                 {
                     logger.LogError($"Process Error: ({p.ExitCode}) {error} <End Of Error>");
+                    return null;
                 }
 
                 codecs.Add(CodecType.Audio, new());
@@ -117,19 +155,20 @@ namespace Compressarr.FFmpegFactory
                 {
                     var codecName = m.Groups[2].Value;
                     var codecDesc = m.Groups[3].Value;
+                    var codecOptions = await GetOptionsAsync(codecName);
 
                     switch (m.Groups[1].Value)
                     {
                         case "A":
-                            codecs[CodecType.Audio].Add(codecName, codecDesc);
+                            codecs[CodecType.Audio].Add(new(codecName, codecDesc, codecOptions));
                             break;
 
                         case "S":
-                            codecs[CodecType.Subtitle].Add(codecName, codecDesc);
+                            codecs[CodecType.Subtitle].Add(new(codecName, codecDesc, codecOptions));
                             break;
 
                         case "V":
-                            codecs[CodecType.Video].Add(codecName, codecDesc);
+                            codecs[CodecType.Video].Add(new(codecName, codecDesc, codecOptions));
                             break;
 
                         default:
@@ -139,7 +178,8 @@ namespace Compressarr.FFmpegFactory
                 }
 
                 return codecs;
-            });
+            }
+
         }
 
         private Task<SortedDictionary<string, string>> GetAvailableContainersAsync()
@@ -212,6 +252,24 @@ namespace Compressarr.FFmpegFactory
                 {
                     logger.LogError(uae.ToString());
                     return uae.Message;
+                }
+                return null;
+            }
+        }
+
+        private async Task<HashSet<CodecOption>> GetOptionsAsync(string codec)
+        {
+            using (logger.BeginScope("Get Codec Options"))
+            {
+                var optionsFile = SettingsManager.GetFilePath(AppDir.CodecOptions, $"{codec}.json");
+
+                if (SettingsManager.HasFile(optionsFile))
+                {
+                    return await settingsManager.ReadJsonFileAsync<HashSet<CodecOption>>(optionsFile);
+                }
+                else
+                {
+                    logger.LogDebug($"Codec Options file not found.");
                 }
                 return null;
             }

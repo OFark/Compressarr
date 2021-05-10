@@ -1,11 +1,12 @@
 ﻿using Compressarr.Filtering.Models;
+using Compressarr.Services.Base;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
 namespace Compressarr.Filtering
 {
-    public interface IFilterManager
+    public interface IFilterManager: IJobDependency
     {
         HashSet<Filter> Filters { get; }
         List<FilterComparitor> StringComparitors { get; }

@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using Xabe.FFmpeg;
@@ -23,23 +24,14 @@ namespace Compressarr.FFmpegFactory.Models
         public bool Succeded;
 
         public string FileName;
-
-        private List<JobEvent> _console = new();
         
-        public IEnumerable<JobEvent> Console
-        {
-            get
-            {
-                return _console.ToList().OrderBy(e => e.Date);
-            }
-
-        }
+        public ImmutableSortedSet<JobEvent> Console { get; set; }
 
         public void Output(string message, LogLevel level)
         {
             if (!string.IsNullOrWhiteSpace(message))
             {
-                _console.Add(new JobEvent(level, message));
+                Console = (Console ?? ImmutableSortedSet.Create<JobEvent>()).Add(new JobEvent(level, message)).TakeLast(100).ToImmutableSortedSet();
                 Update();
             }
         }

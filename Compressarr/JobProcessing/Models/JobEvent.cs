@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Compressarr.JobProcessing.Models
 {
-    public class JobEvent
+    public class JobEvent : IComparable<JobEvent>
     {
         public DateTime Date { get; set; }
         public LogLevel Level { get; set; }
@@ -33,6 +33,11 @@ namespace Compressarr.JobProcessing.Models
             Date = DateTime.Now;
             Level = LogLevel.Information;
             Message = message;
+        }
+
+        public int CompareTo(JobEvent other)
+        {
+            return Date.CompareTo(other.Date);
         }
     }
 }

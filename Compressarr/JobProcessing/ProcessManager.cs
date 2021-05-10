@@ -16,6 +16,7 @@ using Xabe.FFmpeg.Events;
 
 namespace Compressarr.JobProcessing
 {
+    //Singleton
     public class ProcessManager : IProcessManager
     {
         private readonly Regex progressReg = new(@"frame=\s*(\d*)\sfps=\s*([\d\.]*)\sq=\s*(-?[\d\.]*)\ssize=\s*([^\s]*)\stime=\s*([\d:\.]*)\sbitrate=\s*([^\s]*)\sspeed=\s*([\d.]*x)\s*");
@@ -172,7 +173,7 @@ namespace Compressarr.JobProcessing
             using (logger.BeginScope("Converter Data Received"))
             {
                 process.Output(e.Data, LogLevel.Debug);
-
+                
                 if (progressReg.TryMatch(e.Data, out var match))
                 {
                     logger.LogTrace(e.Data);

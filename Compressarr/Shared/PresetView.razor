@@ -1,0 +1,180 @@
+﻿@inject IFFmpegManager FFmpegManager
+@inject IDialogService DialogService
+@inject ILayoutService layoutService
+@inject IJobManager JobManager 
+
+<MudExpansionPanel Class="job">
+    <TitleContent>
+        <MudText>@(NewPreset ? "New Preset" : preset.ToString())</MudText>
+    </TitleContent>
+    <ChildContent>
+        <MudTextField @bind-Value="preset.Name" Label="Name" Class="mb-2" />
+        <MudSelect @bind-Value="preset.Container" Label="Container" OffsetY="true" T="string" Strict="true" Class="mb-2">
+            <MudSelectItem Value="@("copy")">copy - No change</MudSelectItem>
+            <MudDivider />
+            @foreach (var c in FFmpegManager.Containers)
+            {
+                <MudSelectItem Value="@c.Key">@c.Key - @c.Value</MudSelectItem>
+            }
+        </MudSelect>
+        <MudGrid>
+            <MudItem md="6">
+                <MudCard Class="my-2">
+                    <MudCardContent>
+                        <MudSelect @bind-Value="preset.VideoCodec" Label="Video Codec" OffsetY="true" T="Codec" Immediate="true" Class="mb-2">
+                            <MudSelectItem T="Codec" Value="@(new ())" />
+                            <MudDivider />
+                            @foreach (var c in FFmpegManager.VideoCodecs.Where(x => x.Options != null))
+                            {
+                                <MudSelectItem Value="@c"><MudIcon Icon="@Icons.Outlined.Article" Style="vertical-align: middle;" /> @c.ToString()</MudSelectItem>
+                            }
+
+                            @if (FFmpegManager.VideoCodecs.Any(x => x.Options != null))
+                            {
+                                <MudDivider />
+                            }
+
+                            @foreach (var c in FFmpegManager.VideoCodecs.Where(x => x.Options == null))
+                            {
+                                <MudSelectItem Value="@c" />
+                            }
+                        </MudSelect>
+                        <MudTextField @bind-Value="preset.VideoBitRate" Label="Video Bitrate" Disabled="@disabledNoVideo" Class="mb-2" />
+                        <MudNumericField @bind-Value="preset.FrameRate" Label="Framerate" Placeholder="Same as source" Disabled="@disabledNoVideo" Class="mb-2" />
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem md="6">
+                <MudCard Class="my-2">
+                    <MudCardContent>
+                        <MudSelect @bind-Value="preset.AudioCodec" Label="Audio Codec" OffsetY="true" T="Codec" Class="mb-2">
+                            <MudSelectItem T="Codec" Value="@(new ())" />
+                            @foreach (var c in FFmpegManager.AudioCodecs)
+                            {
+                                <MudSelectItem Value="@c" />
+                            }
+                        </MudSelect>
+                        <MudTextField @bind-Value="preset.AudioBitRate" Label="Audio Bitrate" Disabled="@disabledNoAudio" Class="mb-2" />
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+
+            @if (preset.VideoCodec != null && !preset.VideoCodec.IsCopy && preset.VideoCodecOptions != null)
+            {
+                <MudItem md="6">
+                    <MudCard>
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">Additional codec based options</MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            @foreach (var option in preset.VideoCodecOptions)
+                            {
+                                switch (option.Type)
+                                {
+                                    case FFmpegFactory.CodecOptionType.Number:
+                                        {
+                                            <MudNumericField @bind-Value="option.Value" Label="@option.Name" />
+                                        }
+                                        break;
+                                    case FFmpegFactory.CodecOptionType.Range:
+                                        {
+                                            <MudSlider @bind-Value="@option.IntValue" T="int?" Max="@option.Max" Min="option.Min" Immediate="true" Disabled="@(option.DisabledByVideoBitRate && disabledVideoBitrate)">@option.Name: @option.Value <MudIconButton Size="Size.Small" Icon="@Icons.Outlined.Delete" OnClick="@(() => { option.IntValue = null; })"></MudIconButton></MudSlider>
+                                        }
+                                        break;
+                                    case FFmpegFactory.CodecOptionType.Select:
+                                        {
+                                            <MudSelect @bind-Value="option.Value" Label="@option.Name" OffsetY="true">
+                                                @foreach (var c in option.Values)
+                                                                    {
+                                                    <MudSelectItem Value="@c">@c</MudSelectItem>
+                                                                    }
+                                            </MudSelect>
+                                        }
+                                        break;
+                                    case FFmpegFactory.CodecOptionType.String:
+                                        {
+                                            <MudTextField @bind-Value="option.Value" Label="@option.Name" />
+                                        }
+                                        break;
+                                }
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+
+        <MudTextField @bind-Value="preset.OptionalArguments" Label="Additional arguments" Class="mb-2" />
+
+        <MudCard>
+            <MudCardContent>
+                <MudText Typo="Typo.caption">FFMPEG Preview:</MudText>
+                <pre>
+                        @foreach (var str in preset.Arguments)
+                            { @((MarkupString)str)<br /> }
+                    </pre>
+            </MudCardContent>
+        </MudCard>
+        <MudCardActions>
+            <MudButton OnClick="savePreset" Color="Color.Primary" StartIcon="@Icons.Outlined.Save" Class="mr-3">Save</MudButton>
+            @if (!NewPreset)
+            {
+                <MudButton OnClick="deletePreset" Color="Color.Error" StartIcon="@Icons.Outlined.Delete" Disabled="@JobManager.PresetInUse(preset)">Delete</MudButton>
+            }
+        </MudCardActions>
+    </ChildContent>
+</MudExpansionPanel>
+
+@code {
+    [Parameter]
+    public FFmpegPreset preset { get; set; }
+
+    [Parameter]
+    public bool NewPreset { get; set; }
+
+    [Parameter]
+    public EventCallback OnAdd { get; set; }
+
+    private bool disabledNoAudio => preset.AudioCodec?.IsCopy ?? true;
+    private bool disabledNoVideo => preset.VideoCodec?.IsCopy ?? true;
+    private bool disabledVideoBitrate => preset.VideoBitRate.HasValue;
+
+    private async void savePreset()
+    {
+        using (layoutService.Working("Saving..."))
+        {
+
+            await FFmpegManager.AddPresetAsync(preset);
+
+            if (OnAdd.HasDelegate)
+            {
+                await OnAdd.InvokeAsync();
+            }
+
+            layoutService.RaiseChange();
+            StateHasChanged();
+        }
+    }
+
+    private async void deletePreset()
+    {
+        using (layoutService.Working("Deleting..."))
+        {
+
+            bool? result = await DialogService.ShowMessageBox(
+            "Warning",
+            "Deleting can not be undone!",
+            yesText: "Delete!", cancelText: "Cancel");
+
+            if (result ?? false)
+            {
+                await FFmpegManager.DeletePresetAsync(preset);
+                layoutService.RaiseChange();
+            }
+            StateHasChanged();
+        }
+    }
+}

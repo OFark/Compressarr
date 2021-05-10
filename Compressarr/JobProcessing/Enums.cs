@@ -4,7 +4,7 @@
     {
         New,
         Initialising,
-        Added,
+        Testing,
         TestedFail,
         TestedOK,
         Running,

@@ -1,6 +1,7 @@
-﻿using Compressarr.Services.Models;
+﻿using Compressarr.Services.Base;
+using Compressarr.Services.Models;
 using Compressarr.Settings;
-using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Html;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
@@ -13,10 +14,43 @@ namespace Compressarr.Services
     {
 
         private readonly ILogger<SonarrService> logger;
+        private readonly ISettingsManager settingsManager;
 
-        public SonarrService(ILogger<SonarrService> logger)
+        public SonarrService(ILogger<SonarrService> logger, ISettingsManager settingsManager)
         {
             this.logger = logger;
+            this.settingsManager = settingsManager;
+        }
+        private StatusResult _status = null;
+
+        public async Task<StatusResult> GetStatus()
+        {
+            if (_status == null)
+            {
+                _status = new();
+
+                if (!string.IsNullOrWhiteSpace(settingsManager.SonarrSettings?.APIURL))
+                {
+                    if ((await TestConnection(settingsManager.SonarrSettings)).Success)
+                    {
+                        _status.Status = ServiceStatus.Ready;
+                        _status.Message = new ("Ready");
+                    }
+                    else
+                    {
+                        _status.Status = ServiceStatus.Partial;
+                        _status.Message = new ("Connection details are available, but connection cannot be completed. Check <a href=\"/options\">options</a>");
+                    }
+                }
+                else
+                {
+                    _status.Status = ServiceStatus.Incomplete;
+                    _status.Message = new ("Connection details are missing. Use the <a href=\"/options\">options</a> page to enter them");
+
+                }
+            }
+
+            return _status;
         }
 
         public async Task<SystemStatus> TestConnection(APISettings settings)
@@ -30,21 +64,16 @@ namespace Compressarr.Services
                 }
 
                 logger.LogInformation($"Test Sonarr Connection.");
-                SystemStatus ss = new SystemStatus();
+                SystemStatus ss = new();
 
                 var link = $"{settings.APIURL}/api/system/status?apikey={settings.APIKey}";
                 logger.LogDebug($"LinkURL: {link}");
-
-                string statusJSON = null;
-                HttpResponseMessage hrm = null;
-
                 var hc = new HttpClient();
                 try
                 {
                     logger.LogDebug($"Connecting.");
-                    hrm = await hc.GetAsync(link);
-
-                    statusJSON = await hrm.Content.ReadAsStringAsync();
+                    HttpResponseMessage hrm = await hc.GetAsync(link);
+                    var statusJSON = await hrm.Content.ReadAsStringAsync();
 
                     if (hrm.IsSuccessStatusCode)
                     {

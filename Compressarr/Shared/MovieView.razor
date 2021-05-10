@@ -1,0 +1,48 @@
+﻿@using Compressarr.Filtering;
+@using Compressarr.Filtering.Models;
+
+@foreach (var p in tableColumns)
+{
+    <MudTd DataLabel="@p.Value" @ondblclick="@(() => filterBy(p.FilterOn, p.Value))">@GetPropertyValue(movie, p.Value)@p.Suffix</MudTd>
+}
+
+
+@code {
+    [Parameter]
+    public Compressarr.Services.Models.Movie movie { get; set; }
+
+    [Parameter]
+    public IFilterManager filterManager { get; set; }
+
+    [Parameter]
+    public EventCallback<KeyValuePair<string, object>> OnFilterBy { get; set; }
+
+    private List<FilterProperty> tableColumns => filterManager.RadarrTableColumns;
+
+    private void filterBy(string key, string value)
+    {
+        if (OnFilterBy.HasDelegate)
+        {
+            var val = GetPropertyValue(movie, value);
+
+            OnFilterBy.InvokeAsync(new KeyValuePair<string, object>(key, val));
+        }
+    }
+
+    private object GetPropertyValue(object src, string propName)
+    {
+        if (src == null) return null;
+        if (propName == null) throw new ArgumentException("Value cannot be null.", "propName");
+
+        if (propName.Contains("."))//complex type nested
+        {
+            var temp = propName.Split(new char[] { '.' }, 2);
+            return GetPropertyValue(GetPropertyValue(src, temp[0]), temp[1]);
+        }
+        else
+        {
+            var prop = src.GetType().GetProperty(propName);
+            return prop != null ? prop.GetValue(src, null) : null;
+        }
+    }
+}

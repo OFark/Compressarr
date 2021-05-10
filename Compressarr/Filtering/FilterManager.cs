@@ -1,5 +1,6 @@
 ﻿using Compressarr.Filtering.Models;
 using Compressarr.Helpers;
+using Compressarr.Services.Base;
 using Compressarr.Services.Models;
 using Compressarr.Settings;
 using Microsoft.AspNetCore.Hosting;
@@ -153,6 +154,14 @@ namespace Compressarr.Filtering
         /// <param name="filterType"></param>
         /// <returns></returns>
         public IOrderedEnumerable<Filter> GetFilters(MediaSource filterType) => Filters.Where(x => x.MediaSource == filterType).OrderBy(x => x.Name);
+
+        public Task<StatusResult> GetStatus()
+        {
+            return Task.Run(() =>
+            {
+                return new StatusResult() { Status = Filters.Any() ? ServiceStatus.Ready : ServiceStatus.Incomplete, Message = new(Filters.Any() ? "Ready" : "No filters have been defined, you can create some on the <a href=\"/radarr\">Radarr</a> or <a href=\"/sonarr\">Sonarr</a> page") };
+            });
+        }
 
         private void buildFilterProperties(Type type = null, string name = null, string prefix = null)
         {

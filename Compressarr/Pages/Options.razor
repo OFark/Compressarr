@@ -17,7 +17,6 @@
 <MudContainer MaxWidth="MaxWidth.Large">
 
     <MudPaper Class="px-4">
-        <MudText Typo="Typo.h1" title="It's easy to make good decisions when there are no bad options">Options</MudText>
         <MudCard Class="mb-4">
             <MudCardHeader>
                 <CardHeaderContent>
@@ -120,6 +119,25 @@
             </MudCardActions>
         </MudCard>
 
+        <MudCard Class="mb-4">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h5">Settings</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudSelect T="LogLevel" @bind-Value="logLevel" Label="Log Level">
+                    @foreach (LogLevel ll in Enum.GetValues(typeof(LogLevel)))
+                    {
+                        <MudSelectItem Value="ll" />
+                    }
+                </MudSelect>
+            </MudCardContent>
+            <MudCardActions>
+                    <MudButton Color="Color.Primary" OnClick="saveSettings" StartIcon="@Icons.Outlined.Save">Save</MudButton>
+            </MudCardActions>
+        </MudCard>
+
         <MudCard>
             <MudCardContent>
                 <MudList Dense="true">
@@ -148,6 +166,8 @@
     private bool sonarrConnected { get; set; }
     private bool showSonarrStatus { get; set; }
 
+    private LogLevel logLevel { get; set; }
+
     protected async override Task OnInitializedAsync()
     {
         //if (settingsManager.HasSetting(Settings.SettingType.RadarrURL))
@@ -174,6 +194,8 @@
             sonarrTestResponse = JsonConvert.SerializeObject(ss, new JsonSerializerSettings() { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
         }
 
+        logLevel = settingsManager.GetLogLevel();
+
         _ = base.OnInitializedAsync();
     }
 
@@ -189,6 +211,11 @@
     {
         settingsManager.SonarrSettings = null;
         _ = settingsManager.SaveAppSetting();
+    }
+
+    private async void saveSettings()
+    {
+        await settingsManager.UpdateLogLevel(logLevel);
     }
 
     private async void saveRadarrSettings()

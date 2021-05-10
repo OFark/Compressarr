@@ -1,4 +1,6 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Compressarr.FFmpegFactory
 {
@@ -6,6 +8,9 @@ namespace Compressarr.FFmpegFactory
     {
         bool Ready { get; }
         string Version { get; }
+
+        event EventHandler OnReady;
+        event EventHandler<string> OnBroadcast;
 
         Task Start();
     }

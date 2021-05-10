@@ -3,6 +3,8 @@
 @using Microsoft.AspNetCore.Components.Authorization
 
 @inject Compressarr.Pages.Services.ILayoutService layoutService
+@inject IFFmpegInitialiser fFmpegIntialiser
+@inject ISnackbar Snackbar
 
 <MudThemeProvider Theme="@MyCustomTheme" />
 <MudDialogProvider />
@@ -17,10 +19,10 @@
     </MudAppBar>
     <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
         <MudNavMenu>
-            <MudNavLink Match="NavLinkMatch.All" Href="/" title="Security isn't a dirty word, Blackadder. 'Crevice' is a dirty word, but 'security' isn't.">Jobs</MudNavLink>
-            <MudNavLink href="radarr">Radarr</MudNavLink>
-            <MudNavLink href="sonarr">Sonarr</MudNavLink>
-            <MudNavLink href="ffmpeg">FFmpeg</MudNavLink>
+            <MudNavLink Match="NavLinkMatch.All" Href="/">Jobs</MudNavLink>
+            <MudNavLink Href="radarr">Radarr</MudNavLink>
+            <MudNavLink Href="sonarr">Sonarr</MudNavLink>
+            <MudNavLink Href="ffmpeg">FFmpeg</MudNavLink>
             <MudNavLink Href="options">Options</MudNavLink>
         </MudNavMenu>
     </MudDrawer>
@@ -50,12 +52,20 @@
         _drawerOpen = !_drawerOpen;
     }
 
+    protected override void OnInitialized()
+    {
+        fFmpegIntialiser.OnBroadcast += (s, message) => Snackbar.Add(message);
+
+        base.OnInitialized();
+    }
+
     MudTheme MyCustomTheme = new MudTheme()
     {
         Palette = new Palette()
         {
             Primary = Colors.DeepPurple.Default,
-            Secondary = Colors.DeepPurple.Accent1,
+            Secondary = "#89b73a",
+            Tertiary = "#b7513a",
             AppbarText = "#fff",
             AppbarBackground = Colors.BlueGrey.Default
         },

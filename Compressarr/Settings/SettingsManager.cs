@@ -37,16 +37,18 @@ namespace Compressarr.Settings
     {
         private readonly CancellationToken cancellationToken;
         private readonly ILogger<SettingsManager> logger;
+        private readonly IConfiguration configuration;
 
-        private Dictionary<string, ReaderWriterLockSlim> locks = new();
+        private Dictionary<string, SemaphoreSlim> locks = new();
 
-        public SettingsManager(ILogger<SettingsManager> logger, IOptions<APIServiceSettings> appSettings, IOptions<HashSet<FFmpegPreset>> presets, IOptions<HashSet<Filter>> filters, IOptions<HashSet<Job>> jobs, IHostApplicationLifetime lifetime)
+        public SettingsManager(IConfiguration configuration, ILogger<SettingsManager> logger, IOptions<APIServiceSettings> appSettings, IOptions<HashSet<FFmpegPreset>> presets, IOptions<HashSet<Filter>> filters, IOptions<HashSet<Job>> jobs, IHostApplicationLifetime lifetime)
         {
+            this.configuration = configuration;
             Filters = filters?.Value ?? new();
             Jobs = jobs?.Value ?? new();
             Presets = presets?.Value ?? new();
             RadarrSettings = appSettings?.Value?.RadarrSettings ?? new();
-            SonarrSettings = appSettings?.Value.SonarrSettings ?? new();
+            SonarrSettings = appSettings?.Value?.SonarrSettings ?? new();
 
             this.logger = logger;
 
@@ -59,12 +61,12 @@ namespace Compressarr.Settings
         }
 
         public static string ConfigDirectory => GetAppDirPath(AppDir.Config);
-        public Dictionary<CodecType, SortedDictionary<string, string>> Codecs { get; set; }
+        public Dictionary<CodecType, SortedSet<Codec>> Codecs { get; set; }
         public SortedDictionary<string, string> Containers { get; set; }
 
         public HashSet<Filter> Filters { get; set; }
         public HashSet<Job> Jobs { get; set; }
-        public HashSet<FFmpegPreset> Presets { get; }
+        public HashSet<FFmpegPreset> Presets { get; set; }
         public APISettings RadarrSettings { get; set; }
         public APISettings SonarrSettings { get; set; }
 
@@ -97,6 +99,7 @@ namespace Compressarr.Settings
         public static bool HasFile(AppDir dir, string fileName) => File.Exists(Path.Combine(GetAppDirPath(dir), fileName));
 
         public Task DumpDebugFile(string fileName, string content) => WriteTextFileAsync(Path.Combine(GetAppDirPath(AppDir.Debug), fileName), content);
+
         public Task<T> ReadJsonFileAsync<T>(AppFile file) where T : class => ReadJsonFileAsync<T>(GetAppFilePath(file));
 
         public async Task<T> ReadJsonFileAsync<T>(string path) where T : class
@@ -128,29 +131,27 @@ namespace Compressarr.Settings
 
         public Task<string> ReadTextFileAsync(AppFile file) => ReadTextFileAsync(GetAppFilePath(file));
 
-        public Task<string> ReadTextFileAsync(string path)
+        public async Task<string> ReadTextFileAsync(string path)
         {
             using (logger.BeginScope("ReadTextFileAsync from {path}", path))
             {
                 if (File.Exists(path))
                 {
-                    return Task.Run(() =>
+
+                    await GetLock(path).WaitAsync(cancellationToken);
+                    try
                     {
-                        GetLock(path).EnterReadLock();
-                        try
-                        {
-                            logger.LogDebug($"Reading all text from file: {path}");
-                            return File.ReadAllText(path);
-                        }
-                        finally
-                        {
-                            GetLock(path).ExitReadLock();
-                        }
-                    }, cancellationToken);
+                        logger.LogDebug($"Reading all text from file: {path}");
+                        return await File.ReadAllTextAsync(path);
+                    }
+                    finally
+                    {
+                        GetLock(path).Release();
+                    }
                 }
 
                 logger.LogWarning("File does not exist");
-                return new(() => null);
+                return null;
             }
         }
 
@@ -160,7 +161,7 @@ namespace Compressarr.Settings
             {
                 var jsonObj = await ReadJsonFileAsync<dynamic>(AppFile.appsettings);
 
-                var serviceSettings = new APIServiceSettings() {RadarrSettings = RadarrSettings, SonarrSettings = SonarrSettings };
+                var serviceSettings = new APIServiceSettings() { RadarrSettings = RadarrSettings, SonarrSettings = SonarrSettings };
                 jsonObj["Services"] = JToken.FromObject(serviceSettings);
                 jsonObj["Filters"] = JToken.FromObject(Filters);
                 jsonObj["Presets"] = JToken.FromObject(Presets);
@@ -175,6 +176,21 @@ namespace Compressarr.Settings
             }
         }
 
+        public LogLevel GetLogLevel()
+        {
+            var logSettings = configuration.GetSection("Logging");
+            return (LogLevel)Enum.Parse(typeof(LogLevel), logSettings["LogLevel:Default"]);
+        }
+
+        public async Task UpdateLogLevel(LogLevel level)
+        {
+            var jsonObj = await ReadJsonFileAsync<dynamic>(AppFile.appsettings);
+            var logging = jsonObj["Logging"];
+            jsonObj["Logging"]["LogLevel"]["Default"] = level.ToString();
+
+            await WriteJsonFileAsync(AppFile.appsettings, jsonObj);
+        }
+
         public Task WriteJsonFileAsync(AppFile file, object content) => WriteJsonFileAsync(GetAppFilePath(file), content);
         public Task WriteJsonFileAsync(string path, object content) =>
             WriteTextFileAsync(path, JsonConvert.SerializeObject(content, new JsonSerializerSettings() { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore }));
@@ -182,7 +198,7 @@ namespace Compressarr.Settings
 
         public Task WriteTextFileAsync(AppFile file, string content) => WriteTextFileAsync(GetAppFilePath(file), content);
 
-        public Task WriteTextFileAsync(string path, string content)
+        public async Task WriteTextFileAsync(string path, string content)
         {
             using (logger.BeginScope("WriteFileAsyncfrom {path}", path))
             {
@@ -193,30 +209,26 @@ namespace Compressarr.Settings
                     Directory.CreateDirectory(fileDir);
                 }
 
-                return Task.Run(() =>
+                await GetLock(path).WaitAsync(cancellationToken);
+
+                try
                 {
-                    GetLock(path).EnterWriteLock();
-                    {
-                        try
-                        {
-                            logger.LogDebug($"Writing all text to file: {path}");
-                            File.WriteAllText(path, content);
-                        }
-                        finally
-                        {
-                            GetLock(path).ExitWriteLock();
-                        }
-                    }
-                }, cancellationToken);
+                    logger.LogDebug($"Writing all text to file: {path}");
+                    await File.WriteAllTextAsync(path, content);
+                }
+                finally
+                {
+                    GetLock(path).Release();
+                }
             }
         }
-        private ReaderWriterLockSlim GetLock(string path)
+        private SemaphoreSlim GetLock(string path)
         {
             logger.LogDebug($"Getting lock for: {path}");
             if (!locks.ContainsKey(path))
             {
                 logger.LogTrace("Creating new Lock");
-                locks.Add(path, new());
+                locks.Add(path, new(1, 1));
             }
             return locks[path];
         }

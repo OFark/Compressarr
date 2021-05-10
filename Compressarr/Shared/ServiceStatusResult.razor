@@ -1,0 +1,10 @@
+﻿<MudFab Icon="@Result.Icon" Size="Size.Small" Color="@Result.Colour" Title="@Result.Status.ToString()" Style="vertical-align: middle;" Class="mx-4" />
+@if (Result.Status == Services.Base.ServiceStatus.Incomplete || Result.Status == Services.Base.ServiceStatus.Partial)
+{
+    @Result.Message
+}
+
+@code {
+    [Parameter]
+    public StatusResult Result { get; set; }
+}

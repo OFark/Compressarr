@@ -3,9 +3,12 @@ using Compressarr.Filtering;
 using Compressarr.JobProcessing;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Pages.Services;
+using Compressarr.Services;
+using Compressarr.Services.Base;
 using Compressarr.Settings;
 using Microsoft.AspNetCore.Components;
 using System;
+using System.Threading.Tasks;
 
 namespace Compressarr.Pages
 {
@@ -20,22 +23,35 @@ namespace Compressarr.Pages
         [Inject]
         ILayoutService LayoutService { get; set; }
         [Inject]
-        ISettingsManager settingsManager { get; set; }
+        IRadarrService RadarrService { get; set; }
         [Inject]
-        NavigationManager NavManager { get; set; }
+        ISonarrService SonarrService { get; set; }
+        [Inject]
+        ISettingsManager settingsManager { get; set; }
 
-        private Compressarr.JobProcessing.Models.Job newJob = new Job();
+        private Job newJob = new ();
 
-        protected override void OnInitialized()
+        private StatusResult filterStatus = new();
+        private StatusResult presetStatus = new();
+        private StatusResult radarrStatus = new();
+        private StatusResult sonarrStatus = new();
+
+        private bool AllGood => filterStatus.Status == ServiceStatus.Ready &&
+                                presetStatus.Status == ServiceStatus.Ready &&
+                                (radarrStatus.Status == ServiceStatus.Ready ||
+                                sonarrStatus.Status == ServiceStatus.Ready);
+
+
+        protected async override Task OnInitializedAsync()
         {
-            if (settingsManager.RadarrSettings == null)
-            {
-                NavManager.NavigateTo("options");
-            }
-
             LayoutService.OnStateChanged += LayoutService_OnStateChanged;
 
-            base.OnInitialized();
+            radarrStatus = await RadarrService.GetStatus();
+            sonarrStatus = await SonarrService.GetStatus();
+            filterStatus = await FilterManager.GetStatus();
+            presetStatus = await FFmpegManager.GetStatus();
+
+            await base.OnInitializedAsync();
         }
 
         private async void LayoutService_OnStateChanged(object sender, EventArgs e)

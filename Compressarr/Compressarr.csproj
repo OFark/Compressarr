@@ -36,7 +36,6 @@
 
 	<ItemGroup>
 		<Folder Include="config\logs\" />
-		<Folder Include="Settings\Interfaces\" />
 		<Folder Include="wwwroot\icons\" />
 	</ItemGroup>
 </Project>

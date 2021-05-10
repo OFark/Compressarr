@@ -23,6 +23,14 @@ body {
         grid-template-rows: max-content auto;
         height: 100vh;
 
+        a {
+            color: var(--mud-palette-primary);
+
+            &:hover {
+                text-decoration: underline;
+            }
+        }
+
         .modal {
             background: rgba(0,0,0, 0.5);
             position: fixed;
@@ -108,12 +116,7 @@ body {
 
 
         #content {
-            height: 100%;
-            overflow: auto;
-            padding-left: 2rem !important;
-            padding-right: 1.5rem !important;
             padding-top: 1.1rem;
-            position: relative;
 
             #divRadarr {
                 .filterList {
@@ -122,21 +125,21 @@ body {
 
                         thead {
                             th:not(.hide) {
-                                border: 2px solid #666;
-                                border-radius: 4px;
-                                background: white;
 
-                                select, input[type=text] {
-                                    padding: 3px;
+                                select, select:focus-visible {
+                                    padding: 4px 0 6px;
                                     border: none;
-                                    background: transparent;
-                                    color: #333;
+                                    outline: none;
                                 }
 
                                 option {
                                     /*                    background-color: $overBackground*/
                                 }
                             }
+                        }
+
+                        tbody {
+                            color: var(--mud-palette-secondary);
                         }
 
                         td:not(:first-child) {
@@ -230,21 +233,6 @@ body {
 
             #divRadarrOptions, #divSonarrOptions {
                 margin-bottom: 1em;
-            }
-        }
-
-        table {
-            color: $font-color !important;
-
-            &#tableMovies {
-                thead {
-                    font-weight: bold;
-                    white-space: nowrap;
-
-                    tr {
-                        background: $overBackground;
-                    }
-                }
             }
         }
 
