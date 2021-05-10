@@ -130,8 +130,8 @@
                                                         }
                                             </MudText>
                                         </MudTd>
-                                        <MudTd DataLabel="SSIM"><MudText Align="Align.Center">@context.SSIM.Adorn("%")</MudText></MudTd>
-                                        <MudTd DataLabel="Compression"><MudText Align="Align.Center">@context.Compression.Adorn("%")</MudText></MudTd>
+                                        <MudTd DataLabel="SSIM"><MudText Align="Align.Center">@context.SSIM.ToPercent().Adorn("%")</MudText></MudTd>
+                                        <MudTd DataLabel="Compression"><MudText Align="Align.Center">@context.Compression.ToPercent().Adorn("%")</MudText></MudTd>
                                     </RowTemplate>
                                     <PagerContent>
                                         <MudTablePager PageSizeOptions="new int[]{5, 10, 50, 100}" />

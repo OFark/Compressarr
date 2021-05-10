@@ -15,6 +15,12 @@ namespace Compressarr.Helpers
         {
             return string.IsNullOrWhiteSpace(text?.ToString()) ? string.Empty : $"{text}{adornment}";
         }
+
+        public static string ToPercent(this decimal? percent, int decimals = 0)
+        {
+            return percent.HasValue ? Math.Round(percent.Value * 100, decimals).ToString() : null;
+        }
+
         /// <summary>
         /// Perform a deep Copy of the object, using Json as a serialization method. NOTE: Private members are not cloned using this method.
         /// </summary>
