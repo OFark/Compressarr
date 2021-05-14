@@ -23,19 +23,14 @@ namespace Compressarr.Services
     public class RadarrService : IRadarrService
     {
 
+        private static SemaphoreSlim mediaInfoSemaphore = new(1, 1);
+        private readonly IApplicationService applicationService;
         private readonly IFFmpegManager fFmpegManager;
         private readonly IFileService fileService;
         private readonly ILogger<RadarrService> logger;
-        private readonly IApplicationService applicationService;
-
         private StatusResult _status = null;
 
-        private IEnumerable<Movie> movies => applicationService.Movies;
-
         private int previousResultsHash;
-
-        private static SemaphoreSlim mediaInfoSemaphore = new(1, 1);
-
         public RadarrService(IFFmpegManager fFmpegManager, IFileService fileService, ILogger<RadarrService> logger, IApplicationService applicationService)
         {
             this.fFmpegManager = fFmpegManager;
@@ -51,6 +46,7 @@ namespace Compressarr.Services
         public long MovieCount => movies?.Count() ?? 0;
         public string MovieFilter { get; set; }
         public IEnumerable<string> MovieFilterValues { get; set; }
+        private IEnumerable<Movie> movies => applicationService.Movies;
         public void ClearCache()
         {
             applicationService.Movies = new HashSet<Movie>();
@@ -91,31 +87,6 @@ namespace Compressarr.Services
                 LoadMediaInfo(movies);
 
                 return new(true, movies);
-            }
-        }
-
-        private void LoadMediaInfo(IEnumerable<Movie> movies)
-        {
-            if (applicationService.LoadMediaInfoOnFilters)
-            {
-                _ = Task.Run(async () =>
-                {
-                    if (await mediaInfoSemaphore.WaitAsync(1000))
-                    {
-                        try
-                        {
-                            foreach (var movie in movies.Where(x => applicationService.LoadMediaInfoOnFilters && x.MediaInfo == null))
-                            {
-                                movie.MediaInfo = await fFmpegManager.GetMediaInfoAsync($"{applicationService.RadarrSettings.BasePath}{Path.Combine(movie.path, movie.movieFile.relativePath)}");
-                                await OnUpdate(this, null);
-                            }
-                        }
-                        finally
-                        {
-                            mediaInfoSemaphore.Release();
-                        }
-                    }
-                });
             }
         }
 
@@ -400,6 +371,30 @@ namespace Compressarr.Services
             }
         }
 
+        private void LoadMediaInfo(IEnumerable<Movie> movies)
+        {
+            if (applicationService.LoadMediaInfoOnFilters)
+            {
+                _ = Task.Run(async () =>
+                {
+                    if (await mediaInfoSemaphore.WaitAsync(1000))
+                    {
+                        try
+                        {
+                            foreach (var movie in movies.Where(x => applicationService.LoadMediaInfoOnFilters && x.MediaInfo == null))
+                            {
+                                movie.MediaInfo = await fFmpegManager.GetMediaInfoAsync($"{applicationService.RadarrSettings.BasePath}{Path.Combine(movie.path, movie.movieFile.relativePath)}");
+                                await OnUpdate(this, null);
+                            }
+                        }
+                        finally
+                        {
+                            mediaInfoSemaphore.Release();
+                        }
+                    }
+                });
+            }
+        }
         private async Task<ServiceResult<IEnumerable<Movie>>> RequestMovies()
         {
             using (logger.BeginScope("Requesting Movies"))

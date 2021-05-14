@@ -809,11 +809,11 @@ namespace Compressarr.FFmpegFactory
                 var part1Ending = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "NUL" : @"/dev/null";
 
                 args.Add($"-y -i \"{{0}}\" -map 0:v -c:V {preset.VideoEncoder.Name}{preset.VideoCodecParams} -b:v {preset.VideoBitRate}k{frameRate}{passStr} -an -f null {part1Ending}".Replace("%passnum%", "1"));
-                args.Add($"-y -i \"{{0}}\" -map 0:v -c:V {preset.VideoEncoder.Name}{preset.VideoCodecParams} -b:v {preset.VideoBitRate}k{frameRate}{passStr}{opArgsStr}{audioArguments} -map 0:s -c:s copy \"{{1}}\"".Replace("%passnum%", "2"));
+                args.Add($"-y -i \"{{0}}\" -map 0:v -c:V {preset.VideoEncoder.Name}{preset.VideoCodecParams} -b:v {preset.VideoBitRate}k{frameRate}{passStr}{opArgsStr}{audioArguments} -map 0:s? -c:s copy \"{{1}}\"".Replace("%passnum%", "2"));
             }
             else
             {
-                args.Add($"-y -i \"{{0}}\" -map 0:v -c:V {preset.VideoEncoder.Name}{frameRate}{preset.VideoCodecParams}{opArgsStr}{audioArguments} -map 0:s -c:s copy \"{{1}}\"");
+                args.Add($"-y -i \"{{0}}\" -map 0:v -c:V {preset.VideoEncoder.Name}{frameRate}{preset.VideoCodecParams}{opArgsStr}{audioArguments} -map 0:s? -c:s copy \"{{1}}\"");
             }
 
             return args;
