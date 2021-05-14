@@ -5,7 +5,7 @@ using Compressarr.JobProcessing.Models;
 using Compressarr.Pages.Services;
 using Compressarr.Services;
 using Compressarr.Services.Base;
-using Compressarr.Settings;
+using Compressarr.Application;
 using Microsoft.AspNetCore.Components;
 using System;
 using System.Threading.Tasks;
@@ -27,7 +27,7 @@ namespace Compressarr.Pages
         [Inject]
         ISonarrService SonarrService { get; set; }
         [Inject]
-        ISettingsManager settingsManager { get; set; }
+        IApplicationService settingsManager { get; set; }
 
         private Job newJob = new ();
 

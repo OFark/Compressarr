@@ -1,7 +1,7 @@
 ﻿@inject IFFmpegManager FFmpegManager
 @inject IDialogService DialogService
-@inject ILayoutService layoutService
-@inject IJobManager JobManager 
+@inject ILayoutService LayoutService
+@inject IJobManager JobManager
 
 <MudExpansionPanel Class="job">
     <TitleContent>
@@ -21,20 +21,20 @@
             <MudItem md="6">
                 <MudCard Class="my-2">
                     <MudCardContent>
-                        <MudSelect @bind-Value="preset.VideoCodec" Label="Video Codec" OffsetY="true" T="Codec" Immediate="true" Class="mb-2">
-                            <MudSelectItem T="Codec" Value="@(new ())" />
+                        <MudSelect @bind-Value="preset.VideoEncoder" Label="Video Encoder" OffsetY="true" T="Encoder" Immediate="true" Class="mb-2">
+                            <MudSelectItem T="Encoder" Value="@(new ())" />
                             <MudDivider />
-                            @foreach (var c in FFmpegManager.VideoCodecs.Where(x => x.Options != null))
+                            @foreach (var c in FFmpegManager.VideoEncoders.Where(x => x.Options != null))
                             {
                                 <MudSelectItem Value="@c"><MudIcon Icon="@Icons.Outlined.Article" Style="vertical-align: middle;" /> @c.ToString()</MudSelectItem>
                             }
 
-                            @if (FFmpegManager.VideoCodecs.Any(x => x.Options != null))
+                            @if (FFmpegManager.VideoEncoders.Any(x => x.Options != null))
                             {
                                 <MudDivider />
                             }
 
-                            @foreach (var c in FFmpegManager.VideoCodecs.Where(x => x.Options == null))
+                            @foreach (var c in FFmpegManager.VideoEncoders.Where(x => x.Options == null))
                             {
                                 <MudSelectItem Value="@c" />
                             }
@@ -43,27 +43,9 @@
                         <MudNumericField @bind-Value="preset.FrameRate" Label="Framerate" Placeholder="Same as source" Disabled="@disabledNoVideo" Class="mb-2" />
                     </MudCardContent>
                 </MudCard>
-            </MudItem>
-            <MudItem md="6">
-                <MudCard Class="my-2">
-                    <MudCardContent>
-                        <MudSelect @bind-Value="preset.AudioCodec" Label="Audio Codec" OffsetY="true" T="Codec" Class="mb-2">
-                            <MudSelectItem T="Codec" Value="@(new ())" />
-                            @foreach (var c in FFmpegManager.AudioCodecs)
-                            {
-                                <MudSelectItem Value="@c" />
-                            }
-                        </MudSelect>
-                        <MudTextField @bind-Value="preset.AudioBitRate" Label="Audio Bitrate" Disabled="@disabledNoAudio" Class="mb-2" />
-                    </MudCardContent>
-                </MudCard>
-            </MudItem>
-
-
-            @if (preset.VideoCodec != null && !preset.VideoCodec.IsCopy && preset.VideoCodecOptions != null)
-            {
-                <MudItem md="6">
-                    <MudCard>
+                @if (preset.VideoEncoder != null && !preset.VideoEncoder.IsCopy && preset.VideoCodecOptions != null)
+                {
+                    <MudCard Class="my-2">
                         <MudCardHeader>
                             <CardHeaderContent>
                                 <MudText Typo="Typo.h6">Additional codec based options</MudText>
@@ -103,21 +85,21 @@
                             }
                         </MudCardContent>
                     </MudCard>
-                </MudItem>
-            }
+                }
+            </MudItem>
+            <MudItem md="6">
+                @foreach (var fasp in preset.AudioStreamPresets)
+                {
+                    <AudioPreset AudioStreamPreset="@fasp" OnUpdate="AudioPresetUpdate" />
+                }
+            </MudItem>
+
+
+
         </MudGrid>
 
         <MudTextField @bind-Value="preset.OptionalArguments" Label="Additional arguments" Class="mb-2" />
 
-        <MudCard>
-            <MudCardContent>
-                <MudText Typo="Typo.caption">FFMPEG Preview:</MudText>
-                <pre>
-                        @foreach (var str in preset.Arguments)
-                            { @((MarkupString)str)<br /> }
-                    </pre>
-            </MudCardContent>
-        </MudCard>
         <MudCardActions>
             <MudButton OnClick="savePreset" Color="Color.Primary" StartIcon="@Icons.Outlined.Save" Class="mr-3">Save</MudButton>
             @if (!NewPreset)
@@ -138,30 +120,56 @@
     [Parameter]
     public EventCallback OnAdd { get; set; }
 
-    private bool disabledNoAudio => preset.AudioCodec?.IsCopy ?? true;
-    private bool disabledNoVideo => preset.VideoCodec?.IsCopy ?? true;
+    private bool disabledNoVideo => preset.VideoEncoder?.IsCopy ?? true;
     private bool disabledVideoBitrate => preset.VideoBitRate.HasValue;
+
+    protected override void OnInitialized()
+    {
+        LayoutService.OnStateChanged += (o, e) => StateHasChanged();
+        base.OnInitialized();
+    }
+
+    private void AudioPresetUpdate()
+    {
+        var firstCoverAny = preset.AudioStreamPresets.FirstOrDefault(f => f.CoversAny);
+
+        if (firstCoverAny == null)
+        {
+            preset.AudioStreamPresets.Add(new(true));
+        }
+        else
+        {
+            if (firstCoverAny != preset.AudioStreamPresets.Last())
+            {
+                var indexofRemoval = preset.AudioStreamPresets.IndexOf(firstCoverAny) + 1;
+                preset.AudioStreamPresets.RemoveRange(indexofRemoval, preset.AudioStreamPresets.Count() - indexofRemoval);
+            }
+        }
+        StateHasChanged();
+    }
 
     private async void savePreset()
     {
-        using (layoutService.Working("Saving..."))
+        using (LayoutService.Working("Saving..."))
         {
 
             await FFmpegManager.AddPresetAsync(preset);
+
+            JobManager.InitialiseJobs(preset);
 
             if (OnAdd.HasDelegate)
             {
                 await OnAdd.InvokeAsync();
             }
 
-            layoutService.RaiseChange();
+            LayoutService.RaiseChange();
             StateHasChanged();
         }
     }
 
     private async void deletePreset()
     {
-        using (layoutService.Working("Deleting..."))
+        using (LayoutService.Working("Deleting..."))
         {
 
             bool? result = await DialogService.ShowMessageBox(
@@ -172,7 +180,7 @@
             if (result ?? false)
             {
                 await FFmpegManager.DeletePresetAsync(preset);
-                layoutService.RaiseChange();
+                LayoutService.RaiseChange();
             }
             StateHasChanged();
         }

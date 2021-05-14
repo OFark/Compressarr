@@ -1,7 +1,10 @@
 ﻿@using Compressarr
+@using Compressarr.Application;
 @using Compressarr.FFmpegFactory.Models
 @using Compressarr.FFmpegFactory;
+@using Compressarr.Filtering.Models;
 @using Compressarr.Filtering;
+@using Compressarr.Helpers
 @using Compressarr.JobProcessing;
 @using Compressarr.Pages.Services;
 @using Compressarr.Services
@@ -15,7 +18,9 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Routing
 @using Microsoft.AspNetCore.Components.Web
+@using Microsoft.Extensions.Logging
 @using Microsoft.JSInterop
-@using Microsoft.Extensions.Logging 
 @using MudBlazor
+@using System.Linq
 @using System.Net.Http
+@using System.Collections

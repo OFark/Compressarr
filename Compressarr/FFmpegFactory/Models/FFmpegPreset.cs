@@ -1,60 +1,27 @@
-﻿using Compressarr.FFmpegFactory;
-using Compressarr.Helpers;
+﻿using Compressarr.Helpers;
 using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Compressarr.FFmpegFactory.Models
 {
     public class FFmpegPreset
     {
-        private Codec _videoCodec;
+        private Encoder _videoEncoder;
 
         public FFmpegPreset()
         {
-            AudioCodec ??= new();
+            
         }
 
-        [JsonIgnore]
-        public List<string> Arguments
+        public FFmpegPreset(bool init)
         {
-            get
-            {
-                List<string> args = new();
-
-                var audioBitrate = AudioBitRate.HasValue ? $" -b:a {AudioBitRate}k" : "";
-                var frameRate = FrameRate.HasValue ? $" -r {FrameRate}" : "";
-                var opArgsStr = string.IsNullOrWhiteSpace(OptionalArguments) ? "" : $" {OptionalArguments.Trim()}";
-                var passStr = " -pass %passnum%";
-
-                if (VideoBitRate.HasValue)
-                {
-                    if (VideoCodecOptions != null)
-                    {
-                        if (VideoCodecOptions.Any(vco => vco.IncludePass))
-                        {
-                            passStr = string.Empty;
-                        }
-                    }
-
-                    var part1Ending = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "NUL" : @"/dev/null";
-
-                    args.Add($"-y -i \"{{0}}\" -c:v {VideoCodec.Name}{VideoCodecParams} -b:v {VideoBitRate}k{frameRate}{passStr} -an -f null {part1Ending}".Replace("%passnum%", "1"));
-                    args.Add($"-y -i \"{{0}}\" -c:v {VideoCodec.Name}{VideoCodecParams} -b:v {VideoBitRate}k{frameRate}{passStr} -c:a {AudioCodec.Name}{audioBitrate}{opArgsStr} \"{{1}}\"".Replace("%passnum%", "2"));
-                }
-                else
-                {
-                    args.Add($"-y -i \"{{0}}\" -c:v {VideoCodec.Name}{frameRate}{VideoCodecParams} -c:a {AudioCodec.Name}{audioBitrate}{opArgsStr} \"{{1}}\"");
-                }
-
-                return args;
-            }
+            AudioStreamPresets ??= new() { new(true) };
         }
 
-        public int? AudioBitRate { get; set; }
-        public Codec AudioCodec { get; set; }
+        public List<FFmpegAudioStreamPreset> AudioStreamPresets { get; set; }
+
         public string Container { get; set; }
 
         [JsonIgnore]
@@ -66,15 +33,15 @@ namespace Compressarr.FFmpegFactory.Models
         public string Name { get; set; }
         public string OptionalArguments { get; set; }
         public int? VideoBitRate { get; set; }
-        public Codec VideoCodec
+        public Encoder VideoEncoder
         {
             get
             {
-                return _videoCodec ?? new();
+                return _videoEncoder ?? new();
             }
             set
             {
-                if (_videoCodec != null && _videoCodec.Name != value.Name)
+                if (_videoEncoder != null && _videoEncoder.Name != value.Name)
                 {
                     VideoCodecOptions = value?.Options?.WithValues();
                 }
@@ -83,19 +50,20 @@ namespace Compressarr.FFmpegFactory.Models
                     VideoCodecOptions = value?.Options?.WithValues(VideoCodecOptions);
                 }
 
-                _videoCodec = value;
+                _videoEncoder = value;
 
             }
         }
 
-        public HashSet<CodecOptionValue> VideoCodecOptions { get; set; }
+        public HashSet<EncoderOptionValue> VideoCodecOptions { get; set; }
 
         public override string ToString()
         {
-            return string.Join(" | ", (new List<string>() { VideoCodec?.Name, Name }).Where(x =>!string.IsNullOrWhiteSpace(x)));
+            return string.Join(" | ", (new List<string>() { VideoEncoder?.Name, Name }).Where(x =>!string.IsNullOrWhiteSpace(x)));
         }
 
-        private string VideoCodecParams
+        [JsonIgnore]
+        internal string VideoCodecParams
         {
             get
             {

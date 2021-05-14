@@ -1,6 +1,23 @@
 ﻿@using Compressarr.Filtering;
 @using Compressarr.Filtering.Models;
 
+@inject IApplicationService applicationService
+
+@if (applicationService.LoadMediaInfoOnFilters)
+{
+    <MudTd>
+        @if (movie.MediaInfo != null)
+        {
+            <MudIconButton Icon="@(movie.ShowInfo ? Icons.Outlined.Cancel : Icons.Outlined.Info)" OnClick="@(() => { movie.ShowInfo = !movie.ShowInfo; OnUpdate.InvokeAsync(); })"></MudIconButton>
+        }
+        else
+        {
+            <MudIcon Icon="@Icons.Outlined.Sync"></MudIcon>
+        }
+    </MudTd>
+}
+
+
 @foreach (var p in tableColumns)
 {
     <MudTd DataLabel="@p.Value" @ondblclick="@(() => filterBy(p.FilterOn, p.Value))">@GetPropertyValue(movie, p.Value)@p.Suffix</MudTd>
@@ -17,13 +34,16 @@
     [Parameter]
     public EventCallback<KeyValuePair<string, object>> OnFilterBy { get; set; }
 
+    [Parameter]
+    public EventCallback OnUpdate { get; set; }
+
     private List<FilterProperty> tableColumns => filterManager.RadarrTableColumns;
 
     private void filterBy(string key, string value)
     {
         if (OnFilterBy.HasDelegate)
         {
-            var val = GetPropertyValue(movie, value);
+            var val = GetPropertyValue(movie, key);
 
             OnFilterBy.InvokeAsync(new KeyValuePair<string, object>(key, val));
         }

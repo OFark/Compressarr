@@ -1,7 +1,7 @@
 ﻿using Compressarr.FFmpegFactory;
 using Compressarr.JobProcessing;
 using Compressarr.Pages.Services;
-using Compressarr.Settings;
+using Compressarr.Application;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -17,12 +17,12 @@ namespace Compressarr
         private readonly ILogger logger;
         private Task _initializationTask;
 
-        private readonly IFFmpegInitialiser fFmpegInitialiser;
+        //private readonly IApplicationInitialiser fFmpegInitialiser;
 
 
-        public AsyncInitializationMiddleware(RequestDelegate next, IFFmpegInitialiser fFmpegInitialiser, IHostApplicationLifetime lifetime, ILogger<AsyncInitializationMiddleware> logger, ISettingsManager settingsManager)
+        public AsyncInitializationMiddleware(RequestDelegate next,  IHostApplicationLifetime lifetime, ILogger<AsyncInitializationMiddleware> logger, IApplicationService settingsManager)
         {
-            this.fFmpegInitialiser = fFmpegInitialiser;
+            //this.fFmpegInitialiser = fFmpegInitialiser;
             this.logger = logger;
             this.next = next;
 
@@ -43,8 +43,8 @@ namespace Compressarr
                 {
                     logger.LogInformation("Initialization starting");
 
-                    fFmpegInitialiser.OnReady += (o, e) => logger.LogInformation("FFmpeg Ready, Initialisation complete");
-                    _ = fFmpegInitialiser.Start();
+                    //fFmpegInitialiser.OnReady += (o, e) => logger.LogInformation("FFmpeg Ready, Initialisation complete");
+                    //_ = fFmpegInitialiser.Start();
 
                     logger.LogDebug("Initialization started");
 

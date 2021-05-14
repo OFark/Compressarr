@@ -1,0 +1,127 @@
+﻿@inject IFFmpegManager FFmpegManager
+@inject ILayoutService LayoutService
+
+<MudGrid>
+    <MudItem sm="1">
+        <MudText Style="padding-top: 1.65em">
+            When
+        </MudText>
+    </MudItem>
+    <MudItem sm="3">
+        <MudSelect T="AudioStreamRule" @bind-Value="AudioStreamPresetFilter.Rule" TextChanged="resetValues" SelectedValuesChanged="@(() => OnUpdate.InvokeAsync())" Immediate="true" Label="Audio Stream">
+            @foreach (AudioStreamRule r in GetRules)
+            {
+                <MudSelectItem Value="r"></MudSelectItem>
+            }
+        </MudSelect>
+    </MudItem>
+    @switch (AudioStreamPresetFilter.Rule)
+    {
+        case AudioStreamRule.Channels:
+            {
+
+                <MudItem sm="3">
+                    <MudSelect T="FilterComparitor" @bind-Value="AudioStreamPresetFilter.NumberComparitor" Converter="fcConverter">
+                        @foreach (var nc in FFmpegManager.NumberComparitors)
+                        {
+                            <MudSelectItem Value="nc" />
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem sm="GetSize(5)">
+                    <MudNumericField T="int" @bind-Value="AudioStreamPresetFilter.ChannelValue" />
+
+                </MudItem>
+
+            }
+            break;
+        case AudioStreamRule.Codec:
+            {
+                <MudItem sm="2">
+                    <MudSwitch @bind-Checked="AudioStreamPresetFilter.Matches" Color="Color.Secondary" Style="padding-top: 1.2em;">@(AudioStreamPresetFilter.Matches ? "is" : "is not")</MudSwitch>
+                </MudItem>
+
+                <MudItem sm="GetSize(6)">
+                    <MudSelect T="string" MultiSelection="true" @bind-SelectedValues="AudioStreamPresetFilter.Values" Label="Codec">
+                        @foreach (var codec in FFmpegManager.AudioCodecs.Decoders())
+                        {
+                            <MudSelectItem Value="@codec.Name"></MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+            }
+            break;
+        case AudioStreamRule.Language:
+            {
+                <MudItem sm="2">
+                    <MudSwitch @bind-Checked="AudioStreamPresetFilter.Matches" Color="Color.Secondary" Style="padding-top: 1.2em;">@(AudioStreamPresetFilter.Matches ? "is" : "is not")</MudSwitch>
+                </MudItem>
+
+                <MudItem sm="GetSize(6)">
+                    <MudSelect T="string" MultiSelection="true" @bind-SelectedValues="AudioStreamPresetFilter.Values">
+                        @foreach (var language in FFmpegManager.LanguageCodes.OrderByDescending(l => l.Key == "eng").ThenBy(l => l.Value))
+                        {
+                            <MudSelectItem Value="@language.Key">@language.Value</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+            }
+            break;
+    }
+    @if (Filters.Count > 1)
+    {
+        <MudItem sm="1">
+            <MudIconButton Icon="@Icons.Outlined.Delete" OnClick="OnDelete" />
+        </MudItem>
+    }
+</MudGrid>
+@code {
+
+    [Parameter]
+    public FFmpegAudioStreamPresetFilter AudioStreamPresetFilter { get; set; }
+
+    [Parameter]
+    public List<FFmpegAudioStreamPresetFilter> Filters { get; set; }
+
+    [Parameter]
+    public EventCallback OnDelete { get; set; }
+
+    [Parameter]
+    public EventCallback OnUpdate { get; set; }
+
+    private IEnumerable<AudioStreamRule> GetRules
+    {
+        get
+        {
+            var rules = new List<AudioStreamRule>(Enum.GetValues(typeof(AudioStreamRule)).Cast<AudioStreamRule>());
+
+            return rules.Except(Filters.Select(f => f.Rule));
+
+        }
+
+    }
+
+    private int GetSize(int originalSize)
+    {
+        return Filters.Count > 1 ? originalSize - 1 : originalSize;
+    }
+
+    private void resetValues(string text)
+    {
+        if (AudioStreamPresetFilter.Rule.ToString() != text)
+        {
+            AudioStreamPresetFilter.Values = new();
+            AudioStreamPresetFilter.NumberComparitor = null;
+        }
+
+        OnUpdate.InvokeAsync();
+        LayoutService.RaiseChange();
+    }
+
+
+    Converter<FilterComparitor> fcConverter = new Converter<FilterComparitor>
+    {
+        SetFunc = value => value?.ToString(),
+        GetFunc = text => new FilterComparitor(text)
+    };
+}

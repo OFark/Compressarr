@@ -1,7 +1,8 @@
-﻿using Compressarr.JobProcessing.Models;
+﻿using Compressarr.FFmpegFactory;
+using Compressarr.JobProcessing.Models;
 using Compressarr.Services.Base;
 using Compressarr.Services.Models;
-using Compressarr.Settings;
+using Compressarr.Application;
 using Microsoft.AspNetCore.Html;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -14,66 +15,84 @@ using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web;
+using Compressarr.Settings;
 
 namespace Compressarr.Services
 {
     public class RadarrService : IRadarrService
     {
 
+        private readonly IFFmpegManager fFmpegManager;
+        private readonly IFileService fileService;
         private readonly ILogger<RadarrService> logger;
-        private readonly ISettingsManager settingsManager;
+        private readonly IApplicationService applicationService;
 
         private StatusResult _status = null;
-        private ServiceResult<HashSet<Movie>> cachedGetMoviesResult = null;
-
+        
+        private HashSet<Movie> movies = new();
         private int previousResultsHash;
 
-        public RadarrService(ILogger<RadarrService> logger, ISettingsManager settingsManager)
+        public RadarrService(IFFmpegManager fFmpegManager, IFileService fileService, ILogger<RadarrService> logger, IApplicationService applicationService)
         {
+            this.fFmpegManager = fFmpegManager;
+            this.fileService = fileService;
             this.logger = logger;
-            this.settingsManager = settingsManager;
+            this.applicationService = applicationService;
         }
 
-        public long MovieCount => cachedGetMoviesResult?.Results?.Count ?? 0;
+        public event EventHandler OnUpdate;
+
+        public long MovieCount => movies?.Count() ?? 0;
+        public string MovieFilter { get; set; }
+        public IEnumerable<string> MovieFilterValues { get; set; }
         public void ClearCache()
         {
-            cachedGetMoviesResult = null;
+            movies = new();
         }
-
-        public async Task<ServiceResult<HashSet<Movie>>> GetMoviesAsync()
+        public async Task<HashSet<Movie>> GetMoviesAsync(bool force = false)
         {
             using (logger.BeginScope("Get Movies"))
             {
                 logger.LogInformation($"Fetching Movies");
 
-                if (cachedGetMoviesResult == null || !cachedGetMoviesResult.Success)
+                if (!movies.Any() || force)
                 {
-                    logger.LogDebug($"No cached movies, interrogate Radarr.");
-                    return await RequestMovies();
-                }
-                else if (cachedGetMoviesResult.HasExpired)
-                {
-                    logger.LogDebug($"Cache has expired, interrogate Radarr.");
-                    // we will update in the background, return the stale results for now.
-                    _ = RequestMovies();
+                    var moviesRequest = await RequestMovies();
+                    if (moviesRequest.Success)
+                    {
+                        movies = moviesRequest.Results;
+                    }
+                    else
+                    {
+                        return new();
+                    }
                 }
 
-                return cachedGetMoviesResult;
+                if (!string.IsNullOrWhiteSpace(MovieFilter))
+                {
+                    logger.LogDebug("Filtering Movies");
+                    logger.LogDebug($"Filter: {MovieFilter}");
+                    logger.LogDebug($"Filter Values: {string.Join(", ", MovieFilterValues)}");
+
+                    return movies.AsQueryable().Where(MovieFilter, MovieFilterValues.ToArray()).ToHashSet();
+                }
+
+                return movies;
             }
         }
 
-        public async Task<ServiceResult<HashSet<Movie>>> GetMoviesFilteredAsync(string filter, string[] filterValues)
+        public async Task<ServiceResult<HashSet<Movie>>> GetMoviesFilteredAsync(string filter, IEnumerable<string> filterValues)
         {
             using (logger.BeginScope("Get Filtered Movies"))
             {
                 logger.LogDebug("Filtering Movies");
                 logger.LogDebug($"Filter: {filter}");
                 logger.LogDebug($"Filter Values: {string.Join(", ", filterValues)}");
-                var movies = await GetMoviesAsync();
+                var movies = await RequestMovies();
 
                 if (movies.Success)
                 {
-                    return new(true, movies.Results.AsQueryable().Where(filter, filterValues).ToHashSet());
+                    return new(true, movies.Results.AsQueryable().Where(filter, filterValues.ToArray()).ToHashSet());
                 }
                 else
                 {
@@ -88,9 +107,9 @@ namespace Compressarr.Services
             {
                 _status = new();
 
-                if (!string.IsNullOrWhiteSpace(settingsManager.RadarrSettings?.APIURL))
+                if (!string.IsNullOrWhiteSpace(applicationService.RadarrSettings?.APIURL))
                 {
-                    if ((await TestConnection(settingsManager.RadarrSettings)).Success)
+                    if ((await TestConnection(applicationService.RadarrSettings)).Success)
                     {
                         _status.Status = ServiceStatus.Ready;
                         _status.Message = new("Ready");
@@ -118,14 +137,14 @@ namespace Compressarr.Services
             {
                 logger.LogDebug($"Property name: {property}");
 
-                var movies = await GetMoviesAsync();
 
-                if (movies.Success)
+                if (movies.Any())
                 {
-                    return new ServiceResult<List<string>>(true, movies.Results.AsQueryable().GroupBy(property).OrderBy("Count() desc").ThenBy("Key").Select("Key").ToDynamicArray<string>().Where(x => !string.IsNullOrEmpty(x)).ToList());
+                    return new ServiceResult<List<string>>(true, movies.AsQueryable().GroupBy(property).OrderBy("Count() desc").ThenBy("Key").Select("Key").ToDynamicArray<string>().Where(x => !string.IsNullOrEmpty(x)).ToList());
                 }
 
-                return new ServiceResult<List<string>>(movies.Success, movies.ErrorCode, movies.ErrorMessage);
+                var moviesResult = await RequestMovies();
+                return new ServiceResult<List<string>>(moviesResult.Success, moviesResult.ErrorCode, moviesResult.ErrorMessage);
             }
         }
 
@@ -168,7 +187,7 @@ namespace Compressarr.Services
 
                 var destinationFolder = Path.GetDirectoryName(workItem.DestinationFile);
 
-                var link = $"{settingsManager.RadarrSettings?.APIURL}/api/manualimport?folder={HttpUtility.UrlEncode(destinationFolder)}&filterExistingFiles=true&apikey={settingsManager.RadarrSettings?.APIKey}";
+                var link = $"{applicationService.RadarrSettings?.APIURL}/api/manualimport?folder={HttpUtility.UrlEncode(destinationFolder)}&filterExistingFiles=true&apikey={applicationService.RadarrSettings?.APIKey}";
                 logger.LogDebug($"Link: {link}");
 
                 ManualImportResponse mir = null;
@@ -185,7 +204,7 @@ namespace Compressarr.Services
 
                         if (AppEnvironment.IsDevelopment)
                         {
-                            _ = settingsManager.DumpDebugFile("manualImport.json", manualImportJSON).ConfigureAwait(false);
+                            _ = fileService.DumpDebugFile("manualImport.json", manualImportJSON).ConfigureAwait(false);
                         }
 
                         if (hrm.IsSuccessStatusCode)
@@ -249,7 +268,7 @@ namespace Compressarr.Services
 
                 payload.files = new() { file };
 
-                link = $"{settingsManager.RadarrSettings?.APIURL}/api/command?apikey={settingsManager.RadarrSettings?.APIKey}";
+                link = $"{applicationService.RadarrSettings?.APIURL}/api/command?apikey={applicationService.RadarrSettings?.APIKey}";
                 logger.LogDebug($"Link: {link}");
 
 
@@ -265,8 +284,8 @@ namespace Compressarr.Services
 
                         if (AppEnvironment.IsDevelopment)
                         {
-                            _ = settingsManager.DumpDebugFile("importMoviePayload.json", payloadJson);
-                            _ = settingsManager.DumpDebugFile("importMovieResponse.json", await result.Content.ReadAsStringAsync());
+                            _ = fileService.DumpDebugFile("importMoviePayload.json", payloadJson);
+                            _ = fileService.DumpDebugFile("importMovieResponse.json", await result.Content.ReadAsStringAsync());
                         }
 
                         if (result.IsSuccessStatusCode)
@@ -278,7 +297,7 @@ namespace Compressarr.Services
                         else
                         {
                             logger.LogWarning($"Failed: {result.ReasonPhrase}");
-                            _ = settingsManager.DumpDebugFile("importMovieResponse.json", await result.Content.ReadAsStringAsync());
+                            _ = fileService.DumpDebugFile("importMovieResponse.json", await result.Content.ReadAsStringAsync());
                             return new ServiceResult<object>(false, result.StatusCode.ToString(), result.ReasonPhrase);
                         }
 
@@ -316,7 +335,7 @@ namespace Compressarr.Services
                     var statusJSON = await hrm.Content.ReadAsStringAsync();
                     if (AppEnvironment.IsDevelopment)
                     {
-                        _ = settingsManager.DumpDebugFile("testConnection.json", statusJSON);
+                        _ = fileService.DumpDebugFile("testConnection.json", statusJSON);
                     }
 
                     if (hrm.IsSuccessStatusCode)
@@ -354,14 +373,14 @@ namespace Compressarr.Services
         {
             using (logger.BeginScope("Requesting Movies"))
             {
-                if (settingsManager.RadarrSettings == null)
+                if (applicationService.RadarrSettings == null)
                 {
                     logger.LogWarning($"No Radarr settings.");
                     return new(false, "404", "Radarr settings not found. In Options. Go there");
                 }
 
-                var radarrURL = settingsManager.RadarrSettings?.APIURL;// settingsManager.Settings[SettingType.RadarrURL];
-                var radarrAPIKey = settingsManager.RadarrSettings?.APIKey; // settingsManager.Settings[SettingType.RadarrAPIKey];
+                var radarrURL = applicationService.RadarrSettings?.APIURL;// settingsManager.Settings[SettingType.RadarrURL];
+                var radarrAPIKey = applicationService.RadarrSettings?.APIKey; // settingsManager.Settings[SettingType.RadarrAPIKey];
 
                 var link = $"{radarrURL}/api/movie?apikey={radarrAPIKey}";
                 logger.LogDebug($"Link: {link}");
@@ -390,7 +409,7 @@ namespace Compressarr.Services
 
                         if (AppEnvironment.IsDevelopment)
                         {
-                            _ = settingsManager.DumpDebugFile("movies.json", movieJSON);
+                            _ = fileService.DumpDebugFile("movies.json", movieJSON);
                         }
 
                         if (previousResultsHash != 0)
@@ -409,9 +428,22 @@ namespace Compressarr.Services
 
                         var moviesArr = JsonConvert.DeserializeObject<Movie[]>(movieJSON);
 
-                        cachedGetMoviesResult = new(true, moviesArr.Where(m => m.downloaded && m.movieFile != null && m.movieFile.mediaInfo != null).OrderBy(m => m.title).ToHashSet(), new(0, 1, 0));
+                        ServiceResult<HashSet<Movie>> getMoviesResult = new(true, moviesArr.Where(m => m.downloaded && m.movieFile != null && m.movieFile.mediaInfo != null).OrderBy(m => m.title).ToHashSet(), new(0, 1, 0));
+
+                        if (applicationService.LoadMediaInfoOnFilters)
+                        {
+                            _ = Task.Run(async () =>
+                            {
+                                foreach (var movie in getMoviesResult.Results)
+                                {
+                                    movie.MediaInfo = await fFmpegManager.GetMediaInfoAsync(Path.Combine(movie.path, movie.movieFile.relativePath));
+                                    OnUpdate?.Invoke(this, null);
+                                }
+                            });
+                        }
+
                         logger.LogDebug($"Success.");
-                        return cachedGetMoviesResult;
+                        return getMoviesResult;
                     }
                 }
                 catch (Exception ex)

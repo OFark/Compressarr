@@ -6,7 +6,7 @@ using Compressarr.JobProcessing;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Pages.Services;
 using Compressarr.Services;
-using Compressarr.Settings;
+using Compressarr.Application;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -14,6 +14,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using MudBlazor.Services;
 using System.Collections.Generic;
+using Compressarr.Settings;
+using Compressarr.Application.Interfaces;
 
 namespace Compressarr
 {
@@ -33,24 +35,33 @@ namespace Compressarr
             services.AddRazorPages();
             services.AddServerSideBlazor();
 
+            services.Configure<AppSettings>(options => Configuration.GetSection("Settings").Bind(options));
             services.Configure<APIServiceSettings>(options => Configuration.GetSection("Services").Bind(options));
             services.Configure<HashSet<Filter>>(options => Configuration.GetSection("Filters").Bind(options));
-            services.Configure<HashSet<FFmpegPreset>>(options => Configuration.GetSection("Presets").Bind(options));
+            services.Configure<HashSet<FFmpegPreset>>(options =>
+            {
+                foreach(var op in options)
+                {
+                    op.AudioStreamPresets.Clear();
+                }
+                Configuration.GetSection("Presets").Bind(options);
+            });
             services.Configure<HashSet<Job>>(options => Configuration.GetSection("Jobs").Bind(options));
 
 
-            services.AddSingleton<ISettingsManager, SettingsManager>();
-            services.AddSingleton<IFFmpegInitialiser, FFmpegInitialiser>();
+            services.AddSingleton<IApplicationService, ApplicationService>();
+            services.AddSingleton<IStartupTask, ApplicationInitialiser>();
             services.AddSingleton<IProcessManager, ProcessManager>();
 
             services.AddScoped<ILayoutService, LayoutService>();
-            
+
             services.AddTransient<IFFmpegManager, FFmpegManager>();
             services.AddTransient<IFilterManager, FilterManager>();
             services.AddTransient<IJobManager, JobManager>();
             services.AddTransient<IRadarrService, RadarrService>();
             services.AddTransient<ISonarrService, SonarrService>();
 
+            services.AddTransient<IFileService, FileService>();
 
             services.AddMudServices();
         }
@@ -70,8 +81,8 @@ namespace Compressarr
                 app.UseHsts();
             }
 
-            
-            app.UseMiddleware<AsyncInitializationMiddleware>();
+
+            //app.UseMiddleware<AsyncInitializationMiddleware>();
 
             //app.UseHttpsRedirection();
             app.UseStaticFiles();

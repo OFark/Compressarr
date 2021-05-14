@@ -17,7 +17,7 @@ namespace Compressarr.Filtering
         List<FilterProperty> RadarrTableColumns { get; }
 
         Task AddFilter(List<DynamicLinqFilter> dlFilters, string filterName, MediaSource filterType);
-        string ConstructFilterQuery(List<DynamicLinqFilter> dlFilters, out string[] vals);
+        string ConstructFilterQuery(List<DynamicLinqFilter> dlFilters, out List<string> vals);
         Task DeleteFilter(string filterName);
         List<FilterComparitor> GetComparitors(FilterProperty property);
         Filter GetFilter(string filterName);

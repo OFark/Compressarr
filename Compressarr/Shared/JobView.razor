@@ -4,6 +4,9 @@
 @using Compressarr.Pages.Services;
 @using Compressarr.Helpers;
 
+@implements IDisposable
+
+@inject IApplicationService applicationService
 @inject IFFmpegManager fFmpegManager
 @inject IFilterManager filterManager
 @inject IJobManager jobManager
@@ -29,7 +32,7 @@
                     <MudAvatar Image="@FilterImageSrc" Style="vertical-align: middle;" Class="mr-3" />
                 }
             }
-            @(NewJob ? "New Job" : $"{@job.FilterName} | {@job.Preset} - {@job.BaseFolder} {@job.WriteFolder}")
+            @(NewJob ? "New Job" : $"{@job.FilterName} | {@job.Preset} => {@job.DestinationFolder}")
             @if (!NewJob)
             {
                 <MudChip Color="@buttonColour">@buttonText</MudChip>
@@ -71,8 +74,7 @@
                                         <MudSelectItem Value="@c.Name">@c.ToString()</MudSelectItem>
                                     }
                                 </MudSelect>
-                                <DirectoryLookup @bind-Folder="@job.BaseFolder" Label="Base Folder" />
-
+                                
                                 <DirectoryLookup @bind-Folder="@job.DestinationFolder" Label="Destination Folder" Required="true" />
 
                                 <MudCheckBox @bind-Checked="job.AutoImport" Label="Auto Import"></MudCheckBox>
@@ -90,6 +92,7 @@
                             {
                                 <MudTable Items="job.WorkLoad" Striped="true" Dense="true">
                                     <HeaderContent>
+                                        <MudTh></MudTh>
                                         <MudTh>Name</MudTh>
                                         <MudTh>Percent</MudTh>
                                         <MudTh>Frame</MudTh>
@@ -105,6 +108,16 @@
                                         <MudTh>Compression</MudTh>
                                     </HeaderContent>
                                     <RowTemplate>
+                                        <MudTd>
+                                            @if (context.MediaInfo != null)
+                                                    {
+                                                <MudIconButton Size="Size.Small" Icon="@(context.ShowArgs ? Icons.Outlined.Cancel : Icons.Outlined.Info)" OnClick="@(() => context.ShowArgs = !context.ShowArgs)"></MudIconButton>
+                                                    }
+                                                    else
+                                                    {
+                                                <MudIcon Icon="@Icons.Outlined.Sync"></MudIcon>
+                                                    }
+                                        </MudTd>
                                         <MudTd DataLabel="Name">@context.SourceFileName</MudTd>
                                         <MudTd DataLabel="Percent"><MudText Align="Align.Center">@context.Percent.Adorn("%")</MudText></MudTd>
                                         <MudTd DataLabel="Frame"><MudText Align="Align.Center">@context.Frame</MudText></MudTd>
@@ -133,6 +146,23 @@
                                         <MudTd DataLabel="SSIM"><MudText Align="Align.Center">@context.SSIM.ToPercent().Adorn("%")</MudText></MudTd>
                                         <MudTd DataLabel="Compression"><MudText Align="Align.Center">@context.Compression.ToPercent().Adorn("%")</MudText></MudTd>
                                     </RowTemplate>
+                                    <ChildRowContent>
+                                        @if (context.ShowArgs)
+                                                {
+                                            <MudTr>
+                                                <td colspan="14">
+                                                    <MudPaper>
+                                                        <MudList Dense="true">
+                                                            @foreach (var arg in context.Arguments.Select(x => applicationService.InsertNamesIntoFFmpegPreviews ? string.Format(x, context.SourceFile, context.DestinationFile) : x))
+                                                            {
+                                                            <MudListItem>@arg</MudListItem>
+                                                            }
+                                                        </MudList>
+                                                    </MudPaper>
+                                                </td>
+                                            </MudTr>
+                                                }
+                                    </ChildRowContent>
                                     <PagerContent>
                                         <MudTablePager PageSizeOptions="new int[]{5, 10, 50, 100}" />
                                     </PagerContent>
@@ -318,6 +348,11 @@
     protected override void OnInitialized()
     {
         job.StatusUpdate += jobStatusUpdate;
+    }
+
+    void IDisposable.Dispose()
+    {
+        job.StatusUpdate -= jobStatusUpdate;
     }
 
     private void jobStatusUpdate(object caller, EventArgs args)

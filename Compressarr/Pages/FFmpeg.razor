@@ -1,10 +1,10 @@
 ﻿@page "/FFmpeg"
 
+@inject IApplicationService ApplicationService
 @inject IFFmpegManager FFmpegManager
-@inject IFFmpegInitialiser FFmpegInitialiser
 @inject ILayoutService LayoutService
 
-@if (FFmpegInitialiser.Ready)
+@if (appReady)
 {
     <MudExpansionPanels>
 
@@ -31,20 +31,17 @@ else
 
 @code {
 
-    private FFmpegPreset newPreset = new();
+    private FFmpegPreset newPreset = new(true);
 
-    //todo: option to keep current container
+    private bool appReady;
 
-    protected override void OnInitialized()
-    {
-        FFmpegInitialiser.OnReady += FFmpegInitialiser_OnReady;
-
-        base.OnInitialized();
-    }
-
+    
     protected async override Task OnInitializedAsync()
     {
         LayoutService.OnStateChanged += LayoutService_OnStateChanged;
+
+        await ApplicationService.Initialised.WaitAsync();
+        appReady = true;
 
         await base.OnInitializedAsync();
     }
@@ -61,6 +58,6 @@ else
 
     private void addPreset()
     {
-        newPreset = new();
+        newPreset = new(true);
     }
 }

@@ -3,7 +3,7 @@
 @using Microsoft.AspNetCore.Components.Authorization
 
 @inject Compressarr.Pages.Services.ILayoutService layoutService
-@inject IFFmpegInitialiser fFmpegIntialiser
+@inject IApplicationService ApplicationService
 @inject ISnackbar Snackbar
 
 <MudThemeProvider Theme="@MyCustomTheme" />
@@ -54,7 +54,7 @@
 
     protected override void OnInitialized()
     {
-        fFmpegIntialiser.OnBroadcast += (s, message) => Snackbar.Add(message);
+        ApplicationService.OnBroadcast += (s, message) => Snackbar.Add(message);
 
         base.OnInitialized();
     }

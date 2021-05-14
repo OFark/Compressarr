@@ -4,12 +4,14 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Xabe.FFmpeg;
 
 namespace Compressarr.JobProcessing.Models
 
 {
     public class WorkItem
     {
+        public IEnumerable<string> Arguments { get; set; }
         public string Bitrate { get; internal set; }
         public decimal? Compression { get; internal set; }
         public string DestinationFile { get; set; }
@@ -18,6 +20,7 @@ namespace Compressarr.JobProcessing.Models
         public bool Finished { get; internal set; } = false;
         public decimal? FPS { get; internal set; }
         public long? Frame { get; internal set; }
+        public IMediaInfo MediaInfo { get; set; }
         public string MovieName { get; set; }
         public string Name => MovieName ?? SourceFileName;
         public int? Percent { get; internal set; }
@@ -32,5 +35,6 @@ namespace Compressarr.JobProcessing.Models
         public decimal? SSIM { get; set; }
         public bool Success { get; internal set; } = false;
         public TimeSpan? TotalLength { get; internal set; }
+        public bool ShowArgs { get; set; }
     }
 }

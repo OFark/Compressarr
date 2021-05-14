@@ -1,5 +1,6 @@
 ﻿using Compressarr.FFmpegFactory;
 using Compressarr.FFmpegFactory.Models;
+using Compressarr.Filtering;
 using Compressarr.Filtering.Models;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -22,7 +23,6 @@ namespace Compressarr.JobProcessing.Models
         public Action<LogLevel, string> LogAction { get; set; }
 
         public bool AutoImport { get; set; }
-        public string BaseFolder { get; set; }
         [JsonIgnore]
         public bool Cancel { get; internal set; } = false;
 
@@ -58,8 +58,18 @@ namespace Compressarr.JobProcessing.Models
         [JsonIgnore]
         public HashSet<WorkItem> WorkLoad { get; internal set; }
 
-        [JsonIgnore]
-        public string WriteFolder => DestinationFolder ?? BaseFolder;
+        public bool SafeToInitialise => JobState switch
+        {
+            JobState.Finished => true,
+            JobState.Running => false,
+            JobState.New => true,
+            JobState.Initialising => false,
+            JobState.Testing => false,
+            JobState.TestedFail => true,
+            JobState.TestedOK => true,
+            JobState.Waiting => false,
+            _ => false
+        };
 
         public void Log(string message, LogLevel level)
         {

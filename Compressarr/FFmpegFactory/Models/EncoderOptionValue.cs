@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 namespace Compressarr.FFmpegFactory.Models
 {
 
-    public class CodecOptionValue : CodecOption
+    public class EncoderOptionValue : EncoderOption
     {
         public int? IntValue
         {

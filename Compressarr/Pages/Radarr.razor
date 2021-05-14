@@ -1,16 +1,28 @@
 ﻿@page "/radarr"
-@using Compressarr.Filtering;
-@using Compressarr.Filtering.Models;
-@using Compressarr.Helpers;
-@using Compressarr.Pages.Services;
 
-@inject Compressarr.Services.IRadarrService radarrService
+@inject IRadarrService radarrService
 @inject IFilterManager filterManager
-@inject IJobManager JobManager  
+@inject IJobManager JobManager
 @inject ILayoutService layoutService
 @inject IDialogService DialogService
+@inject IApplicationService applicationService
 
 <MudPaper id="divRadarr">
+    <MudGrid>
+        <MudItem xs="9"></MudItem>
+        <MudItem xs="3">
+            <MudToolBar>
+                <MudToolBarSpacer />
+                <MudButton StartIcon="@Icons.Outlined.MovieCreation" Color="Color.Secondary" Class="mt-6 mr-4" OnClick="@(() => radarrService.GetMoviesAsync(true))">Refresh</MudButton>
+                <MudSelect @bind-Value="filterSelected" Label="Filters" OffsetY="true" Immediate="true">
+                    @foreach (var filter in filterManager.GetFilters(MediaSource.Radarr))
+                    {
+                        <MudSelectItem Value="@filter.Name" />
+                    }
+                </MudSelect>
+            </MudToolBar>
+        </MudItem>
+    </MudGrid>
     @if (!string.IsNullOrWhiteSpace(AlertMessage))
     {
         <MudAlert Severity="Severity.Error">@AlertMessage</MudAlert>
@@ -80,7 +92,7 @@
                                         break;
                                     case FilterPropertyType.Number:
                                         {
-                                            <MudNumericField T="int" @bind-Value="filterIntValue" Placeholder="something" />
+                                            <MudNumericField T="decimal" @bind-Value="filterIntValue" Placeholder="something" />
                                         }
                                         break;
                                     case FilterPropertyType.Enum:
@@ -125,12 +137,7 @@
             </div>
         </MudItem>
         <MudItem sm="1">
-            <MudSelect @bind-Value="filterSelected" Label="Filters" OffsetY="true" Immediate="true">
-                @foreach (var filter in filterManager.GetFilters(MediaSource.Radarr))
-                {
-                    <MudSelectItem Value="@filter.Name" />
-                }
-            </MudSelect>
+
         </MudItem>
     </MudGrid>
     @if (dlFilters.Any())
@@ -148,14 +155,76 @@
     }
     <MudTable Items="movies" Dense="true" Striped="true" Hover="true" @ref="table">
         <HeaderContent>
+            @if (applicationService.LoadMediaInfoOnFilters)
+            {
+                <MudTh>Info</MudTh>
+            }
             @foreach (var p in filterManager.RadarrTableColumns)
             {
                 <MudTh title="@p.Key" @ondblclick="@(() => filterOn(p.FilterOn))">@p.Name</MudTh>
             }
         </HeaderContent>
         <RowTemplate>
-            <MovieView movie="@context" filterManager="filterManager" OnFilterBy="filterBy" />
+            <MovieView movie="@context" filterManager="filterManager" OnFilterBy="filterBy" OnUpdate="@(() => StateHasChanged())" />
         </RowTemplate>
+        <ChildRowContent>
+            @if (context.ShowInfo)
+            {
+                <MudTr>
+                    <td colspan="99">
+                        <MudCard>
+                            <MudBlazor.MudCardContent>
+                                <MudTreeView T="string" ExpandOnClick="true">
+                                    <MudTreeViewItem Value='@($"Duration: {@context.MediaInfo.Duration}")' />
+                                    <MudTreeViewItem Value='@($"Path: {@context.MediaInfo.Path}")' />
+                                    <MudTreeViewItem Value='@($"Size: {@context.MediaInfo.Size}")' />
+                                    <MudTreeViewItem Value="@($"Audio Streams: {context.MediaInfo.AudioStreams.Count()}")">
+                                        @foreach (var s in context.MediaInfo.AudioStreams)
+                                        {
+                                            <MudTreeViewItem Value='@($"Stream: {s.Index}")'>
+                                                <MudTreeViewItem Value='@($"Bitrate: {s.Bitrate}")' />
+                                                <MudTreeViewItem Value='@($"Channels: {s.Channels}")' />
+                                                <MudTreeViewItem Value='@($"Codec: {s.Codec}")' />
+                                                <MudTreeViewItem Value='@($"Default: {s.Default}")' />
+                                                <MudTreeViewItem Value='@($"Language: {s.Language}")' />
+                                                <MudTreeViewItem Value='@($"Sample Rate: {s.SampleRate}")' />
+                                            </MudTreeViewItem>
+                                        }
+                                    </MudTreeViewItem>
+                                    <MudTreeViewItem Value="@($"Video Streams: {context.MediaInfo.VideoStreams.Count()}")">
+                                        @foreach (var s in context.MediaInfo.VideoStreams)
+                                        {
+                                            <MudTreeViewItem Value='@($"Stream: {s.Index}")'>
+                                                <MudTreeViewItem Value='@($"Bitrate: {s.Bitrate}")' />
+                                                <MudTreeViewItem Value='@($"Codec: {s.Codec}")' />
+                                                <MudTreeViewItem Value='@($"Default: {s.Default}")' />
+                                                <MudTreeViewItem Value='@($"Framerate: {s.Framerate}")' />
+                                                <MudTreeViewItem Value='@($"Height: {s.Height}")' />
+                                                <MudTreeViewItem Value='@($"Width: {s.Width}")' />
+                                                <MudTreeViewItem Value='@($"Pixel Format: {s.PixelFormat}")' />
+                                                <MudTreeViewItem Value='@($"Ratio: {s.Ratio}")' />
+                                            </MudTreeViewItem>
+                                        }
+                                    </MudTreeViewItem>
+                                    <MudTreeViewItem Value="@($"Subtitle Streams: {context.MediaInfo.SubtitleStreams.Count()}")">
+                                        @foreach (var s in context.MediaInfo.SubtitleStreams)
+                                        {
+                                            <MudTreeViewItem Value='@($"Stream: {s.Index}")'>
+                                                <MudTreeViewItem Value='@($"Codec: {s.Codec}")' />
+                                                <MudTreeViewItem Value='@($"Default: {s.Default}")' />
+                                                <MudTreeViewItem Value='@($"Forced: {s.Forced}")' />
+                                                <MudTreeViewItem Value='@($"Language: {s.Language}")' />
+                                                <MudTreeViewItem Value='@($"Title: {s.Title}")' />
+                                            </MudTreeViewItem>
+                                        }
+                                    </MudTreeViewItem>
+                                </MudTreeView>
+                            </MudBlazor.MudCardContent>
+                        </MudCard>
+                    </td>
+                </MudTr>
+            }
+        </ChildRowContent>
         <PagerContent>
             <MudTablePager PageSizeOptions="new int[]{5, 10, 25, 50, 100}" />
         </PagerContent>
@@ -164,9 +233,6 @@
 
 @code {
     private IEnumerable<Compressarr.Services.Models.Movie> Movies { get; set; }
-    private int pageSize = 20;
-    private int pageNumber = 0;
-    private int pageCount = 0;
 
     private bool showSaveDialog = false;
     private bool showingMovies = false;
@@ -176,7 +242,7 @@
     private string AlertMessage = null;
 
     private string filter = "";
-    private string[] filterValues;
+    private List<string> filterValues;
 
     private string newFilterTextButton = "Add";
 
@@ -184,11 +250,11 @@
     private string filterComparitorStr = "==";
     private string filterValue;
 
-    private int filterIntValue
+    private decimal filterIntValue
     {
         get
         {
-            return int.TryParse(filterValue, out var x) ? x : 0;
+            return decimal.TryParse(filterValue, out var x) ? x : 0;
         }
         set
         {
@@ -212,7 +278,7 @@
             {
                 dlFilters = filter.Filters.ToList().Clone();
                 showSaveDialog = true;
-                LoadMovies();
+                filterUpdate();
             }
             else
             {
@@ -235,6 +301,8 @@
     protected override void OnInitialized()
     {
         dlFilters = new List<DynamicLinqFilter>();
+
+        radarrService.OnUpdate += RefreshMovies;
 
         base.OnInitialized();
     }
@@ -266,7 +334,7 @@
             dlFilters.Add(dlFilter);
             resetFilterInputs();
 
-            await LoadMovies();
+            filterUpdate();
         }
 
     }
@@ -275,7 +343,7 @@
     {
         dlFilters = new List<DynamicLinqFilter>();
         filterName = null;
-        await LoadMovies();
+        filterUpdate();
     }
 
     private void filterBy(KeyValuePair<string, object> filter)
@@ -316,11 +384,11 @@
             }
 
             resetFilterInputs();
-            await LoadMovies();
+            filterUpdate();
         }
     }
 
-    private async void deleteFilter(DynamicLinqFilter filter)
+    private void deleteFilter(DynamicLinqFilter filter)
     {
         if (dlFilters.Contains(filter))
         {
@@ -349,7 +417,7 @@
             }
         }
 
-        await LoadMovies();
+        filterUpdate();
     }
 
     private async void deleteSavedFilter()
@@ -380,6 +448,7 @@
         else
         {
             filterManager.AddFilter(dlFilters, filterName, MediaSource.Radarr);
+            JobManager.InitialiseJobs(filterManager.GetFilter(filterName));
         }
     }
 
@@ -388,55 +457,81 @@
         filterPropertyStr = "title";
         filterComparitorStr = "==";
         filterValue = null;
-
-        pageNumber = 0;
     }
 
     private async void filterUpdate()
     {
-        await LoadMovies();
+        if (dlFilters.Any())
+        {
+            filter = filterManager.ConstructFilterQuery(dlFilters, out filterValues);
+            var formatStr = System.Text.RegularExpressions.Regex.Replace(filter, @"@(\d)", "\"{$1}\"");
+            newFilterTextButton = "And";
+        }
+        else
+        {
+            filter = string.Empty;
+            filterValues = new();
+            newFilterTextButton = "Add";
+        }
+
+        radarrService.MovieFilter = filter;
+        radarrService.MovieFilterValues = filterValues;
+
+        movies = await radarrService.GetMoviesAsync();
+
+        StateHasChanged();
+    }
+
+    private async void RefreshMovies(object sender, EventArgs e)
+    {
+        movies = await radarrService.GetMoviesAsync();
+
+        InvokeAsync(() => StateHasChanged());
     }
 
     private async Task LoadMovies()
     {
-        pageSize = 20;
+
 
         using (layoutService.Working("Loading"))
         {
 
-            if (dlFilters.Any())
-            {
-                filter = filterManager.ConstructFilterQuery(dlFilters, out filterValues);
-                var formatStr = System.Text.RegularExpressions.Regex.Replace(filter, @"@(\d)", "\"{$1}\"");
-                filterStr = string.Format(formatStr, filterValues);
-                newFilterTextButton = "And";
-            }
-            else
-            {
-                filter = string.Empty;
-                newFilterTextButton = "Add";
-            }
+            //if (dlFilters.Any())
+            //{
+            //    filter = filterManager.ConstructFilterQuery(dlFilters, out filterValues);
+            //    var formatStr = System.Text.RegularExpressions.Regex.Replace(filter, @"@(\d)", "\"{$1}\"");
+            //    filterStr = string.Format(formatStr, filterValues);
+            //    newFilterTextButton = "And";
+            //}
+            //else
+            //{
+            //    filter = string.Empty;
+            //    newFilterTextButton = "Add";
+            //}
 
-            Compressarr.Services.Models.ServiceResult<HashSet<Compressarr.Services.Models.Movie>> _result;
+            //Compressarr.Services.Models.ServiceResult<HashSet<Compressarr.Services.Models.Movie>> _result;
 
 
-            if (string.IsNullOrWhiteSpace(filter))
-            {
-                _result = await radarrService.GetMoviesAsync();
-            }
-            else
-            {
-                _result = await radarrService.GetMoviesFilteredAsync(filter, filterValues);
-            }
+            //if (string.IsNullOrWhiteSpace(filter))
+            //{
+            //    _result = await radarrService.GetMoviesAsync();
+            //}
+            //else
+            //{
+            //    _result = await radarrService.GetMoviesFilteredAsync(filter, filterValues);
+            //}
 
-            if (_result.Success)
-            {
-                movies = _result.Results;
-            }
-            else
-            {
-                AlertMessage = _result.ErrorString;
-            }
+            //if (_result.Success)
+            //{
+            //    movies = _result.Results;
+            //}
+            //else
+            //{
+            //    AlertMessage = _result.ErrorString;
+            //}
+
+            movies = await radarrService.GetMoviesAsync();
+
             StateHasChanged();
         }
     }

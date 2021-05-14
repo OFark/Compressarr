@@ -6,7 +6,7 @@ using Compressarr.Helpers;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Services;
 using Compressarr.Services.Models;
-using Compressarr.Settings;
+using Compressarr.Application;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
@@ -17,33 +17,33 @@ using System.Threading.Tasks;
 
 namespace Compressarr.JobProcessing
 {
-    public class JobManager : FFmpegReliant, IJobManager
+    public class JobManager : IJobManager
     {
+        private readonly IApplicationService applicationService;
         private readonly IFFmpegManager fFmpegManager;
+        private readonly IFileService fileService;
         private readonly IFilterManager filterManager;
         private readonly ILogger<JobManager> logger;
-        private readonly IOptionsMonitor<HashSet<Job>> jobsSnapshot;
+        private readonly IOptionsMonitor<HashSet<Job>> jobsMonitor;
         private readonly IProcessManager processManager;
         private readonly IRadarrService radarrService;
-        private readonly ISettingsManager settingsManager;
         private readonly ISonarrService sonarrService;
 
 
-        public JobManager(IFFmpegInitialiser fFmpegInitialiser, IFFmpegManager fFmpegManager, IFilterManager filterManager, ISettingsManager settingsManager, ILogger<JobManager> logger, IOptionsMonitor<HashSet<Job>> jobsMonitor, IProcessManager processManager, IRadarrService radarrService, ISonarrService sonarrService)
+        public JobManager(IFFmpegManager fFmpegManager, IFileService fileService, IFilterManager filterManager, IApplicationService applicationService, ILogger<JobManager> logger, IOptionsMonitor<HashSet<Job>> jobsMonitor, IProcessManager processManager, IRadarrService radarrService, ISonarrService sonarrService)
         {
+            this.applicationService = applicationService;
             this.fFmpegManager = fFmpegManager;
+            this.fileService = fileService;
             this.filterManager = filterManager;
-            this.jobsSnapshot = jobsMonitor;
+            this.jobsMonitor = jobsMonitor;
             this.logger = logger;
             this.processManager = processManager;
             this.radarrService = radarrService;
-            this.settingsManager = settingsManager;
             this.sonarrService = sonarrService;
-
-            WhenReady(fFmpegInitialiser, InitialiseJobs);
         }
 
-        public HashSet<Job> Jobs => settingsManager.Jobs;
+        public HashSet<Job> Jobs => applicationService.Jobs;
 
         public async Task<bool> AddJobAsync(Job newJob)
         {
@@ -67,7 +67,7 @@ namespace Compressarr.JobProcessing
                         Jobs.Add(newJob);
                     }
 
-                    _ = settingsManager.SaveAppSetting();
+                    _ = applicationService.SaveAppSetting();
                     return true;
                 }
                 return false;
@@ -108,7 +108,7 @@ namespace Compressarr.JobProcessing
                 }
 
                 job = null;
-                return settingsManager.SaveAppSetting();
+                return applicationService.SaveAppSetting();
             }
         }
 
@@ -130,30 +130,16 @@ namespace Compressarr.JobProcessing
                     }
 
                     var movies = getMoviesResult.Results;
-                    var paths = movies.Select(x => new { x.id, Path = $"{job.BaseFolder}{Path.Combine(x.path, x.movieFile.relativePath)}" }).ToList();
+                    var files = movies.Select(x => new { x.id, x.MediaInfo, Path = $"{applicationService.RadarrSettings.BasePath}{Path.Combine(x.path, x.movieFile.relativePath)}" }).ToList();
 
-                    return new ServiceResult<HashSet<WorkItem>>(true, paths.Select(p => new WorkItem() { Source = job.Filter.MediaSource, SourceID = p.id, SourceFile = p.Path }).ToHashSet());
+                    return new ServiceResult<HashSet<WorkItem>>(true, files.Select(p => new WorkItem() { MediaInfo = p.MediaInfo, Source = job.Filter.MediaSource, SourceID = p.id, SourceFile = p.Path }).ToHashSet());
                 }
 
                 logger.LogWarning($"Source ({job.Filter.MediaSource}) is not supported");
                 return new ServiceResult<HashSet<WorkItem>>(false, "404", "Not Implemented");
             }
         }
-
-        public void InitialiseJobs()
-        {
-            using (logger.BeginScope("Initialising Jobs"))
-            {
-                if (Jobs != null)
-                {
-                    foreach (var job in Jobs.Where(j => !j.Initialised))
-                    {
-                        _ = InitialiseJob(job);
-                    }
-                }
-            }
-        }
-
+        
         public async Task InitialiseJob(Job job, bool force = false)
         {
             using (logger.BeginScope("Initialise Job: {job}", job))
@@ -177,7 +163,7 @@ namespace Compressarr.JobProcessing
 
                     if (job.Preset != null)
                     {
-                        job.Preset.ContainerExtension = fFmpegManager.ConvertContainerToExtension(job.Preset.Container);
+                        job.Preset.ContainerExtension = await fFmpegManager.ConvertContainerToExtension(job.Preset.Container);
                         logger.LogDebug($"Container Extension set to {job.Preset.ContainerExtension}");
                         job.UpdateState(JobState.Testing);
                         job.Cancel = false;
@@ -190,7 +176,7 @@ namespace Compressarr.JobProcessing
                             //var radarrURL = settingsManager.Settings[SettingType.RadarrURL];
                             //var radarrAPIKey =settingsManager.Settings[SettingType.RadarrAPIKey];
 
-                            var systemStatus = await radarrService.TestConnection(settingsManager.RadarrSettings);
+                            var systemStatus = await radarrService.TestConnection(applicationService.RadarrSettings);
 
                             if (!systemStatus.Success)
                             {
@@ -222,6 +208,13 @@ namespace Compressarr.JobProcessing
                                     Fail(job);
                                     return;
                                 }
+
+                                if(wi.MediaInfo == null || force)
+                                {
+                                    wi.MediaInfo = await fFmpegManager.GetMediaInfoAsync(wi.SourceFile);
+                                }
+
+                                wi.Arguments = fFmpegManager.GetArguments(job.Preset, wi.MediaInfo);
 
                                 var destinationpath = job.DestinationFolder;
 
@@ -257,11 +250,11 @@ namespace Compressarr.JobProcessing
 
                             Log(job, LogLevel.Debug, "Workload complied", "Checking Destination Folder", "Writing Test.txt file");
 
-                            var testFilePath = Path.Combine(job.WriteFolder, "Test.txt");
+                            var testFilePath = Path.Combine(job.DestinationFolder, "Test.txt");
 
                             try
                             {
-                                await settingsManager.WriteTextFileAsync(testFilePath, "This is a write test");
+                                await fileService.WriteTextFileAsync(testFilePath, "This is a write test");
 
                                 //todo FileManager this 
                                 File.Delete(testFilePath);
@@ -287,6 +280,30 @@ namespace Compressarr.JobProcessing
             }
         }
 
+        public void InitialiseJobs(Filter filter)
+        {
+            foreach(var job in Jobs.Where(j => j.SafeToInitialise && j.Filter == filter))
+            {
+                _ = InitialiseJob(job, true);
+            }
+        }
+
+        public void InitialiseJobs(MediaSource source)
+        {
+            foreach (var job in Jobs.Where(j => j.SafeToInitialise && j.Filter.MediaSource == source))
+            {
+                _ = InitialiseJob(job, true);
+            }
+        }
+
+        public void InitialiseJobs(FFmpegPreset preset)
+        {
+            foreach (var job in Jobs.Where(j => j.SafeToInitialise && j.Preset == preset))
+            {
+                _ = InitialiseJob(job, true);
+            }
+        }
+
         public bool FilterInUse(string filterName)
         {
             return Jobs.Any(j => j.FilterName == filterName);
@@ -303,7 +320,7 @@ namespace Compressarr.JobProcessing
             {
                 logger.LogInformation($"Job ID: {job.ID}");
 
-                var fileJobs = jobsSnapshot?.CurrentValue;
+                var fileJobs = jobsMonitor?.CurrentValue;
 
                 var fileJob = fileJobs?.FirstOrDefault(j => j.ID == job.ID);
 

@@ -1,4 +1,5 @@
 ﻿using Compressarr.FFmpegFactory.Models;
+using Compressarr.Filtering.Models;
 using Compressarr.JobProcessing;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Services.Base;
@@ -11,15 +12,22 @@ namespace Compressarr.FFmpegFactory
     public interface IFFmpegManager : IJobDependency
     {
         SortedSet<Codec> AudioCodecs { get; }
+        SortedSet<Encoder> AudioEncoders { get; }
         SortedDictionary<string, string> Containers { get; }
+        Dictionary<string, string> LanguageCodes { get; }
+        List<FilterComparitor> NumberComparitors { get; }
         HashSet<FFmpegPreset> Presets { get; }
         SortedSet<Codec> SubtitleCodecs { get; }
+        SortedSet<Encoder> SubtitleEncoders { get; }
         SortedSet<Codec> VideoCodecs { get; }
+        SortedSet<Encoder> VideoEncoders { get; }
+        List<string> AudioBitrates { get; }
+
         Task AddPresetAsync(FFmpegPreset newPreset);
         Task<WorkItemCheckResult> CheckResult(Job job);
-        string ConvertContainerToExtension(string container);
+        Task<string> ConvertContainerToExtension(string container);
         Task DeletePresetAsync(FFmpegPreset preset);
-        Codec GetCodec(CodecType type, string name);
+        List<string> GetArguments(FFmpegPreset preset, IMediaInfo mediaInfo);
         Task<IMediaInfo> GetMediaInfoAsync(string filepath);
         FFmpegPreset GetPreset(string presetName);
     }

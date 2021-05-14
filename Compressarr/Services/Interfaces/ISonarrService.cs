@@ -1,7 +1,8 @@
 ﻿using Compressarr.Services.Base;
 using Compressarr.Services.Models;
-using Compressarr.Settings;
+using Compressarr.Application;
 using System.Threading.Tasks;
+using Compressarr.Settings;
 
 namespace Compressarr.Services
 {

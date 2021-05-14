@@ -22,10 +22,12 @@ namespace Compressarr.JobProcessing
         private readonly Regex progressReg = new(@"frame=\s*(\d*)\sfps=\s*([\d\.]*)\sq=\s*(-?[\d\.]*)\ssize=\s*([^\s]*)\stime=\s*([\d:\.]*)\sbitrate=\s*([^\s]*)\sspeed=\s*([\d.]*x)\s*");
         private readonly Regex ssimReg = new(@"\[Parsed_ssim_4\s@\s\w*\]\sSSIM\sY\:\d\.\d*\s\([inf\d\.]*\)\sU\:\d\.\d*\s\([inf\d\.]*\)\sV\:\d\.\d*\s\([inf\d\.]*\)\sAll\:(\d\.\d*)\s\([inf\d\.]*\)");
 
-        private ILogger<ProcessManager> logger;
+        private readonly IFFmpegManager ffmpegManager;
+        private readonly ILogger<ProcessManager> logger;
 
-        public ProcessManager(ILogger<ProcessManager> logger)
+        public ProcessManager(ILogger<ProcessManager> logger, IFFmpegManager ffmpegManager)
         {
+            this.ffmpegManager = ffmpegManager;
             this.logger = logger;
         }
 
@@ -54,7 +56,7 @@ namespace Compressarr.JobProcessing
                         job.Process.WorkItem.Running = true;
                         logger.LogDebug("FFmpeg process work item starting.");
 
-                        foreach (var arg in job.Preset.Arguments)
+                        foreach (var arg in job.Process.WorkItem.Arguments)
                         {
                             if (job.Process.cont)
                             {

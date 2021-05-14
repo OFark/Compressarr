@@ -1,9 +1,25 @@
 ﻿namespace Compressarr.FFmpegFactory
 {
-    public enum FFmpegStatus
+    public enum AudioStreamAction
     {
-        Initialising,
-        Ready
+        Copy,
+        Encode,
+        Delete
+    }
+    public enum AudioStreamRule
+    {
+        Any,
+        Codec,
+        Channels,
+        Language
+    }
+
+    public enum CodecOptionType
+    {
+        Number,
+        Range,
+        Select,
+        String
     }
 
     public enum CodecType
@@ -13,28 +29,11 @@
         Video
     }
 
-    public enum CodecOptionType
+    public enum FFmpegStatus
     {
-        Number,
-        Range,
-        Select, 
-        String
+        Initialising,
+        Ready
     }
-
-    public enum h26xPreset
-    {
-        ultrafast,
-        superfast,
-        veryfast,
-        faster,
-        fast,
-        medium,
-        slow,
-        slower,
-        veryslow,
-        placebo
-    }
-
     public enum h264tune
     {
         animation,
@@ -51,5 +50,19 @@
         fastdecode,
         grain,
         zerolatency
+    }
+
+    public enum h26xPreset
+    {
+        ultrafast,
+        superfast,
+        veryfast,
+        faster,
+        fast,
+        medium,
+        slow,
+        slower,
+        veryslow,
+        placebo
     }
 }

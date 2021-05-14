@@ -3,6 +3,7 @@ using Compressarr.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using Xabe.FFmpeg;
 
 namespace Compressarr.Services.Models
 {
@@ -63,7 +64,7 @@ namespace Compressarr.Services.Models
         public string audioChannelPositionsText { get; set; }
 
         [Filter("Audio - Channels", FilterPropertyType.Number)]
-        public int audioChannels { get; set; }
+        public int audioChannelsContainer { get; set; }
 
         [Filter("Audio - Codec ID", FilterPropertyType.Enum)]
         public string audioCodecID { get; set; }
@@ -273,6 +274,10 @@ namespace Compressarr.Services.Models
 
         [Filter("YouTube Trailer ID")]
         public string youTubeTrailerId { get; set; }
+
+        public IMediaInfo MediaInfo { get; set; }
+
+        public bool ShowInfo { get; set; }
     }
 
     public class MovieFile

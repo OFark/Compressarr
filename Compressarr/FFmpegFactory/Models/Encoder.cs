@@ -6,28 +6,39 @@ using System.Threading.Tasks;
 
 namespace Compressarr.FFmpegFactory.Models
 {
-    public class Codec : IComparable<Codec>
+    public class Encoder : IComparable<Encoder>
     {
-        public Codec(string name, string description, bool decoder, bool encoder)
+        public Encoder(string name, string description, HashSet<EncoderOption> options)
         {
             Name = name;
             Description = description;
-            Decoder = decoder;
-            Encoder = encoder;
+            Options = options;
         }
 
-        public bool Decoder { get; set; }
+        public Encoder()
+        {
+            Name = "copy";
+            Description = "No change";
+            Options = null;
+            IsCopy = true;
+        }
+
+
+        [JsonIgnore]
         public string Description { get; set; }
-        public bool Encoder { get; set; }
 
+        [JsonIgnore]
+        public bool IsCopy { get; private set; }
         public string Name { get; set; }
+        [JsonIgnore]
+        public HashSet<EncoderOption> Options { get; set; }
 
-        public int CompareTo(Codec other)
+        public int CompareTo(Encoder other)
         {
             return Name.CompareTo(other.Name);
         }
 
-        public bool Equals(Codec other)
+        public bool Equals(Encoder other)
         {
             if (other == null) return false;
             return Name == other.Name;

@@ -10,15 +10,9 @@ namespace Compressarr.Helpers
 {
     public static class ExtensionMethods
     {
-
         public static string Adorn(this object text, string adornment)
         {
             return string.IsNullOrWhiteSpace(text?.ToString()) ? string.Empty : $"{text}{adornment}";
-        }
-
-        public static string ToPercent(this decimal? percent, int decimals = 0)
-        {
-            return percent.HasValue ? Math.Round(percent.Value * 100, decimals).ToString() : null;
         }
 
         /// <summary>
@@ -55,6 +49,16 @@ namespace Compressarr.Helpers
             return JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(source), deserializeSettings);
         }
 
+        public static SortedSet<Codec> Decoders(this SortedSet<Codec> codecs)
+        {
+            return new SortedSet<Codec>(codecs.Where(x => x.Decoder));
+        }
+
+        public static SortedSet<Codec> Encoders(this SortedSet<Codec> codecs)
+        {
+            return new SortedSet<Codec>(codecs.Where(x => x.Encoder));
+        }
+
         public static string NullIfEmpty(this string text)
         {
             return string.IsNullOrWhiteSpace(text) ? null : text;
@@ -70,29 +74,35 @@ namespace Compressarr.Helpers
             return String.Format(new FileSizeFormatProvider(), "{0:br}", l);
         }
 
-        public static HashSet<CodecOptionValue> WithValues(this HashSet<CodecOption> codecOptions, HashSet<CodecOptionValue> values = null)
+        public static string ToFileSize(this long l)
         {
-            var covs = codecOptions.Select(x => x.Clone<CodecOptionValue>()).ToHashSet();
+            return String.Format(new FileSizeFormatProvider(), "{0:fs}", l);
+        }
+
+        public static string ToFileSize(this int l)
+        {
+            return String.Format(new FileSizeFormatProvider(), "{0:fs}", l);
+        }
+
+        public static string ToPercent(this decimal? percent, int decimals = 0)
+        {
+            return percent.HasValue ? Math.Round(percent.Value * 100, decimals).ToString() : null;
+        }
+        public static bool TryMatch(this Regex reg, string input, out Match match)
+        {
+            match = reg.Match(input);
+            return match.Success;
+        }
+
+        public static HashSet<EncoderOptionValue> WithValues(this HashSet<EncoderOption> codecOptions, HashSet<EncoderOptionValue> values = null)
+        {
+            var covs = codecOptions.Select(x => x.Clone<EncoderOptionValue>()).ToHashSet();
 
             foreach (var cov in covs)
             {
                 cov.Value = values?.FirstOrDefault(x => x.Name == cov.Name)?.Value;
             }
             return covs;
-        }
-
-        public static string ToFileSize(this long l)
-        {
-            return String.Format(new FileSizeFormatProvider(), "{0:fs}", l);
-        }
-        public static string ToFileSize(this int l)
-        {
-            return String.Format(new FileSizeFormatProvider(), "{0:fs}", l);
-        }
-        public static bool TryMatch(this Regex reg, string input, out Match match)
-        {
-            match = reg.Match(input);
-            return match.Success;
         }
     }
 }

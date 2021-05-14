@@ -2,7 +2,7 @@
 using Compressarr.Helpers;
 using Compressarr.Services.Base;
 using Compressarr.Services.Models;
-using Compressarr.Settings;
+using Compressarr.Application;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
@@ -17,8 +17,8 @@ namespace Compressarr.Filtering
     public class FilterManager : IFilterManager
     {
         private readonly ILogger<FilterManager> logger;
-        private readonly ISettingsManager settingsManager;
-        public FilterManager(ILogger<FilterManager> logger, ISettingsManager settingsManager)
+        private readonly IApplicationService settingsManager;
+        public FilterManager(ILogger<FilterManager> logger, IApplicationService settingsManager)
         {
             this.logger = logger;
             this.settingsManager = settingsManager;
@@ -92,12 +92,12 @@ namespace Compressarr.Filtering
             }
         }
 
-        public string ConstructFilterQuery(List<DynamicLinqFilter> dlFilters, out string[] vals)
+        public string ConstructFilterQuery(List<DynamicLinqFilter> dlFilters, out List<string> vals)
         {
             var filtervalues = new List<string>();
             var filterStr = recursiveFilterQuery(dlFilters, ref filtervalues);
 
-            vals = filtervalues.ToArray();
+            vals = filtervalues;
 
             return filterStr;
         }

@@ -1,17 +1,17 @@
-using Compressarr.Settings;
+using Compressarr.Application;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Threading.Tasks;
 
 namespace Compressarr
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public async static Task Main(string[] args)
         {
-            CreateHostBuilder(args).Build()
-                                       .Run();
+            await CreateHostBuilder(args).Build().RunWithTasksAsync();
         }
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>
@@ -21,7 +21,8 @@ namespace Compressarr
                 {
                     if (AppEnvironment.InDocker)
                     {
-                        configBuilder.AddJsonFile(SettingsManager.GetAppFilePath(AppFile.appsettings), true, true);
+                        var fs = new FileService(null, null);
+                        configBuilder.AddJsonFile(fs.GetAppFilePath(AppFile.appsettings), true, true);
                     }
                 })
                 .ConfigureWebHostDefaults(webBuilder =>

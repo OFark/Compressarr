@@ -1,7 +1,7 @@
 ﻿@using System.IO;
 @using Compressarr.Shared.Models
 
-<MudAutocomplete T="DirectorySuggestion" Required="@Required" Label="@Label" @bind-Value="_folder" ResetValueOnEmptyText="true" SearchFunc="dirInput">
+<MudAutocomplete T="DirectorySuggestion" Required="@Required" Label="@Label" @bind-Value="_folder" Immediate="true" SearchFunc="dirInput">
     <ItemTemplate Context="e">
         <MudText>@(e.Name)</MudText>
     </ItemTemplate>
@@ -24,17 +24,20 @@
         get => new DirectorySuggestion(Folder);
         set
         {
-            if (Folder == value?.Suggestion || value == null || string.IsNullOrEmpty(value.Suggestion)) return;
-
-
-            Folder = value.Suggestion;
-            FolderChanged.InvokeAsync(value.Suggestion);
+            Folder = value?.Suggestion;
+            FolderChanged.InvokeAsync(value?.Suggestion);
         }
     }
 
+    private void clearFolder()
+    {
+        Folder = null;
+        FolderChanged.InvokeAsync(null);
+    }
+
+    //This is required to enable two-way binding
     [Parameter]
     public EventCallback<string> FolderChanged { get; set; }
-
 
     private async Task<IEnumerable<DirectorySuggestion>> dirInput(string path)
     {
@@ -70,6 +73,11 @@
                 {
                     suggestions = new();
                 }
+            }
+            else
+            {
+                Folder = null;
+                FolderChanged.InvokeAsync(null);
             }
         });
 

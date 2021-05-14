@@ -1,12 +1,13 @@
 ﻿using Compressarr.Services.Base;
 using Compressarr.Services.Models;
-using Compressarr.Settings;
+using Compressarr.Application;
 using Microsoft.AspNetCore.Html;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Compressarr.Settings;
 
 namespace Compressarr.Services
 {
@@ -14,9 +15,9 @@ namespace Compressarr.Services
     {
 
         private readonly ILogger<SonarrService> logger;
-        private readonly ISettingsManager settingsManager;
+        private readonly IApplicationService settingsManager;
 
-        public SonarrService(ILogger<SonarrService> logger, ISettingsManager settingsManager)
+        public SonarrService(ILogger<SonarrService> logger, IApplicationService settingsManager)
         {
             this.logger = logger;
             this.settingsManager = settingsManager;

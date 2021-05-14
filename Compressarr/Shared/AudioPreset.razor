@@ -1,0 +1,82 @@
+﻿@inject IFFmpegManager FFmpegManager
+@inject ILayoutService LayoutService
+
+<MudCard Class="my-2">
+    <MudCardContent>
+        @foreach (var fil in AudioStreamPreset.Filters)
+        {
+            <AudioPresetFilter AudioStreamPresetFilter="fil" Filters="AudioStreamPreset.Filters" OnUpdate="Update" OnDelete="@(() => DeleteFilter(fil))" />
+
+        }
+        @if (AudioStreamPreset.Filters.Any() && AudioStreamPreset.Filters.Last().Rule != AudioStreamRule.Any)
+        {
+            <MudIconButton Icon="@Icons.Outlined.Add" OnClick="@(() => AudioStreamPreset.Filters.Add(new()) )" />
+        }
+        <MudGrid>
+            <MudItem sm="1">
+                <MudText Style="padding-top: 1.65em">
+                    Then
+                </MudText>
+            </MudItem>
+            <MudItem sm="3">
+                <MudSelect T="AudioStreamAction" @bind-Value="AudioStreamPreset.Action">
+                    @foreach (AudioStreamAction r in Enum.GetValues(typeof(AudioStreamAction)))
+                    {
+                        <MudSelectItem Value="r"></MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            @switch (AudioStreamPreset.Action)
+            {
+                case AudioStreamAction.Encode:
+                    {
+
+                        <MudItem sm="3">
+                            <MudSelect T="Encoder" @bind-Value="AudioStreamPreset.Encoder" Label="Encoder">
+                                @foreach (var ae in FFmpegManager.AudioEncoders)
+                                {
+                                    <MudSelectItem Value="ae" />
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem sm="5">
+                            <MudSelect T="string" @bind-Value="AudioStreamPreset.BitRate" Label="Bit Rate">
+                                <MudSelectItem Value="string.Empty">Auto</MudSelectItem>
+                                @foreach (var b in FFmpegManager.AudioBitrates)
+                                {
+                                    <MudSelectItem Value="b" />
+                                }
+                            </MudSelect>
+                        </MudItem>
+                    }
+                    break;
+            }
+        </MudGrid>
+
+    </MudCardContent>
+</MudCard>
+@code {
+
+    [Parameter]
+    public FFmpegAudioStreamPreset AudioStreamPreset { get; set; }
+
+    [Parameter]
+    public EventCallback OnUpdate { get; set; }
+
+    protected override void OnInitialized()
+    {
+        LayoutService.OnStateChanged += (o, e) => StateHasChanged();
+        base.OnInitialized();
+    }
+
+    private void DeleteFilter(FFmpegAudioStreamPresetFilter filter)
+    {
+        AudioStreamPreset.Filters.Remove(filter);
+        StateHasChanged();
+    }
+
+    private void Update()
+    {
+        OnUpdate.InvokeAsync();
+    }
+}

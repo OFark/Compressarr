@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Compressarr.FFmpegFactory.Models
 {
-    public class CodecOption
+    public class EncoderOption
     {
         public string Arg { get; set; }
         public bool DisabledByVideoBitRate { get; set; }
