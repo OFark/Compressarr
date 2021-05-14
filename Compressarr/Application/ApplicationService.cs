@@ -2,6 +2,7 @@
 using Compressarr.FFmpegFactory.Models;
 using Compressarr.Filtering.Models;
 using Compressarr.JobProcessing.Models;
+using Compressarr.Services.Models;
 using Compressarr.Settings;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -66,6 +67,7 @@ namespace Compressarr.Application
         public HashSet<FFmpegPreset> Presets { get; set; }
         public APISettings RadarrSettings { get; set; }
         public APISettings SonarrSettings { get; set; }
+        public IEnumerable<Movie> Movies { get; set; }
 
         //App Settings
         public bool LoadMediaInfoOnFilters { get; set; }

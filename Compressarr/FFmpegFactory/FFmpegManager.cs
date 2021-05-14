@@ -748,8 +748,6 @@ namespace Compressarr.FFmpegFactory
             var opArgsStr = string.IsNullOrWhiteSpace(preset.OptionalArguments) ? "" : $" {preset.OptionalArguments.Trim()}";
             var passStr = " -pass %passnum%";
 
-            var mapStr = "-map 0:s -map 0:v";
-
             var audioArguments = string.Empty;
 
             //If were treating all audio streams the same
@@ -766,6 +764,8 @@ namespace Compressarr.FFmpegFactory
             }
             else
             {
+                var i = 0; //for stream output tracking
+
                 foreach (var stream in mediaInfo.AudioStreams)
                 {
                     foreach (var audioPreset in preset.AudioStreamPresets)
@@ -785,9 +785,9 @@ namespace Compressarr.FFmpegFactory
                         {
                             audioArguments += audioPreset.Action switch
                             {
-                                AudioStreamAction.Copy => $" -map 0:{stream.Index} -c:{stream.Index} copy",
+                                AudioStreamAction.Copy => $" -map 0:{stream.Index} -c:a:{i++} copy",
                                 AudioStreamAction.Delete => "",
-                                AudioStreamAction.Encode => $" -map 0:{stream.Index} -c:{stream.Index} {audioPreset.Encoder.Name}{(string.IsNullOrWhiteSpace(audioPreset.BitRate) ? "" : " -b:a ")}{audioPreset.BitRate}",
+                                AudioStreamAction.Encode => $" -map 0:{stream.Index} -c:a:{i++} {audioPreset.Encoder.Name}{(string.IsNullOrWhiteSpace(audioPreset.BitRate) ? "" : $" -b:a:{i} ")}{audioPreset.BitRate}",
                                 _ => throw new System.NotImplementedException()
                             };
                             break;
@@ -808,12 +808,12 @@ namespace Compressarr.FFmpegFactory
 
                 var part1Ending = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "NUL" : @"/dev/null";
 
-                args.Add($"-y -i \"{{0}}\" {mapStr} - c:v {preset.VideoEncoder.Name}{preset.VideoCodecParams} -b:v {preset.VideoBitRate}k{frameRate}{passStr} -an -f null {part1Ending}".Replace("%passnum%", "1"));
-                args.Add($"-y -i \"{{0}}\" {mapStr} -c:v {preset.VideoEncoder.Name}{preset.VideoCodecParams} -b:v {preset.VideoBitRate}k{frameRate}{passStr}{audioArguments}{opArgsStr} \"{{1}}\"".Replace("%passnum%", "2"));
+                args.Add($"-y -i \"{{0}}\" -map 0:v -c:V {preset.VideoEncoder.Name}{preset.VideoCodecParams} -b:v {preset.VideoBitRate}k{frameRate}{passStr} -an -f null {part1Ending}".Replace("%passnum%", "1"));
+                args.Add($"-y -i \"{{0}}\" -map 0:v -c:V {preset.VideoEncoder.Name}{preset.VideoCodecParams} -b:v {preset.VideoBitRate}k{frameRate}{passStr}{opArgsStr}{audioArguments} -map 0:s -c:s copy \"{{1}}\"".Replace("%passnum%", "2"));
             }
             else
             {
-                args.Add($"-y -i \"{{0}}\" {mapStr} -c:v {preset.VideoEncoder.Name}{frameRate}{preset.VideoCodecParams}{audioArguments}{opArgsStr} \"{{1}}\"");
+                args.Add($"-y -i \"{{0}}\" -map 0:v -c:V {preset.VideoEncoder.Name}{frameRate}{preset.VideoCodecParams}{opArgsStr}{audioArguments} -map 0:s -c:s copy \"{{1}}\"");
             }
 
             return args;
@@ -826,7 +826,7 @@ namespace Compressarr.FFmpegFactory
 
             using (logger.BeginScope($"Getting MediaInfo"))
             {
-                logger.LogInformation("File Name: {filepath}");
+                logger.LogInformation($"File Name: {filepath}");
                 try
                 {
                     return await FFmpeg.GetMediaInfo(filepath);

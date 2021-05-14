@@ -288,7 +288,7 @@
     }
     private MudTable<Movie> table;
 
-    private HashSet<Movie> movies = new();
+    private IEnumerable<Movie> movies = new HashSet<Movie>();
 
     private FilterProperty FilterProperty => filterManager.RadarrFilterProperties.FirstOrDefault(x => x.Value == filterPropertyStr);
     private FilterComparitor FilterComparitor => filterManager.GetComparitors(FilterProperty).FirstOrDefault(x => x.Value == filterComparitorStr);
@@ -302,7 +302,7 @@
     {
         dlFilters = new List<DynamicLinqFilter>();
 
-        radarrService.OnUpdate += RefreshMovies;
+        radarrService.OnUpdate += (o,e) => InvokeAsync(() => StateHasChanged());
 
         base.OnInitialized();
     }
@@ -477,16 +477,24 @@
         radarrService.MovieFilter = filter;
         radarrService.MovieFilterValues = filterValues;
 
-        movies = await radarrService.GetMoviesAsync();
+        await RefreshMovies(this, null);
 
         StateHasChanged();
     }
 
-    private async void RefreshMovies(object sender, EventArgs e)
+    private async Task RefreshMovies(object sender, EventArgs e)
     {
-        movies = await radarrService.GetMoviesAsync();
+        var _result = await radarrService.GetMoviesAsync();
+        if (_result.Success)
+        {
+            movies = _result.Results;
+        }
+        else
+        {
+            AlertMessage = _result.ErrorString;
+        }
 
-        InvokeAsync(() => StateHasChanged());
+        _ = InvokeAsync(() => StateHasChanged());
     }
 
     private async Task LoadMovies()
@@ -495,42 +503,7 @@
 
         using (layoutService.Working("Loading"))
         {
-
-            //if (dlFilters.Any())
-            //{
-            //    filter = filterManager.ConstructFilterQuery(dlFilters, out filterValues);
-            //    var formatStr = System.Text.RegularExpressions.Regex.Replace(filter, @"@(\d)", "\"{$1}\"");
-            //    filterStr = string.Format(formatStr, filterValues);
-            //    newFilterTextButton = "And";
-            //}
-            //else
-            //{
-            //    filter = string.Empty;
-            //    newFilterTextButton = "Add";
-            //}
-
-            //Compressarr.Services.Models.ServiceResult<HashSet<Compressarr.Services.Models.Movie>> _result;
-
-
-            //if (string.IsNullOrWhiteSpace(filter))
-            //{
-            //    _result = await radarrService.GetMoviesAsync();
-            //}
-            //else
-            //{
-            //    _result = await radarrService.GetMoviesFilteredAsync(filter, filterValues);
-            //}
-
-            //if (_result.Success)
-            //{
-            //    movies = _result.Results;
-            //}
-            //else
-            //{
-            //    AlertMessage = _result.ErrorString;
-            //}
-
-            movies = await radarrService.GetMoviesAsync();
+            await RefreshMovies(this, null);
 
             StateHasChanged();
         }

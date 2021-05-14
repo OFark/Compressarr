@@ -3,6 +3,7 @@ using Compressarr.FFmpegFactory.Models;
 using Compressarr.Filtering.Models;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Services.Base;
+using Compressarr.Services.Models;
 using Compressarr.Settings;
 using Microsoft.Extensions.Logging;
 using Nito.AsyncEx;
@@ -30,6 +31,7 @@ namespace Compressarr.Application
         string FFmpegVersion { get; set; }
         bool LoadMediaInfoOnFilters { get; set; }
         bool InsertNamesIntoFFmpegPreviews { get; set; }
+        IEnumerable<Movie> Movies { get; set; }
 
         void Broadcast(string message);
         LogLevel GetLogLevel();

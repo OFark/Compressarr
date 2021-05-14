@@ -51,6 +51,7 @@
                     if (Directory.Exists(path))
                     {
                         suggestions = new DirectoryInfo(path).GetDirectories().Select(di => new DirectorySuggestion(di)).ToList();
+                        suggestions.Insert(0, new DirectorySuggestion(path));
                     }
                     else
                     {
@@ -81,7 +82,7 @@
             }
         });
 
-        return suggestions.OrderBy(x => x.Name);
+        return suggestions.OrderBy(x => x.Suggestion);
     }
 
 

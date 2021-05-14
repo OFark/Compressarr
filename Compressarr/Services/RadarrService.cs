@@ -16,6 +16,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Web;
 using Compressarr.Settings;
+using System.Threading;
 
 namespace Compressarr.Services
 {
@@ -28,9 +29,12 @@ namespace Compressarr.Services
         private readonly IApplicationService applicationService;
 
         private StatusResult _status = null;
-        
-        private HashSet<Movie> movies = new();
+
+        private IEnumerable<Movie> movies => applicationService.Movies;
+
         private int previousResultsHash;
+
+        private static SemaphoreSlim mediaInfoSemaphore = new(1, 1);
 
         public RadarrService(IFFmpegManager fFmpegManager, IFileService fileService, ILogger<RadarrService> logger, IApplicationService applicationService)
         {
@@ -40,64 +44,91 @@ namespace Compressarr.Services
             this.applicationService = applicationService;
         }
 
-        public event EventHandler OnUpdate;
+        public delegate Task AsyncEventHandler(object sender, EventArgs e);
+
+        public event AsyncEventHandler OnUpdate;
 
         public long MovieCount => movies?.Count() ?? 0;
         public string MovieFilter { get; set; }
         public IEnumerable<string> MovieFilterValues { get; set; }
         public void ClearCache()
         {
-            movies = new();
+            applicationService.Movies = new HashSet<Movie>();
         }
-        public async Task<HashSet<Movie>> GetMoviesAsync(bool force = false)
+        public async Task<ServiceResult<IEnumerable<Movie>>> GetMoviesAsync(bool force = false)
         {
             using (logger.BeginScope("Get Movies"))
             {
                 logger.LogInformation($"Fetching Movies");
 
-                if (!movies.Any() || force)
+                if (movies == null || !movies.Any() || force)
                 {
                     var moviesRequest = await RequestMovies();
                     if (moviesRequest.Success)
                     {
-                        movies = moviesRequest.Results;
+                        applicationService.Movies = moviesRequest.Results;
                     }
                     else
                     {
-                        return new();
+                        return moviesRequest;
                     }
                 }
 
+                
                 if (!string.IsNullOrWhiteSpace(MovieFilter))
                 {
                     logger.LogDebug("Filtering Movies");
                     logger.LogDebug($"Filter: {MovieFilter}");
                     logger.LogDebug($"Filter Values: {string.Join(", ", MovieFilterValues)}");
 
-                    return movies.AsQueryable().Where(MovieFilter, MovieFilterValues.ToArray()).ToHashSet();
+                    var results = movies.AsQueryable().Where(MovieFilter, MovieFilterValues.ToArray());
+
+                    LoadMediaInfo(results);
+
+                    return new(true, results);
                 }
 
-                return movies;
+                LoadMediaInfo(movies);
+
+                return new(true, movies);
             }
         }
 
-        public async Task<ServiceResult<HashSet<Movie>>> GetMoviesFilteredAsync(string filter, IEnumerable<string> filterValues)
+        private void LoadMediaInfo(IEnumerable<Movie> movies)
+        {
+            if (applicationService.LoadMediaInfoOnFilters)
+            {
+                _ = Task.Run(async () =>
+                {
+                    if (await mediaInfoSemaphore.WaitAsync(1000))
+                    {
+                        try
+                        {
+                            foreach (var movie in movies.Where(x => applicationService.LoadMediaInfoOnFilters && x.MediaInfo == null))
+                            {
+                                movie.MediaInfo = await fFmpegManager.GetMediaInfoAsync($"{applicationService.RadarrSettings.BasePath}{Path.Combine(movie.path, movie.movieFile.relativePath)}");
+                                await OnUpdate(this, null);
+                            }
+                        }
+                        finally
+                        {
+                            mediaInfoSemaphore.Release();
+                        }
+                    }
+                });
+            }
+        }
+
+        public async Task<ServiceResult<IEnumerable<Movie>>> GetMoviesFilteredAsync(string filter, IEnumerable<string> filterValues)
         {
             using (logger.BeginScope("Get Filtered Movies"))
             {
                 logger.LogDebug("Filtering Movies");
                 logger.LogDebug($"Filter: {filter}");
                 logger.LogDebug($"Filter Values: {string.Join(", ", filterValues)}");
-                var movies = await RequestMovies();
-
-                if (movies.Success)
-                {
-                    return new(true, movies.Results.AsQueryable().Where(filter, filterValues.ToArray()).ToHashSet());
-                }
-                else
-                {
-                    return movies;
-                }
+                MovieFilter = filter;
+                MovieFilterValues = filterValues;
+                return await GetMoviesAsync();
             }
         }
 
@@ -369,7 +400,7 @@ namespace Compressarr.Services
             }
         }
 
-        private async Task<ServiceResult<HashSet<Movie>>> RequestMovies()
+        private async Task<ServiceResult<IEnumerable<Movie>>> RequestMovies()
         {
             using (logger.BeginScope("Requesting Movies"))
             {
@@ -428,22 +459,9 @@ namespace Compressarr.Services
 
                         var moviesArr = JsonConvert.DeserializeObject<Movie[]>(movieJSON);
 
-                        ServiceResult<HashSet<Movie>> getMoviesResult = new(true, moviesArr.Where(m => m.downloaded && m.movieFile != null && m.movieFile.mediaInfo != null).OrderBy(m => m.title).ToHashSet(), new(0, 1, 0));
-
-                        if (applicationService.LoadMediaInfoOnFilters)
-                        {
-                            _ = Task.Run(async () =>
-                            {
-                                foreach (var movie in getMoviesResult.Results)
-                                {
-                                    movie.MediaInfo = await fFmpegManager.GetMediaInfoAsync(Path.Combine(movie.path, movie.movieFile.relativePath));
-                                    OnUpdate?.Invoke(this, null);
-                                }
-                            });
-                        }
-
                         logger.LogDebug($"Success.");
-                        return getMoviesResult;
+
+                        return new (true, moviesArr.Where(m => m.downloaded && m.movieFile != null && m.movieFile.mediaInfo != null).OrderBy(m => m.title).ToHashSet(), new(0, 1, 0));
                     }
                 }
                 catch (Exception ex)

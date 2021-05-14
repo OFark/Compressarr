@@ -58,6 +58,11 @@ namespace Compressarr.JobProcessing.Models
         [JsonIgnore]
         public HashSet<WorkItem> WorkLoad { get; internal set; }
 
+        public override string ToString()
+        {
+            return Name;
+        }
+
         public bool SafeToInitialise => JobState switch
         {
             JobState.Finished => true,

@@ -8,11 +8,11 @@
     <MudTd>
         @if (movie.MediaInfo != null)
         {
-            <MudIconButton Icon="@(movie.ShowInfo ? Icons.Outlined.Cancel : Icons.Outlined.Info)" OnClick="@(() => { movie.ShowInfo = !movie.ShowInfo; OnUpdate.InvokeAsync(); })"></MudIconButton>
+            <MudIconButton Size="Size.Small" Icon="@(movie.ShowInfo ? Icons.Outlined.Cancel : Icons.Outlined.Info)" OnClick="@(() => { movie.ShowInfo = !movie.ShowInfo; OnUpdate.InvokeAsync(); })"></MudIconButton>
         }
         else
         {
-            <MudIcon Icon="@Icons.Outlined.Sync"></MudIcon>
+            <MudIcon Size="Size.Small" Icon="@Icons.Outlined.Sync"></MudIcon>
         }
     </MudTd>
 }

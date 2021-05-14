@@ -5,7 +5,7 @@ using System.Threading;
 
 namespace Compressarr.Services.Models
 {
-    public class ServiceResult<T> where T : class, new()
+    public class ServiceResult<T> 
     {
         public bool Success { get; }
         public string ErrorCode { get; set; }
