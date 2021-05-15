@@ -756,9 +756,10 @@ namespace Compressarr.FFmpegFactory
                 var audioPreset = preset.AudioStreamPresets.First();
                 audioArguments = audioPreset.Action switch
                 {
-                    AudioStreamAction.Copy => " -map 0:a -c:a copy",
+                    AudioStreamAction.Copy => " -map 0:a? -c:a copy",
                     AudioStreamAction.Delete => "",
-                    AudioStreamAction.Encode => $" -map 0:a -c:a {audioPreset.Encoder.Name}{(string.IsNullOrWhiteSpace(audioPreset.BitRate) ? "" : " -b:a ")}{audioPreset.BitRate}",
+                    AudioStreamAction.DeleteUnlessOnly => " -map 0:a:0? -c:a copy",
+                    AudioStreamAction.Encode => $" -map 0:a? -c:a {audioPreset.Encoder.Name}{(string.IsNullOrWhiteSpace(audioPreset.BitRate) ? "" : " -b:a ")}{audioPreset.BitRate}",
                     _ => throw new System.NotImplementedException()
                 };
             }
@@ -787,6 +788,7 @@ namespace Compressarr.FFmpegFactory
                             {
                                 AudioStreamAction.Copy => $" -map 0:{stream.Index} -c:a:{i++} copy",
                                 AudioStreamAction.Delete => "",
+                                AudioStreamAction.DeleteUnlessOnly => preset.AudioStreamPresets.Last() == audioPreset && i == 0 ? $" -map 0:{stream.Index} -c:a:{i++} copy" : "",
                                 AudioStreamAction.Encode => $" -map 0:{stream.Index} -c:a:{i++} {audioPreset.Encoder.Name}{(string.IsNullOrWhiteSpace(audioPreset.BitRate) ? "" : $" -b:a:{i} ")}{audioPreset.BitRate}",
                                 _ => throw new System.NotImplementedException()
                             };

@@ -7,6 +7,7 @@ namespace Compressarr.Settings
 {
     public class AppSettings
     {
+        public bool AlwaysCalculateSSIM { get; set; }
         public bool LoadMediaInfoOnFilters { get; set; }
         public bool InsertNamesIntoFFmpegPreviews { get; set; }
 

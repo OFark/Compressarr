@@ -32,6 +32,7 @@ namespace Compressarr.Application
         bool LoadMediaInfoOnFilters { get; set; }
         bool InsertNamesIntoFFmpegPreviews { get; set; }
         IEnumerable<Movie> Movies { get; set; }
+        bool AlwaysCalculateSSIM { get; set; }
 
         void Broadcast(string message);
         LogLevel GetLogLevel();

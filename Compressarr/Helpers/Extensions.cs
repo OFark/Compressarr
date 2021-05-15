@@ -74,6 +74,10 @@ namespace Compressarr.Helpers
             return String.Format(new FileSizeFormatProvider(), "{0:br}", l);
         }
 
+        public static string ToCamelCaseSplit(this string text)
+        {
+            return Regex.Replace(text, "([A-Z])", " $1", RegexOptions.Compiled).Trim();
+        }
         public static string ToFileSize(this long l)
         {
             return String.Format(new FileSizeFormatProvider(), "{0:fs}", l);

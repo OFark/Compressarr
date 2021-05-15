@@ -34,6 +34,7 @@ namespace Compressarr.Application
             this.configuration = configuration;
             this.fileService = fileService;
 
+            AlwaysCalculateSSIM = appSettings?.Value?.AlwaysCalculateSSIM ?? false;
             LoadMediaInfoOnFilters = appSettings?.Value?.LoadMediaInfoOnFilters ?? false;
             InsertNamesIntoFFmpegPreviews = appSettings?.Value?.InsertNamesIntoFFmpegPreviews ?? false;
 
@@ -70,6 +71,7 @@ namespace Compressarr.Application
         public IEnumerable<Movie> Movies { get; set; }
 
         //App Settings
+        public bool AlwaysCalculateSSIM { get; set; }
         public bool LoadMediaInfoOnFilters { get; set; }
         public bool InsertNamesIntoFFmpegPreviews { get; set; }
 
@@ -96,6 +98,7 @@ namespace Compressarr.Application
                 jsonObj["Jobs"] = JToken.FromObject(Jobs);                
                 jsonObj["Settings"] = JToken.FromObject(new AppSettings()
                 {
+                    AlwaysCalculateSSIM = AlwaysCalculateSSIM,
                     InsertNamesIntoFFmpegPreviews = InsertNamesIntoFFmpegPreviews,
                     LoadMediaInfoOnFilters = LoadMediaInfoOnFilters
                 });

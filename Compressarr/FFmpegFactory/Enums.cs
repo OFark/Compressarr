@@ -4,7 +4,8 @@
     {
         Copy,
         Encode,
-        Delete
+        Delete,
+        DeleteUnlessOnly
     }
     public enum AudioStreamRule
     {

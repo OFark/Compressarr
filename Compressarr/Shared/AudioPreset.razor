@@ -22,7 +22,7 @@
                 <MudSelect T="AudioStreamAction" @bind-Value="AudioStreamPreset.Action">
                     @foreach (AudioStreamAction r in Enum.GetValues(typeof(AudioStreamAction)))
                     {
-                        <MudSelectItem Value="r"></MudSelectItem>
+                        <MudSelectItem Value="r">@r.ToString().ToCamelCaseSplit()</MudSelectItem>
                     }
                 </MudSelect>
             </MudItem>
