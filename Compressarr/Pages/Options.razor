@@ -152,7 +152,8 @@
                 <MudListItem>Application: @System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString()</MudListItem>
                 <MudListItem>Runtime: @Environment.Version.ToString()</MudListItem>
                 <MudListItem>FFmpeg: @applicationService.FFmpegVersion</MudListItem>
-                <MudListItem>OS: @Environment.OSVersion.VersionString</MudListItem>
+                <MudListItem>Docker: @(AppEnvironment.InDocker ? "Yes" : "No")</MudListItem>
+                <MudListItem>OS: @Environment.OSVersion.VersionString @(AppEnvironment.InNvidiaDocker ? "- Nvidia HW Support"</MudListItem>
                 <MudListItem>OS 64bit: @Environment.Is64BitOperatingSystem</MudListItem>
                 <MudListItem>App 64bit: @Environment.Is64BitProcess</MudListItem>
             </MudList>

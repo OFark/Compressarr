@@ -69,7 +69,6 @@ namespace Compressarr.FFmpegFactory
                             throw new FileNotFoundException("FFmpeg not found, download must have failed.");
                         }
 
-                        applicationService.FFmpegVersion = await GetFFmpegVersionAsync();
 
                         if (!ffmpegAlreadyExists)
                         {
@@ -96,6 +95,9 @@ namespace Compressarr.FFmpegFactory
                     {
                         Progress("Nvidia Docker, skipping FFMpeg download");
                     }
+
+                    applicationService.FFmpegVersion = await GetFFmpegVersionAsync();
+
 
                     var codecLoader = GetAvailableCodecsAsync();
                     var containerLoader = GetAvailableContainersAsync();
@@ -369,7 +371,20 @@ namespace Compressarr.FFmpegFactory
                     }
                     else
                     {
-                        logger.LogDebug($"Version file missing.");
+                        logger.LogDebug($"Version file missing. Trying manually");
+
+                        var result = await RunProcess(fileService.FFMPEGPath, "-version");
+
+                        if(result.Success)
+                        {
+                            var reg = new Regex(@"(?<=version\s)(.*)(?=\sCopy)");
+                            var match = reg.Match(result.StdOut);
+                            if (match != null)
+                            {
+                                return match.Value;
+                            }
+                        }
+
                     }
                 }
                 catch (UnauthorizedAccessException uae)
