@@ -48,19 +48,19 @@ namespace Compressarr.FFmpegFactory
 
                     Progress("Initialising FFmpeg");
 
-                    var ffmpegAlreadyExists = fileService.HasFile(fileService.FFMPEGPath);
-                    if (!ffmpegAlreadyExists)
-                    {
-                        Progress("Downloading FFmpeg");
-                    }
-                    else
-                    {
-                        existingVersion = await GetFFmpegVersionAsync();
-                        Progress("Checking for FFmpeg update");
-                    }
-
                     if (!AppEnvironment.InNvidiaDocker)
                     {
+                        var ffmpegAlreadyExists = fileService.HasFile(fileService.FFMPEGPath);
+                        if (!ffmpegAlreadyExists)
+                        {
+                            Progress("Downloading FFmpeg");
+                        }
+                        else
+                        {
+                            existingVersion = await GetFFmpegVersionAsync();
+                            Progress("Checking for FFmpeg update");
+                        }
+
                         await FFmpegDownloader.GetLatestVersion(FFmpegVersion.Official, fileService.GetAppDirPath(AppDir.FFmpeg), new Progress<ProgressInfo>(reportFFmpegProgress));
                         logger.LogDebug("FFmpeg latest version check finished.");
 
@@ -91,6 +91,10 @@ namespace Compressarr.FFmpegFactory
                                 await RunProcess("/bin/bash", $"-c \"chmod +x {exe}\"");
                             }
                         }
+                    }
+                    else
+                    {
+                        Progress("Nvidia Docker, skipping FFMpeg download");
                     }
 
                     var codecLoader = GetAvailableCodecsAsync();
