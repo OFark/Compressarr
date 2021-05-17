@@ -63,33 +63,33 @@ namespace Compressarr.FFmpegFactory
                     {
                         await FFmpegDownloader.GetLatestVersion(FFmpegVersion.Official, fileService.GetAppDirPath(AppDir.FFmpeg), new Progress<ProgressInfo>(reportFFmpegProgress));
                         logger.LogDebug("FFmpeg latest version check finished.");
-                    }
 
-                    if (!fileService.HasFile(fileService.FFMPEGPath))
-                    {
-                        throw new FileNotFoundException("FFmpeg not found, download must have failed.");
-                    }
-
-                    applicationService.FFmpegVersion = await GetFFmpegVersionAsync();
-
-                    if (!ffmpegAlreadyExists)
-                    {
-                        Progress("FFmpeg finished Downloading ");
-                    }
-                    else
-                    {
-                        if (existingVersion != applicationService.FFmpegVersion && applicationService.FFmpegVersion != null)
+                        if (!fileService.HasFile(fileService.FFMPEGPath))
                         {
-                            Progress($"FFmpeg updated to: {applicationService.FFmpegVersion}");
+                            throw new FileNotFoundException("FFmpeg not found, download must have failed.");
                         }
-                    }
 
-                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                    {
-                        logger.LogDebug("Running on Linux, CHMOD required");
-                        foreach (var exe in new string[] { fileService.FFMPEGPath, fileService.FFPROBEPath })
+                        applicationService.FFmpegVersion = await GetFFmpegVersionAsync();
+
+                        if (!ffmpegAlreadyExists)
                         {
-                            await RunProcess("/bin/bash", $"-c \"chmod +x {exe}\"");
+                            Progress("FFmpeg finished Downloading ");
+                        }
+                        else
+                        {
+                            if (existingVersion != applicationService.FFmpegVersion && applicationService.FFmpegVersion != null)
+                            {
+                                Progress($"FFmpeg updated to: {applicationService.FFmpegVersion}");
+                            }
+                        }
+
+                        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                        {
+                            logger.LogDebug("Running on Linux, CHMOD required");
+                            foreach (var exe in new string[] { fileService.FFMPEGPath, fileService.FFPROBEPath })
+                            {
+                                await RunProcess("/bin/bash", $"-c \"chmod +x {exe}\"");
+                            }
                         }
                     }
 
@@ -250,9 +250,10 @@ namespace Compressarr.FFmpegFactory
 
                 foreach (Match m in reg.Matches(result.StdOut))
                 {
-                    if(!string.IsNullOrWhiteSpace(m.Value)) { 
-                    hwdecoders.Add(m.Value.Trim());
-                        }
+                    if (!string.IsNullOrWhiteSpace(m.Value))
+                    {
+                        hwdecoders.Add(m.Value.Trim());
+                    }
                 }
 
                 return hwdecoders;
