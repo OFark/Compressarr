@@ -1,4 +1,5 @@
 ﻿using Compressarr.FFmpegFactory.Models;
+using Compressarr.Settings.FFmpegFactory;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -98,15 +99,28 @@ namespace Compressarr.Helpers
             return match.Success;
         }
 
-        public static HashSet<EncoderOptionValue> WithValues(this HashSet<EncoderOption> codecOptions, HashSet<EncoderOptionValue> values = null)
+        public static string Wrap(this string text, string format)
         {
-            var covs = codecOptions.Select(x => x.Clone<EncoderOptionValue>()).ToHashSet();
+            if (string.IsNullOrWhiteSpace(text)) return null;
+            return string.Format(format, text);
+        }
 
-            foreach (var cov in covs)
+        public static HashSet<EncoderOptionValue> WithValues(this HashSet<EncoderOption> encoderOptions, IEnumerable<EncoderOptionValueBase> values = null)
+        {
+            var eovs = new HashSet<EncoderOptionValue>();
+            foreach (var eo in encoderOptions)
             {
-                cov.Value = values?.FirstOrDefault(x => x.Name == cov.Name)?.Value;
+                var eov = new EncoderOptionValue(eo.Name);
+                var value = values?.FirstOrDefault(v => v.Name == eo.Name);
+                if (value != null)
+                {
+                    eov = new(value);
+                }
+                eov.EncoderOption = eo;
+
+                eovs.Add(eov);
             }
-            return covs;
+            return eovs;
         }
     }
 }

@@ -4,6 +4,7 @@ using Compressarr.Filtering.Models;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Services.Models;
 using Compressarr.Settings;
+using Compressarr.Settings.FFmpegFactory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -18,6 +19,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Xabe.FFmpeg;
 
 namespace Compressarr.Application
 {
@@ -27,9 +29,9 @@ namespace Compressarr.Application
         private readonly IConfiguration configuration;
         private readonly IFileService fileService;
         private readonly ILogger<ApplicationService> logger;
-        private SemaphoreSlim appSettingslock = new(1,1);
+        private readonly SemaphoreSlim appSettingslock = new(1, 1);
 
-        public ApplicationService(IConfiguration configuration, IFileService fileService, ILogger<ApplicationService> logger, IOptions<AppSettings> appSettings, IOptions<APIServiceSettings> apiServiceSettings, IOptions<HashSet<FFmpegPreset>> presets, IOptions<HashSet<Filter>> filters, IOptions<HashSet<Job>> jobs, IHostApplicationLifetime lifetime)
+        public ApplicationService(IConfiguration configuration, IFileService fileService, ILogger<ApplicationService> logger, IOptions<AppSettings> appSettings, IOptions<APIServiceSettings> apiServiceSettings, IOptions<HashSet<FFmpegPresetBase>> presets, IOptions<HashSet<Filter>> filters, IOptions<HashSet<Job>> jobs, IHostApplicationLifetime lifetime)
         {
             this.configuration = configuration;
             this.fileService = fileService;
@@ -40,7 +42,7 @@ namespace Compressarr.Application
 
             Filters = filters?.Value ?? new();
             Jobs = jobs?.Value ?? new();
-            Presets = presets?.Value ?? new();
+            Presets = presets?.Value.Select(p => new FFmpegPreset(p)).ToHashSet() ?? new();
             RadarrSettings = apiServiceSettings?.Value?.RadarrSettings ?? new();
             SonarrSettings = apiServiceSettings?.Value?.SonarrSettings ?? new();
 
@@ -52,7 +54,10 @@ namespace Compressarr.Application
             Initialised = new();
         }
 
-        public string State { get; set; } = "Started";
+        public Queue<string> StateHistory { get; set; } = new();
+        public string State { get; set; }
+
+        public double Progress { get; set; }
 
         public AsyncManualResetEvent FFMpegReady { get; }
         public AsyncManualResetEvent Initialised { get; }
@@ -63,6 +68,7 @@ namespace Compressarr.Application
         public Dictionary<CodecType, SortedSet<Codec>> Codecs { get; set; }
         public SortedDictionary<string, string> Containers { get; set; }
         public Dictionary<CodecType, SortedSet<Encoder>> Encoders { get; set; }
+        public SortedSet<string> HardwareDecoders { get; set; }
         public HashSet<Filter> Filters { get; set; }
         public HashSet<Job> Jobs { get; set; }
         public HashSet<FFmpegPreset> Presets { get; set; }
@@ -94,8 +100,8 @@ namespace Compressarr.Application
                 var serviceSettings = new APIServiceSettings() { RadarrSettings = RadarrSettings, SonarrSettings = SonarrSettings };
                 jsonObj["Services"] = JToken.FromObject(serviceSettings);
                 jsonObj["Filters"] = JToken.FromObject(Filters);
-                jsonObj["Presets"] = JToken.FromObject(Presets);
-                jsonObj["Jobs"] = JToken.FromObject(Jobs);                
+                jsonObj["Presets"] = JToken.FromObject(Presets.Select(x => new FFmpegPresetBase(x)));
+                jsonObj["Jobs"] = JToken.FromObject(Jobs);
                 jsonObj["Settings"] = JToken.FromObject(new AppSettings()
                 {
                     AlwaysCalculateSSIM = AlwaysCalculateSSIM,

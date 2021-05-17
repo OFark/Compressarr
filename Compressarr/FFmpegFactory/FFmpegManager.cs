@@ -12,6 +12,7 @@ using System.Linq.Dynamic.Core;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Xabe.FFmpeg;
+using Compressarr.Helpers;
 
 namespace Compressarr.FFmpegFactory
 {
@@ -750,6 +751,8 @@ namespace Compressarr.FFmpegFactory
 
             var audioArguments = string.Empty;
 
+            var hardwareDecoder = preset.HardwareDecoder.Wrap("-hwaccel {0} ");
+
             //If were treating all audio streams the same
             if (preset.AudioStreamPresets.First().CoversAny)
             {
@@ -802,7 +805,7 @@ namespace Compressarr.FFmpegFactory
             {
                 if (preset.VideoCodecOptions != null)
                 {
-                    if (preset.VideoCodecOptions.Any(vco => vco.IncludePass))
+                    if (preset.VideoCodecOptions.Any(vco => vco.EncoderOption.IncludePass))
                     {
                         passStr = string.Empty;
                     }
@@ -810,12 +813,12 @@ namespace Compressarr.FFmpegFactory
 
                 var part1Ending = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "NUL" : @"/dev/null";
 
-                args.Add($"-y -i \"{{0}}\" -map 0:v -c:V {preset.VideoEncoder.Name}{preset.VideoCodecParams} -b:v {preset.VideoBitRate}k{frameRate}{passStr} -an -f null {part1Ending}".Replace("%passnum%", "1"));
-                args.Add($"-y -i \"{{0}}\" -map 0:v -c:V {preset.VideoEncoder.Name}{preset.VideoCodecParams} -b:v {preset.VideoBitRate}k{frameRate}{passStr}{opArgsStr}{audioArguments} -map 0:s? -c:s copy \"{{1}}\"".Replace("%passnum%", "2"));
+                args.Add($"{hardwareDecoder}-y -i \"{{0}}\" -map 0:v -c:V {preset.VideoEncoder.Name}{preset.VideoCodecParams} -b:v {preset.VideoBitRate}k{frameRate}{passStr} -an -f null {part1Ending}".Replace("%passnum%", "1"));
+                args.Add($"{hardwareDecoder}-y -i \"{{0}}\" -map 0:v -c:V {preset.VideoEncoder.Name}{preset.VideoCodecParams} -b:v {preset.VideoBitRate}k{frameRate}{passStr}{opArgsStr}{audioArguments} -map 0:s? -c:s copy \"{{1}}\"".Replace("%passnum%", "2"));
             }
             else
             {
-                args.Add($"-y -i \"{{0}}\" -map 0:v -c:V {preset.VideoEncoder.Name}{frameRate}{preset.VideoCodecParams}{opArgsStr}{audioArguments} -map 0:s? -c:s copy \"{{1}}\"");
+                args.Add($"{hardwareDecoder}-y -i \"{{0}}\" -map 0:v -c:V {preset.VideoEncoder.Name}{frameRate}{preset.VideoCodecParams}{opArgsStr}{audioArguments} -map 0:s? -c:s copy \"{{1}}\"");
             }
 
             return args;

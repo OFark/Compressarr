@@ -74,7 +74,7 @@
                                         <MudSelectItem Value="@c.Name">@c.ToString()</MudSelectItem>
                                     }
                                 </MudSelect>
-                                
+
                                 <DirectoryLookup @bind-Folder="@job.DestinationFolder" Label="Destination Folder" Required="true" />
 
                                 <MudCheckBox @bind-Checked="job.AutoImport" Label="Auto Import"></MudCheckBox>
@@ -154,9 +154,9 @@
                                                     <MudPaper>
                                                         <MudList Dense="true">
                                                             @foreach (var arg in context.Arguments.Select(x => applicationService.InsertNamesIntoFFmpegPreviews ? string.Format(x, context.SourceFile, context.DestinationFile) : x))
-                                                            {
-                                                            <MudListItem>@arg</MudListItem>
-                                                            }
+                                                                    {
+                                                                <MudListItem>@arg</MudListItem>
+                                                                    }
                                                         </MudList>
                                                     </MudPaper>
                                                 </td>
@@ -167,6 +167,9 @@
                                         <MudTablePager PageSizeOptions="new int[]{5, 10, 50, 100}" />
                                     </PagerContent>
                                 </MudTable>
+                                <MudPaper Class="mt-2" Elevation="0">
+                                    <MudProgressLinear Color="Color.Primary" Value="initialisationProgress" />
+                                </MudPaper>
                             }
                             else
                             {
@@ -264,6 +267,9 @@
 
     private string FilterType => job?.Filter?.MediaSource.ToString().ToLower();
 
+    private double initialisationProgress;
+
+
     private int? minSSIM
     {
         get
@@ -348,6 +354,13 @@
     protected override void OnInitialized()
     {
         job.StatusUpdate += jobStatusUpdate;
+        job.InitialisationProgress = new Progress<double>(jobProgress);
+    }
+
+    private void jobProgress(double val)
+    {
+        initialisationProgress = val;
+        StateHasChanged();
     }
 
     void IDisposable.Dispose()

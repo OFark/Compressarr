@@ -1,35 +1,12 @@
 ﻿using Compressarr.Application;
-using Compressarr.Application.Interfaces;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
 using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Compressarr
 {
     public static class WebHostExtensions
     {
-        public static IServiceCollection AddStartupTask<T>(this IServiceCollection services) where T : class, IStartupTask
-            => services.AddTransient<IStartupTask, T>();
-
-        public static async Task RunWithTasksAsync(this IHost webHost, CancellationToken cancellationToken = default)
-        {
-            // Load all tasks from DI
-            var startupTasks = webHost.Services.GetServices<IStartupTask>();
-
-            // Execute all the tasks
-            foreach (var startupTask in startupTasks)
-            {
-                _ = startupTask.ExecuteAsync(cancellationToken);
-            }
-
-            // Start the tasks as normal
-            await webHost.RunAsync(cancellationToken);
-        }
-
         public static IHostBuilder ConfigureDefaultFiles(this IHostBuilder builder)
         {
             if (!AppEnvironment.IsDevelopment)

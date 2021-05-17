@@ -1,7 +1,7 @@
 ﻿@using System.IO;
 @using Compressarr.Shared.Models
 
-<MudAutocomplete T="DirectorySuggestion" Required="@Required" Label="@Label" @bind-Value="_folder" Immediate="true" SearchFunc="dirInput">
+<MudAutocomplete T="DirectorySuggestion" Required="@Required" Clearable="true" Label="@Label" @bind-Value="_folder" Immediate="true" SearchFunc="dirInput">
     <ItemTemplate Context="e">
         <MudText>@(e.Name)</MudText>
     </ItemTemplate>

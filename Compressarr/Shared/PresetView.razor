@@ -1,4 +1,5 @@
-﻿@inject IFFmpegManager FFmpegManager
+﻿@inject IApplicationService ApplicationService 
+@inject IFFmpegManager FFmpegManager
 @inject IDialogService DialogService
 @inject ILayoutService LayoutService
 @inject IJobManager JobManager
@@ -39,6 +40,12 @@
                                 <MudSelectItem Value="@c" />
                             }
                         </MudSelect>
+                        <MudSelect @bind-Value="preset.HardwareDecoder" Clearable="true" Label="Hardware Decoder" OffsetY="true" T="string" Immediate="true" Class="mb-2">
+                            @foreach (var hwd in ApplicationService.HardwareDecoders)
+                            {
+                                <MudSelectItem Value="@hwd" />
+                            }
+                        </MudSelect>
                         <MudTextField @bind-Value="preset.VideoBitRate" Label="Video Bitrate" Disabled="@disabledNoVideo" Class="mb-2" />
                         <MudNumericField @bind-Value="preset.FrameRate" Label="Framerate" Placeholder="Same as source" Disabled="@disabledNoVideo" Class="mb-2" />
                     </MudCardContent>
@@ -54,7 +61,7 @@
                         <MudCardContent>
                             @foreach (var option in preset.VideoCodecOptions)
                             {
-                                switch (option.Type)
+                                switch (option.EncoderOption.Type)
                                 {
                                     case FFmpegFactory.CodecOptionType.Number:
                                         {
@@ -63,14 +70,14 @@
                                         break;
                                     case FFmpegFactory.CodecOptionType.Range:
                                         {
-                                            <MudSlider @bind-Value="@option.IntValue" T="int?" Max="@option.Max" Min="option.Min" Immediate="true" Disabled="@(option.DisabledByVideoBitRate && disabledVideoBitrate)">@option.Name: @option.Value <MudIconButton Size="Size.Small" Icon="@Icons.Outlined.Delete" OnClick="@(() => { option.IntValue = null; })"></MudIconButton></MudSlider>
+                                            <MudSlider @bind-Value="@option.IntValue" T="int?" Max="@option.EncoderOption.Max" Min="option.EncoderOption.Min" Immediate="true" Disabled="@(option.EncoderOption.DisabledByVideoBitRate && disabledVideoBitrate)">@option.Name: @option.Value <MudIconButton Size="Size.Small" Icon="@Icons.Outlined.Delete" OnClick="@(() => { option.IntValue = null; })"></MudIconButton></MudSlider>
                                         }
                                         break;
                                     case FFmpegFactory.CodecOptionType.Select:
                                         {
-                                            <MudSelect @bind-Value="option.Value" Label="@option.Name" OffsetY="true">
-                                                @foreach (var c in option.Values)
-                                                                    {
+                                            <MudSelect @bind-Value="option.Value" Label="@option.Name" Clearable="true" OffsetY="true">
+                                                @foreach (var c in option.EncoderOption.Values)
+                                                {
                                                     <MudSelectItem Value="@c">@c</MudSelectItem>
                                                                     }
                                             </MudSelect>
@@ -135,7 +142,7 @@
 
         if (firstCoverAny == null)
         {
-            preset.AudioStreamPresets.Add(new(true));
+            preset.AudioStreamPresets.Add(new());
         }
         else
         {

@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Compressarr.Settings.FFmpegFactory;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -23,6 +24,10 @@ namespace Compressarr.FFmpegFactory.Models
             IsCopy = true;
         }
 
+        public Encoder(EncoderBase encoder)
+        {
+            Name = encoder?.Name;
+        }
 
         [JsonIgnore]
         public string Description { get; set; }

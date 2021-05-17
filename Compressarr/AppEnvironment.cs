@@ -8,6 +8,7 @@ namespace Compressarr
 {
     public class AppEnvironment
     {
+        public static bool InNvidiaDocker => Environment.GetEnvironmentVariable("NVIDIA_DRIVER_CAPABILITIES") != null;
         public static bool InDocker => Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true";
 
         public static bool IsDevelopment => !InDocker && Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == Environments.Development;

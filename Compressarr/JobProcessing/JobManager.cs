@@ -198,6 +198,7 @@ namespace Compressarr.JobProcessing
 
                             Log(job, LogLevel.Debug, "Files Returned", "Building Workload");
 
+                            double i = 0;
                             job.WorkLoad = getFilesResults.Results;
                             foreach (var wi in job.WorkLoad)
                             {
@@ -246,6 +247,9 @@ namespace Compressarr.JobProcessing
                                 {
                                     wi.DestinationFile = Path.ChangeExtension(wi.DestinationFile, job.Preset.ContainerExtension);
                                 }
+
+                                job.InitialisationProgress?.Report(++i / job.WorkLoad.Count * 100);
+                                job.UpdateStatus(this);
                             }
 
                             Log(job, LogLevel.Debug, "Workload complied", "Checking Destination Folder", "Writing Test.txt file");

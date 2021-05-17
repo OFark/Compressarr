@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Compressarr.Settings.Filtering;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,7 +7,7 @@ using System.Text.RegularExpressions;
 
 namespace Compressarr.Filtering.Models
 {
-    public class FilterComparitor : IEquatable<FilterComparitor>
+    public class FilterComparitor : FilterComparitorBase, IEquatable<FilterComparitor>
     {
         public static Dictionary<string, string> valueNames = new Dictionary<string, string>()
         {
@@ -24,6 +25,7 @@ namespace Compressarr.Filtering.Models
         {
 
         }
+
         public FilterComparitor(string value)
         {
             Value = value;
@@ -53,8 +55,6 @@ namespace Compressarr.Filtering.Models
 
         [JsonIgnore]
         public string Operator => $"{(IsParamMethod ? "." : " ")}{Value}{(IsParamMethod ? "(@)" : " ")}";
-
-        public string Value { get; set; } = string.Empty;
 
         public bool Equals(FilterComparitor other)
         {   

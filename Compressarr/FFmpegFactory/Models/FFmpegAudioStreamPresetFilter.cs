@@ -1,4 +1,5 @@
 ﻿using Compressarr.Filtering.Models;
+using Compressarr.Settings.FFmpegFactory;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,16 +7,22 @@ using System.Threading.Tasks;
 
 namespace Compressarr.FFmpegFactory.Models
 {
-    public class FFmpegAudioStreamPresetFilter
+    public class FFmpegAudioStreamPresetFilter : FFmpegAudioStreamPresetFilterBase
     {
-        private FilterComparitor numberComparitor;
+        public FFmpegAudioStreamPresetFilter()
+        {
 
-        public int ChannelValue { get; set; }
-        public bool Matches { get; set; }
+        }
 
+        public FFmpegAudioStreamPresetFilter(FFmpegAudioStreamPresetFilterBase audioStreamPresetFilterBase)
+        {
+            ChannelValue = audioStreamPresetFilterBase?.ChannelValue ?? 0;
+            Matches = audioStreamPresetFilterBase?.Matches ?? false;
+            NumberComparitor = audioStreamPresetFilterBase.NumberComparitor != null ? new FilterComparitor(audioStreamPresetFilterBase.NumberComparitor.Value) : null;
+            Rule = audioStreamPresetFilterBase?.Rule ?? default;
+            Values = audioStreamPresetFilterBase?.Values;
+        }
 
-        public FilterComparitor NumberComparitor { get;  set; }
-        public AudioStreamRule Rule { get; set; }
-        public HashSet<string> Values { get; set; }
+        public new FilterComparitor NumberComparitor { get;  set; }
     }
 }

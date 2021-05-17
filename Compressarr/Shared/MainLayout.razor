@@ -2,6 +2,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 
+@inject IApplicationInitialiser applicationInitialiser
 @inject Compressarr.Pages.Services.ILayoutService layoutService
 @inject IApplicationService ApplicationService
 @inject ISnackbar Snackbar
@@ -30,6 +31,15 @@
         <LayoutEngine @ref="layoutEngine" OnStateChanged="LayoutEngineStateChanged">
             <MudContainer MaxWidth="MaxWidth.Large" Fixed="true" id="content">
                 <CascadingValue Value=layoutEngine>
+                    @if (ApplicationService.State != "Ready")
+                    {
+                        <MudContainer MaxWidth="MaxWidth.Small">
+                            <MudPaper Class="pa-3 mb-3">
+                                <MudText>@ApplicationService.State</MudText>
+                                <MudProgressLinear Color="Color.Primary" Value="ApplicationService.Progress" />
+                            </MudPaper>
+                        </MudContainer>
+                    }
                     @Body
                 </CascadingValue>
             </MudContainer>
@@ -54,9 +64,39 @@
 
     protected override void OnInitialized()
     {
-        ApplicationService.OnBroadcast += (s, message) => Snackbar.Add(message);
+        ApplicationService.OnBroadcast += (s, message) =>
+        {
+            if (Dispatcher.CreateDefault().CheckAccess())
+            {
+                Snackbar.Add(message);
+                StateHasChanged();
+            }
+            else
+            {
+                InvokeAsync(() =>
+                {
+                    Snackbar.Add(message);
+                    StateHasChanged();
+                });
+            }
+        };
 
         base.OnInitialized();
+    }
+
+
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            while (ApplicationService.StateHistory.TryDequeue(out var state))
+            {
+                Snackbar.Add(state);
+            }
+        }
+
+        base.OnAfterRender(firstRender);
     }
 
     MudTheme MyCustomTheme = new MudTheme()

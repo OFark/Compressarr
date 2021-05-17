@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Compressarr.Settings.FFmpegFactory;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -8,8 +9,18 @@ using System.Threading.Tasks;
 namespace Compressarr.FFmpegFactory.Models
 {
 
-    public class EncoderOptionValue : EncoderOption
+    public class EncoderOptionValue : EncoderOptionValueBase 
     {
+        public EncoderOptionValue(string name)
+        {
+            Name = name;
+        }
+        public EncoderOptionValue(EncoderOptionValueBase valueBase)
+        {
+            Name = valueBase?.Name;
+            Value = valueBase?.Value;
+        }
+
         public int? IntValue
         {
             get
@@ -21,16 +32,7 @@ namespace Compressarr.FFmpegFactory.Models
                 Value = value.ToString();
             }
         }
-
-        public string Value { get; set; }
-        public override bool ShouldSerializeArg() => false;
-        public override bool ShouldSerializeDisabledByVideoBitRate() => false;
-        public override bool ShouldSerializeIncludePass() => false;
-        public bool ShouldSerializeIntValue() => false;
-        public override bool ShouldSerializeMax() => false;
-        public override bool ShouldSerializeMin() => false;
-        public override bool ShouldSerializeType() => false;
-        public override bool ShouldSerializeValues() => false;
+        public EncoderOption EncoderOption { get; set; }
     }
 
 }

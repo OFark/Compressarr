@@ -1,39 +1,43 @@
 ﻿using Compressarr.Helpers;
-using Newtonsoft.Json;
+using Compressarr.Settings.FFmpegFactory;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
 namespace Compressarr.FFmpegFactory.Models
 {
-    public class FFmpegPreset
+    public class FFmpegPreset : FFmpegPresetBase
     {
         private Encoder _videoEncoder;
 
         public FFmpegPreset()
         {
-            
+            AudioStreamPresets ??= new() { new() };
         }
 
-        public FFmpegPreset(bool init)
+
+        public FFmpegPreset(FFmpegPresetBase presetBase)
         {
-            AudioStreamPresets ??= new() { new(true) };
+            AudioStreamPresets = presetBase?.AudioStreamPresets?.Select(x => new FFmpegAudioStreamPreset(x)).ToList();
+            Container = presetBase?.Container;
+            FrameRate = presetBase?.FrameRate;
+            HardwareDecoder = presetBase?.HardwareDecoder;
+            Name = presetBase?.Name;
+            OptionalArguments = presetBase?.OptionalArguments;
+            VideoBitRate = presetBase?.VideoBitRate;
+            VideoCodecOptions = presetBase?.VideoCodecOptions?.Select(x => new EncoderOptionValue(x)).ToHashSet();
+            _videoEncoder = presetBase.VideoEncoder != null ? new Encoder(presetBase.VideoEncoder) : null;
         }
 
-        public List<FFmpegAudioStreamPreset> AudioStreamPresets { get; set; }
+        public new List<FFmpegAudioStreamPreset> AudioStreamPresets { get; set; }
 
-        public string Container { get; set; }
-
-        [JsonIgnore]
         public string ContainerExtension { get; set; }
-        public double? FrameRate { get; set; }
-        [JsonIgnore]
+
         public bool Initialised { get; set; }
 
-        public string Name { get; set; }
-        public string OptionalArguments { get; set; }
-        public int? VideoBitRate { get; set; }
-        public Encoder VideoEncoder
+        public new HashSet<EncoderOptionValue> VideoCodecOptions { get; set; }
+
+        public new Encoder VideoEncoder
         {
             get
             {
@@ -55,14 +59,6 @@ namespace Compressarr.FFmpegFactory.Models
             }
         }
 
-        public HashSet<EncoderOptionValue> VideoCodecOptions { get; set; }
-
-        public override string ToString()
-        {
-            return string.Join(" | ", (new List<string>() { VideoEncoder?.Name, Name }).Where(x =>!string.IsNullOrWhiteSpace(x)));
-        }
-
-        [JsonIgnore]
         internal string VideoCodecParams
         {
             get
@@ -74,27 +70,32 @@ namespace Compressarr.FFmpegFactory.Models
                     {
                         if (VideoBitRate.HasValue)
                         {
-                            if (vco.IncludePass)
+                            if (vco.EncoderOption.IncludePass)
                             {
-                                sb.Append($" {vco.Arg.Replace("<val>", $"{vco.Value} pass=%passnum%".Trim())}");
+                                sb.Append($" {vco.EncoderOption.Arg.Replace("<val>", $"{vco.Value} pass=%passnum%".Trim())}");
                             }
                             else if (!string.IsNullOrWhiteSpace(vco.Value))
                             {
-                                if (!vco.DisabledByVideoBitRate)
+                                if (!vco.EncoderOption.DisabledByVideoBitRate)
                                 {
-                                    sb.Append($" {vco.Arg.Replace("<val>", $"{vco.Value}".Trim())}");
+                                    sb.Append($" {vco.EncoderOption.Arg.Replace("<val>", $"{vco.Value}".Trim())}");
                                 }
                             }
                         }
                         else if (!string.IsNullOrWhiteSpace(vco.Value))
                         {
-                            sb.Append($" {vco.Arg.Replace("<val>", $"{vco.Value}".Trim())}");
+                            sb.Append($" {vco.EncoderOption.Arg.Replace("<val>", $"{vco.Value}".Trim())}");
                         }
                     }
                 }
 
                 return sb.ToString();
             }
+        }
+
+        public override string ToString()
+        {
+            return string.Join(" | ", (new List<string>() { VideoEncoder?.Name, Name }).Where(x => !string.IsNullOrWhiteSpace(x)));
         }
     }
 }

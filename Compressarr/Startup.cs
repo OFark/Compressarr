@@ -1,3 +1,4 @@
+using Compressarr.Application;
 using Compressarr.FFmpegFactory;
 using Compressarr.FFmpegFactory.Models;
 using Compressarr.Filtering;
@@ -6,16 +7,16 @@ using Compressarr.JobProcessing;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Pages.Services;
 using Compressarr.Services;
-using Compressarr.Application;
+using Compressarr.Settings;
+using Compressarr.Settings.FFmpegFactory;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using MudBlazor;
 using MudBlazor.Services;
 using System.Collections.Generic;
-using Compressarr.Settings;
-using Compressarr.Application.Interfaces;
 
 namespace Compressarr
 {
@@ -38,19 +39,12 @@ namespace Compressarr
             services.Configure<AppSettings>(options => Configuration.GetSection("Settings").Bind(options));
             services.Configure<APIServiceSettings>(options => Configuration.GetSection("Services").Bind(options));
             services.Configure<HashSet<Filter>>(options => Configuration.GetSection("Filters").Bind(options));
-            services.Configure<HashSet<FFmpegPreset>>(options =>
-            {
-                foreach(var op in options)
-                {
-                    op.AudioStreamPresets.Clear();
-                }
-                Configuration.GetSection("Presets").Bind(options);
-            });
+            services.Configure<HashSet<FFmpegPresetBase>>(options => Configuration.GetSection("Presets").Bind(options));
             services.Configure<HashSet<Job>>(options => Configuration.GetSection("Jobs").Bind(options));
 
 
+            services.AddSingleton<IApplicationInitialiser, ApplicationInitialiser>();
             services.AddSingleton<IApplicationService, ApplicationService>();
-            services.AddSingleton<IStartupTask, ApplicationInitialiser>();
             services.AddSingleton<IProcessManager, ProcessManager>();
 
             services.AddScoped<ILayoutService, LayoutService>();
@@ -63,7 +57,10 @@ namespace Compressarr
 
             services.AddTransient<IFileService, FileService>();
 
-            services.AddMudServices();
+            services.AddMudServices(config =>
+            {
+                config.SnackbarConfiguration.PositionClass = Defaults.Classes.Position.BottomCenter;
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

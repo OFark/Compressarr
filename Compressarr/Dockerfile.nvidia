@@ -1,0 +1,29 @@
+#See https://aka.ms/containerfastmode to understand how Visual Studio uses this Dockerfile to build your images for faster debugging.
+
+FROM mcr.microsoft.com/dotnet/sdk:5.0 AS build
+WORKDIR /src
+COPY . ./Compressarr/
+WORKDIR "/src/Compressarr"
+RUN dotnet publish -c Release -o /app/publish
+
+FROM jrottenberg/ffmpeg:snapshot-nvidia AS ffmpeg
+
+FROM mcr.microsoft.com/dotnet/aspnet:5.0-focal
+WORKDIR /app
+COPY --from=build /app/publish ./
+COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
+COPY --from=ffmpeg /usr/local/share/ /usr/local/share/
+COPY --from=ffmpeg /usr/local/lib/ /usr/local/lib/
+COPY --from=ffmpeg /usr/local/include/ /usr/local/include/
+COPY --from=ffmpeg /usr/local/cuda/ /usr/local/cuda/
+
+RUN     apt-get -yqq update && \
+        apt-get install -yq --no-install-recommends ca-certificates expat libgomp1 libxcb-shape0-dev && \
+        apt-get autoremove -y && \
+        apt-get clean -y
+
+
+ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib64:/usr/local/cuda/targets/x86_64-linux/lib
+ENV NVIDIA_DRIVER_CAPABILITIES compute,utility,video
+
+ENTRYPOINT ["dotnet", "Compressarr.dll"]

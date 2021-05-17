@@ -384,7 +384,10 @@ namespace Compressarr.Services
                             foreach (var movie in movies.Where(x => applicationService.LoadMediaInfoOnFilters && x.MediaInfo == null))
                             {
                                 movie.MediaInfo = await fFmpegManager.GetMediaInfoAsync($"{applicationService.RadarrSettings.BasePath}{Path.Combine(movie.path, movie.movieFile.relativePath)}");
-                                await OnUpdate(this, null);
+                                if (OnUpdate != null)
+                                {
+                                    await OnUpdate(this, null);
+                                }
                             }
                         }
                         finally

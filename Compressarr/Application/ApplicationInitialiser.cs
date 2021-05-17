@@ -1,150 +1,155 @@
-﻿using Compressarr.FFmpegFactory.Models;
-using Compressarr.Application;
+﻿using Compressarr.Application;
+using Compressarr.Application.Models;
+using Compressarr.FFmpegFactory.Models;
+using Compressarr.JobProcessing;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Xabe.FFmpeg;
 using Xabe.FFmpeg.Downloader;
-using System.Linq;
-using Compressarr.JobProcessing;
-using Compressarr.Application.Interfaces;
 
 namespace Compressarr.FFmpegFactory
 {
-    public class ApplicationInitialiser : IStartupTask
+    public class ApplicationInitialiser : IApplicationInitialiser
     {
 
         private readonly IFileService fileService;
         private readonly IJobManager jobManager;
         private readonly ILogger<ApplicationInitialiser> logger;
         private readonly IApplicationService applicationService;
+
+
+        private readonly Task InitialisationTask;
+
         public ApplicationInitialiser(IFileService fileService, IJobManager jobManager, ILogger<ApplicationInitialiser> logger, IApplicationService applicationService)
         {
             this.applicationService = applicationService;
             this.fileService = fileService;
             this.jobManager = jobManager;
             this.logger = logger;
+
+            InitialisationTask = Task.Run(() => InitialiseAsync());
         }
 
-        public async Task ExecuteAsync(CancellationToken cancellationToken = default)
+        public async Task InitialiseAsync(CancellationToken cancellationToken = default)
         {
             using (logger.BeginScope("Initialising Application"))
             {
-                string existingVersion = null;
-
-                var ffmpegAlreadyExists = fileService.HasFile(fileService.FFMPEGPath);
-                if (!ffmpegAlreadyExists)
+                try
                 {
-                    logger.LogInformation("Downloading FFmpeg");
-                    applicationService.Broadcast("Downloading FFmpeg");
-                }
-                else
-                {
-                    existingVersion = await GetFFmpegVersionAsync();
-                    logger.LogInformation("Checking for FFmpeg update");
-                    applicationService.Broadcast("Checking for FFmpeg update");
-                }
+                    string existingVersion = null;
 
-                await FFmpegDownloader.GetLatestVersion(FFmpegVersion.Official, fileService.GetAppDirPath(AppDir.FFmpeg));
-                logger.LogDebug("FFmpeg latest version check finished.");
+                    Progress("Initialising FFmpeg");
 
-                if (!fileService.HasFile(fileService.FFMPEGPath))
-                {
-                    throw new FileNotFoundException("FFmpeg not found, download must have failed.");
-                }
-
-                applicationService.FFmpegVersion = await GetFFmpegVersionAsync();
-
-                if (!ffmpegAlreadyExists)
-                {
-                    logger.LogInformation("FFmpeg downloaded.");
-                    applicationService.Broadcast("FFmpeg finished Downloading ");
-                }
-                else
-                {
-                    if (existingVersion != applicationService.FFmpegVersion && applicationService.FFmpegVersion != null)
+                    var ffmpegAlreadyExists = fileService.HasFile(fileService.FFMPEGPath);
+                    if (!ffmpegAlreadyExists)
                     {
-                        logger.LogInformation("FFmpeg updated.");
-                        applicationService.Broadcast($"FFmpeg updated to: {applicationService.FFmpegVersion}");
+                        Progress("Downloading FFmpeg");
                     }
-                }
-
-                var codecLoader = GetAvailableCodecsAsync();
-                var encoderLoader = GetAvailableEncodersAsync();
-                var containerLoader = GetAvailableContainersAsync();
-
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                {
-                    logger.LogDebug("Running on Linux, CHMOD required");
-                    foreach (var exe in new string[] { fileService.FFMPEGPath, fileService.FFPROBEPath })
+                    else
                     {
-                        using (var p = new Process())
+                        existingVersion = await GetFFmpegVersionAsync();
+                        Progress("Checking for FFmpeg update");
+                    }
+
+                    if (!AppEnvironment.InNvidiaDocker)
+                    {
+                        await FFmpegDownloader.GetLatestVersion(FFmpegVersion.Official, fileService.GetAppDirPath(AppDir.FFmpeg), new Progress<ProgressInfo>(reportFFmpegProgress));
+                        logger.LogDebug("FFmpeg latest version check finished.");
+                    }
+
+                    if (!fileService.HasFile(fileService.FFMPEGPath))
+                    {
+                        throw new FileNotFoundException("FFmpeg not found, download must have failed.");
+                    }
+
+                    applicationService.FFmpegVersion = await GetFFmpegVersionAsync();
+
+                    if (!ffmpegAlreadyExists)
+                    {
+                        Progress("FFmpeg finished Downloading ");
+                    }
+                    else
+                    {
+                        if (existingVersion != applicationService.FFmpegVersion && applicationService.FFmpegVersion != null)
                         {
-                            p.StartInfo = new ProcessStartInfo()
-                            {
-                                RedirectStandardOutput = true,
-                                UseShellExecute = false,
-                                CreateNoWindow = true,
-                                WindowStyle = ProcessWindowStyle.Hidden,
-                                FileName = "/bin/bash",
-                                Arguments = $"-c \"chmod +x {exe}\""
-                            };
-                            p.StartInfo.RedirectStandardOutput = true;
-                            p.StartInfo.RedirectStandardError = true;
-                            p.OutputDataReceived += (sender, args) => logger.LogInformation(args.Data);
-                            logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
-                            p.Start();
-                            var error = p.StandardError.ReadToEnd();
-                            p.WaitForExit();
-
-                            if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(error))
-                            {
-                                logger.LogError($"Process Error: ({p.ExitCode}) {error} <End Of Error>");
-                            }
-                            logger.LogDebug("Process finished");
-                        };
+                            Progress($"FFmpeg updated to: {applicationService.FFmpegVersion}");
+                        }
                     }
-                }
 
-
-                applicationService.Codecs = await codecLoader;
-                applicationService.Containers = await containerLoader;
-                applicationService.Encoders = await encoderLoader;
-
-                Progress("FFmpeg Initialisation complete");
-                
-                applicationService.FFMpegReady.Set();
-
-                InitialisePresets();
-
-                Progress("Application Initialisation complete");
-                
-                applicationService.Initialised.Set();
-
-                if (applicationService.Jobs != null)
-                {
-                    foreach (var job in applicationService.Jobs.Where(j => !j.Initialised))
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                     {
-                        await jobManager.InitialiseJob(job);
+                        logger.LogDebug("Running on Linux, CHMOD required");
+                        foreach (var exe in new string[] { fileService.FFMPEGPath, fileService.FFPROBEPath })
+                        {
+                            await RunProcess("/bin/bash", $"-c \"chmod +x {exe}\"");
+                        }
                     }
-                    Progress("Job Initialisation complete");
+
+                    var codecLoader = GetAvailableCodecsAsync();
+                    var containerLoader = GetAvailableContainersAsync();
+                    var decoderLoader = GetAvailableHardwareDecodersAsync();
+                    var encoderLoader = GetAvailableEncodersAsync();
+
+                    applicationService.Codecs = await codecLoader;
+                    applicationService.Containers = await containerLoader;
+                    applicationService.Encoders = await encoderLoader;
+                    applicationService.HardwareDecoders = await decoderLoader;
+
+                    Progress("FFmpeg Initialisation complete");
+
+                    applicationService.FFMpegReady.Set();
+
+                    Progress("Initialising Presets");
+
+                    InitialisePresets();
+
+                    Progress("Application Initialisation complete");
+
+                    applicationService.Initialised.Set();
+
+                    if (applicationService.Jobs != null)
+                    {
+                        Progress("Initialising Jobs");
+
+                        foreach (var job in applicationService.Jobs.Where(j => !j.Initialised))
+                        {
+                            job.StatusUpdate += Job_StatusUpdate;
+                            await jobManager.InitialiseJob(job);
+                            job.StatusUpdate -= Job_StatusUpdate;
+                        }
+                        Progress("Job Initialisation complete");
+                    }
+
+
+                    Progress("Ready");
                 }
-
-
-                Progress("Ready");
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Initialisation Error");
+                }
             }
+        }
+
+        private void Job_StatusUpdate(object sender, EventArgs e)
+        {
+            applicationService.Progress = (double)100 * jobManager.Jobs.Sum(j => j.WorkLoad?.Count(x => x.MediaInfo != null) ?? 0) / jobManager.Jobs.Sum(j => j.WorkLoad?.Count ?? 1);
+            applicationService.Broadcast("");
         }
 
         private void Progress(string message)
         {
+            applicationService.StateHistory.Append(message);
+            applicationService.State = message;
             logger.LogInformation(message);
             applicationService.Broadcast(message);
-            applicationService.State = message;
         }
 
         private void InitialisePresets()
@@ -181,29 +186,14 @@ namespace Compressarr.FFmpegFactory
 
         private async Task<Dictionary<CodecType, SortedSet<Encoder>>> GetAvailableEncodersAsync()
         {
-            logger.LogDebug($"Get available codecs.");
+            logger.LogDebug($"Get available encoders.");
 
             var encoders = new Dictionary<CodecType, SortedSet<Encoder>>();
-            using (var p = new Process())
+
+            var result = await RunProcess(fileService.FFMPEGPath, "-encoders -v 1");
+
+            if (result.Success)
             {
-                p.StartInfo.UseShellExecute = false;
-                p.StartInfo.RedirectStandardOutput = true;
-                p.StartInfo.RedirectStandardError = true;
-                p.StartInfo.FileName = fileService.FFMPEGPath;
-                p.StartInfo.Arguments = "-encoders -v 1";
-
-                logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
-                p.Start();
-                var output = p.StandardOutput.ReadToEnd();
-                var error = p.StandardError.ReadToEnd();
-                await p.WaitForExitAsync();
-
-                if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(error))
-                {
-                    logger.LogError($"Process Error: ({p.ExitCode}) {error} <End Of Error>");
-                    return null;
-                }
-
                 encoders.Add(CodecType.Audio, new());
                 encoders.Add(CodecType.Subtitle, new());
                 encoders.Add(CodecType.Video, new());
@@ -212,7 +202,7 @@ namespace Compressarr.FFmpegFactory
                 var reg = new Regex(regPattern, RegexOptions.IgnoreCase | RegexOptions.Multiline);
                 logger.LogDebug($"Regex matching pattern: \"{regPattern}\"");
 
-                foreach (Match m in reg.Matches(output))
+                foreach (Match m in reg.Matches(result.StdOut))
                 {
                     var encoderName = m.Groups[2].Value;
                     var encoderDesc = m.Groups[3].Value;
@@ -241,6 +231,35 @@ namespace Compressarr.FFmpegFactory
                 return encoders;
             }
 
+            return null;
+        }
+
+        private async Task<SortedSet<string>> GetAvailableHardwareDecodersAsync()
+        {
+            logger.LogDebug($"Get available hardware decoders.");
+
+            var hwdecoders = new SortedSet<string>();
+
+            var result = await RunProcess(fileService.FFMPEGPath, "-hwaccels -v 1");
+
+            if (result.Success)
+            {
+                var regPattern = @"^(?!Hardware).*";
+                var reg = new Regex(regPattern, RegexOptions.IgnoreCase | RegexOptions.Multiline);
+                logger.LogDebug($"Regex matching pattern: \"{regPattern}\"");
+
+                foreach (Match m in reg.Matches(result.StdOut))
+                {
+                    if(!string.IsNullOrWhiteSpace(m.Value)) { 
+                    hwdecoders.Add(m.Value.Trim());
+                        }
+                }
+
+                return hwdecoders;
+            }
+
+            return null;
+
         }
 
         private async Task<Dictionary<CodecType, SortedSet<Codec>>> GetAvailableCodecsAsync()
@@ -248,26 +267,11 @@ namespace Compressarr.FFmpegFactory
             logger.LogDebug($"Get available codecs.");
 
             var codecs = new Dictionary<CodecType, SortedSet<Codec>>();
-            using (var p = new Process())
+
+            var result = await RunProcess(fileService.FFMPEGPath, "-codecs -v 1");
+
+            if (result.Success)
             {
-                p.StartInfo.UseShellExecute = false;
-                p.StartInfo.RedirectStandardOutput = true;
-                p.StartInfo.RedirectStandardError = true;
-                p.StartInfo.FileName = fileService.FFMPEGPath;
-                p.StartInfo.Arguments = "-codecs -v 1";
-
-                logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
-                p.Start();
-                var output = p.StandardOutput.ReadToEnd();
-                var error = p.StandardError.ReadToEnd();
-                await p.WaitForExitAsync();
-
-                if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(error))
-                {
-                    logger.LogError($"Process Error: ({p.ExitCode}) {error} <End Of Error>");
-                    return null;
-                }
-
                 codecs.Add(CodecType.Audio, new());
                 codecs.Add(CodecType.Subtitle, new());
                 codecs.Add(CodecType.Video, new());
@@ -276,7 +280,7 @@ namespace Compressarr.FFmpegFactory
                 var reg = new Regex(regPattern, RegexOptions.IgnoreCase | RegexOptions.Multiline);
                 logger.LogDebug($"Regex matching pattern: \"{regPattern}\"");
 
-                foreach (Match m in reg.Matches(output))
+                foreach (Match m in reg.Matches(result.StdOut))
                 {
                     var decoder = m.Groups[1].Value == "D";
                     var encoder = m.Groups[2].Value == "E";
@@ -306,41 +310,26 @@ namespace Compressarr.FFmpegFactory
                 }
 
                 return codecs;
-            }
 
+            }
+            return null;
         }
 
-        private Task<SortedDictionary<string, string>> GetAvailableContainersAsync()
+        private async Task<SortedDictionary<string, string>> GetAvailableContainersAsync()
         {
             logger.LogDebug($"Get Available Containers.");
 
             var formats = new SortedDictionary<string, string>();
-            var p = new Process();
-            p.StartInfo.UseShellExecute = false;
-            p.StartInfo.RedirectStandardOutput = true;
-            p.StartInfo.RedirectStandardError = true;
-            p.StartInfo.FileName = fileService.FFMPEGPath;
-            p.StartInfo.Arguments = "-formats -v 1";
 
-            logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
+            var result = await RunProcess(fileService.FFMPEGPath, "-formats -v 1");
 
-            return Task.Run(() =>
+            if (result.Success)
             {
-                p.Start();
-                var output = p.StandardOutput.ReadToEnd();
-                var error = p.StandardError.ReadToEnd();
-                p.WaitForExit();
-
-                if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(error))
-                {
-                    logger.LogError($"Process Error: ({p.ExitCode}) {error} <End Of Error>");
-                }
-
                 var regPattern = @"^\s?([D\s])([E\s])\s(?!=)([^\s]*)\s*(.*)$";
                 var reg = new Regex(regPattern, RegexOptions.IgnoreCase | RegexOptions.Multiline);
                 logger.LogDebug($"Regex matching pattern: \"{regPattern}\"");
 
-                foreach (Match m in reg.Matches(output))
+                foreach (Match m in reg.Matches(result.StdOut))
                 {
                     if (m.Groups[2].Value == "E")
                     {
@@ -349,7 +338,9 @@ namespace Compressarr.FFmpegFactory
                 }
 
                 return formats;
-            });
+            }
+
+            return null;
         }
 
         private async Task<string> GetFFmpegVersionAsync()
@@ -397,10 +388,54 @@ namespace Compressarr.FFmpegFactory
                 }
                 else
                 {
-                    logger.LogDebug($"Codec Options file not found.");
+                    logger.LogTrace($"Codec Options file not found.");
                 }
                 return null;
             }
+        }
+
+        private async Task<ProcessResponse> RunProcess(string filePath, string arguments)
+        {
+            var response = new ProcessResponse();
+
+            using (var p = new Process())
+            {
+                p.StartInfo = new ProcessStartInfo()
+                {
+                    Arguments = arguments,
+                    CreateNoWindow = true,
+                    FileName = filePath,
+                    RedirectStandardError = true,
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                };
+
+                logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
+                p.Start();
+                response.StdOut = p.StandardOutput.ReadToEnd();
+                response.StdErr = p.StandardError.ReadToEnd();
+                await p.WaitForExitAsync();
+
+                response.ExitCode = p.ExitCode;
+
+                if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(response.StdErr))
+                {
+                    logger.LogError($"Process Error: ({p.ExitCode}) {response.StdErr} <End Of Error>");
+                }
+                else
+                {
+                    response.Success = true;
+                }
+
+                return response;
+            }
+        }
+
+        private void reportFFmpegProgress(ProgressInfo info)
+        {
+            applicationService.Progress = 100 * info.DownloadedBytes / info.TotalBytes;
+            applicationService.Broadcast("");
         }
     }
 }

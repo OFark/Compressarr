@@ -40,8 +40,7 @@
                             </MudSelect>
                         </MudItem>
                         <MudItem sm="5">
-                            <MudSelect T="string" @bind-Value="AudioStreamPreset.BitRate" Label="Bit Rate">
-                                <MudSelectItem Value="string.Empty">Auto</MudSelectItem>
+                            <MudSelect T="string" Clearable="true" @bind-Value="AudioStreamPreset.BitRate" Label="Bit Rate">
                                 @foreach (var b in FFmpegManager.AudioBitrates)
                                 {
                                     <MudSelectItem Value="b" />

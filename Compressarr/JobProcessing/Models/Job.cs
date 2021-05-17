@@ -20,6 +20,9 @@ namespace Compressarr.JobProcessing.Models
         public bool Initialised { get; set; }
 
         [JsonIgnore]
+        public IProgress<double> InitialisationProgress { get; set; }
+
+        [JsonIgnore]
         public Action<LogLevel, string> LogAction { get; set; }
 
         public bool AutoImport { get; set; }
