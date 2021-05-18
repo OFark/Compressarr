@@ -283,7 +283,7 @@ namespace Compressarr.FFmpegFactory
                 codecs.Add(CodecType.Subtitle, new());
                 codecs.Add(CodecType.Video, new());
 
-                var regPattern = @"^\s([D\.])([E\.])([VAS])[I.][L\.][S\.]\s(?!=)([^\s]*)\s*(.*)$";
+                var regPattern = @"^\s([D\.])([E\.])([VAS])[I.][L\.][S\.]\s(?!=)([^\s]*).*$";
                 var reg = new Regex(regPattern, RegexOptions.IgnoreCase | RegexOptions.Multiline);
                 logger.LogDebug($"Regex matching pattern: \"{regPattern}\"");
 

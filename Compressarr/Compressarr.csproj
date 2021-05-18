@@ -10,6 +10,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<Content Remove="appsettings.Development.json" />
 		<Content Remove="compilerconfig.json" />
 	</ItemGroup>
 
@@ -18,6 +19,9 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<None Include="appsettings.Development.json">
+		  <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+		</None>
 		<None Include="compilerconfig.json" />
 	</ItemGroup>
 
