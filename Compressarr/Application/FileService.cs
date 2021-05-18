@@ -51,8 +51,7 @@ namespace Compressarr.Application
         public string ConfigDirectory => GetAppDirPath(AppDir.Config);
 
         public string FFMPEGPath => RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? GetFilePath(AppDir.FFmpeg, "ffmpeg.exe")
-                                  : RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? 
-                                        AppEnvironment.InNvidiaDocker ? "/usr/local/bin/ffmpeg" : GetFilePath(AppDir.FFmpeg, "ffmpeg")
+                                  : RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? GetFilePath(AppDir.FFmpeg, "ffmpeg")
                                   : throw new NotSupportedException("Cannot Identify OS");
 
         public string FFPROBEPath => RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? GetFilePath(AppDir.FFmpeg, "ffprobe.exe")
@@ -64,7 +63,7 @@ namespace Compressarr.Application
             AppDir.CodecOptions => AppEnvironment.IsDevelopment ? "CodecOptions" : Path.Combine(ConfigDirectory, "CodecOptions"),
             AppDir.Config => AppEnvironment.InDocker ? "/config" : AppEnvironment.IsDevelopment ? "config" : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config"),
             AppDir.Debug => Path.Combine(ConfigDirectory, "debug"),
-            AppDir.FFmpeg => Path.Combine(ConfigDirectory, "FFmpeg"),
+            AppDir.FFmpeg => Path.Combine(AppEnvironment.InNvidiaDocker ? "/usr/local/bin/" : ConfigDirectory, "FFmpeg"),
             AppDir.Logs => Path.Combine(ConfigDirectory, "logs"),
             _ => Path.Combine(ConfigDirectory, dir.ToString())
         };
