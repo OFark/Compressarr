@@ -2,13 +2,26 @@
 {
     public enum JobState
     {
-        New,
+        BuildingWorkLoad,
+        Cancelled,
+        Error,
+        Finished,
         Initialising,
-        Testing,
+        LoadingMediaInfo,
+        New,
+        Ready,
+        Running,
         TestedFail,
         TestedOK,
-        Running,
+        Testing,
         Waiting,
-        Finished
+    }
+
+    public enum ConditionState
+    {
+        NotStarted,
+        Processing,
+        Succeeded,
+        Failed
     }
 }

@@ -5,7 +5,7 @@
     <MudCardContent>
         @foreach (var fil in AudioStreamPreset.Filters)
         {
-            <AudioPresetFilter AudioStreamPresetFilter="fil" Filters="AudioStreamPreset.Filters" OnUpdate="Update" OnDelete="@(() => DeleteFilter(fil))" />
+            <AudioPresetFilter AudioStreamPresetFilter="fil" Filters="AudioStreamPreset.Filters" IsFirst="@(AudioStreamPreset.Filters.IndexOf(fil) == 0)" OnUpdate="Update" OnDelete="@(() => DeleteFilter(fil))" />
 
         }
         @if (AudioStreamPreset.Filters.Any() && AudioStreamPreset.Filters.Last().Rule != AudioStreamRule.Any)
@@ -39,8 +39,8 @@
                                 }
                             </MudSelect>
                         </MudItem>
-                        <MudItem sm="5">
-                            <MudSelect T="string" Clearable="true" @bind-Value="AudioStreamPreset.BitRate" Label="Bit Rate">
+                        <MudItem sm="4">
+                            <MudSelect T="string" OffsetY="true" Clearable="true" @bind-Value="AudioStreamPreset.BitRate" Label="Bit Rate">
                                 @foreach (var b in FFmpegManager.AudioBitrates)
                                 {
                                     <MudSelectItem Value="b" />
@@ -49,7 +49,18 @@
                         </MudItem>
                     }
                     break;
+                default:
+                    {
+                        <MudItem sm="7"></MudItem>
+                    }
+                    break;
             }
+            <MudItem sm="1">
+                @if (!AudioStreamPreset.CoversAny)
+                {
+                    <MudIconButton Icon="@Icons.Outlined.ContentCopy" OnClick="copy" />
+                }
+            </MudItem>
         </MudGrid>
 
     </MudCardContent>
@@ -61,6 +72,9 @@
 
     [Parameter]
     public EventCallback OnUpdate { get; set; }
+
+    [Parameter]
+    public EventCallback<FFmpegAudioStreamPreset> OnCopy { get; set; }
 
     protected override void OnInitialized()
     {
@@ -74,8 +88,19 @@
         StateHasChanged();
     }
 
+    private void copy()
+    {
+        OnCopy.InvokeAsync(AudioStreamPreset);
+    }
+
+
     private void Update()
     {
+        if (AudioStreamPreset.CoversAny)
+        {
+            AudioStreamPreset.Filters.RemoveAll(x => x.Rule != AudioStreamRule.Any);
+        }
+
         OnUpdate.InvokeAsync();
     }
 }

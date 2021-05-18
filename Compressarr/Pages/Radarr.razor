@@ -276,7 +276,7 @@
             var filter = filterManager.GetFilter(filterName);
             if (filter != null)
             {
-                dlFilters = filter.Filters.ToList().Clone();
+                dlFilters = filter.Filters.ToList().JsonClone();
                 showSaveDialog = true;
                 filterUpdate();
             }

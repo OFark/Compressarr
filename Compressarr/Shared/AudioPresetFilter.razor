@@ -8,8 +8,8 @@
         </MudText>
     </MudItem>
     <MudItem sm="3">
-        <MudSelect T="AudioStreamRule" @bind-Value="AudioStreamPresetFilter.Rule" TextChanged="resetValues" SelectedValuesChanged="@(() => OnUpdate.InvokeAsync())" Immediate="true" Label="Audio Stream">
-            @foreach (AudioStreamRule r in GetRules)
+        <MudSelect T="AudioStreamRule?" OffsetY="true" @bind-Value="AudioStreamPresetFilter.Rule" Strict="true" TextChanged="resetValues" SelectedValuesChanged="@(() => OnUpdate.InvokeAsync())" Immediate="true" Label="Audio Stream">
+            @foreach (var r in GetRules)
             {
                 <MudSelectItem Value="r"></MudSelectItem>
             }
@@ -21,7 +21,7 @@
             {
 
                 <MudItem sm="3">
-                    <MudSelect T="FilterComparitor" @bind-Value="AudioStreamPresetFilter.NumberComparitor" Converter="fcConverter">
+                    <MudSelect OffsetY="true" T="FilterComparitor" @bind-Value="AudioStreamPresetFilter.NumberComparitor" Converter="fcConverter">
                         @foreach (var nc in FFmpegManager.NumberComparitors)
                         {
                             <MudSelectItem Value="nc" />
@@ -42,7 +42,7 @@
                 </MudItem>
 
                 <MudItem sm="GetSize(6)">
-                    <MudSelect T="string" MultiSelection="true" @bind-SelectedValues="AudioStreamPresetFilter.Values" Label="Codec">
+                    <MudSelect OffsetY="true" T="string" MultiSelection="true" @bind-SelectedValues="AudioStreamPresetFilter.Values" Label="Codec">
                         @foreach (var codec in FFmpegManager.AudioCodecs.Decoders())
                         {
                             <MudSelectItem Value="@codec.Name"></MudSelectItem>
@@ -84,18 +84,23 @@
     public List<FFmpegAudioStreamPresetFilter> Filters { get; set; }
 
     [Parameter]
+    public bool IsFirst { get; set; }
+
+    [Parameter]
     public EventCallback OnDelete { get; set; }
 
     [Parameter]
     public EventCallback OnUpdate { get; set; }
 
-    private IEnumerable<AudioStreamRule> GetRules
+    private IEnumerable<AudioStreamRule?> GetRules
     {
         get
         {
-            var rules = new List<AudioStreamRule>(Enum.GetValues(typeof(AudioStreamRule)).Cast<AudioStreamRule>());
+            var rules = new List<AudioStreamRule?>(Enum.GetValues(typeof(AudioStreamRule)).Cast<AudioStreamRule?>());
 
-            return rules.Except(Filters.Select(f => f.Rule));
+            if (!IsFirst) rules.Remove(AudioStreamRule.Any);
+
+            return rules.Except(Filters.Select(f => f.Rule).Where(x => x != AudioStreamPresetFilter.Rule));
 
         }
 

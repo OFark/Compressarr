@@ -86,7 +86,7 @@ namespace Compressarr.Filtering
                     Filters.Add(filter);
                 }
 
-                filter.Filters = dlFilters.Clone();
+                filter.Filters = dlFilters.JsonClone();
 
                 return settingsManager.SaveAppSetting();
             }

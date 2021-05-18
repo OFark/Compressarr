@@ -1,4 +1,4 @@
-﻿@inject IApplicationService ApplicationService 
+﻿@inject IApplicationService ApplicationService
 @inject IFFmpegManager FFmpegManager
 @inject IDialogService DialogService
 @inject ILayoutService LayoutService
@@ -77,7 +77,7 @@
                                         {
                                             <MudSelect @bind-Value="option.Value" Label="@option.Name" Clearable="true" OffsetY="true">
                                                 @foreach (var c in option.EncoderOption.Values)
-                                                {
+                                                                    {
                                                     <MudSelectItem Value="@c">@c</MudSelectItem>
                                                                     }
                                             </MudSelect>
@@ -97,7 +97,7 @@
             <MudItem md="6">
                 @foreach (var fasp in preset.AudioStreamPresets)
                 {
-                    <AudioPreset AudioStreamPreset="@fasp" OnUpdate="AudioPresetUpdate" />
+                    <AudioPreset AudioStreamPreset="@fasp" OnUpdate="AudioPresetUpdate" OnCopy="CopyAudioStreamPreset" />
                 }
             </MudItem>
 
@@ -153,6 +153,18 @@
             }
         }
         StateHasChanged();
+    }
+
+    private void CopyAudioStreamPreset(FFmpegAudioStreamPreset asPreset)
+    {
+        var index = preset.AudioStreamPresets.IndexOf(asPreset);
+
+        if (index >= 0)
+        {
+            var clone = asPreset.Clone();
+            preset.AudioStreamPresets.Insert(index, clone);
+            StateHasChanged();
+        }
     }
 
     private async void savePreset()

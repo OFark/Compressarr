@@ -18,7 +18,7 @@ namespace Compressarr.JobProcessing
         Task DeleteJob(Job job);
         bool FilterInUse(string filterName);
         Task<ServiceResult<HashSet<WorkItem>>> GetFiles(Job job);
-        Task InitialiseJob(Job job, bool force = false);
+        Task InitialiseJob(Job job);
         void InitialiseJobs(Filter filter);
         void InitialiseJobs(MediaSource source);
         void InitialiseJobs(FFmpegPreset preset);

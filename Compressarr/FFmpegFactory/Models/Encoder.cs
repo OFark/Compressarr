@@ -1,4 +1,5 @@
-﻿using Compressarr.Settings.FFmpegFactory;
+﻿using Compressarr.Application.Interfaces;
+using Compressarr.Settings.FFmpegFactory;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -7,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Compressarr.FFmpegFactory.Models
 {
-    public class Encoder : IComparable<Encoder>
+    public class Encoder : IComparable<Encoder>, ICloneable<Encoder>
     {
         public Encoder(string name, string description, HashSet<EncoderOption> options)
         {
@@ -27,6 +28,11 @@ namespace Compressarr.FFmpegFactory.Models
         public Encoder(EncoderBase encoder)
         {
             Name = encoder?.Name;
+        }
+
+        public Encoder Clone()
+        {
+            return new Encoder(Name, Description, Options);
         }
 
         [JsonIgnore]

@@ -43,111 +43,114 @@ namespace Compressarr.JobProcessing
             {
                 try
                 {
-                    semaphore.Wait(job.Process.cancellationTokenSource.Token);
+                    await semaphore.WaitAsync(job.Process.cancellationTokenSource.Token);
 
-                    logger.LogInformation($"Job {job.Name} changed from {job.JobState} to {JobState.Running}.");
-                    job.UpdateState(JobState.Running);
-
-                    using (logger.BeginScope("FFmpeg Process"))
+                    using(var jobRunner = new JobWorker(job.Condition.Encode))
                     {
-                        logger.LogInformation("Starting.");
 
-                        var succeded = true;
-
-                        job.Process.cont = true;
-
-                        job.Process.WorkItem.Running = true;
-                        logger.LogDebug("FFmpeg process work item starting.");
-
-                        foreach (var arg in job.Process.WorkItem.Arguments)
+                        using (logger.BeginScope("FFmpeg Process"))
                         {
-                            if (job.Process.cont)
-                            {
-                                var arguments = string.Format(arg, job.Process.WorkItem.SourceFile, job.Process.WorkItem.DestinationFile);
-                                logger.LogDebug($"FFmpeg Process arguments: \"{arguments}\"");
+                            logger.LogInformation("Starting.");
 
-                                Task<IConversionResult> converionTask = null;
-                                try
+                            var succeded = true;
+
+                            job.Process.cont = true;
+
+                            job.Process.WorkItem.Running = true;
+                            logger.LogDebug("FFmpeg process work item starting.");
+
+                            foreach (var arg in job.Process.WorkItem.Arguments)
+                            {
+                                if (job.Process.cont)
                                 {
+                                    var arguments = string.Format(arg, job.Process.WorkItem.SourceFile, job.Process.WorkItem.DestinationFile);
+                                    logger.LogDebug($"FFmpeg Process arguments: \"{arguments}\"");
+
+                                    Task<IConversionResult> converionTask = null;
+                                    try
+                                    {
+                                        job.Process.Converter = FFmpeg.Conversions.New();
+                                        job.Process.Converter.OnDataReceived += (sender, args) => Converter_OnDataReceived(args, job.Process);
+                                        job.Process.Converter.OnProgress += (sender, args) => Converter_OnProgress(args, job.Process);
+
+                                        converionTask = job.Process.Converter.Start(arguments, job.Process.cancellationTokenSource.Token);
+                                        logger.LogDebug("FFmpeg conversion started.");
+                                        await converionTask;
+                                        logger.LogDebug("FFmpeg conversion finished.");
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        job.Process.Update(this);
+                                        job.Log(ex.Message, LogLevel.Error);
+                                        job.Log(ex.InnerException?.Message, LogLevel.Error);
+                                        succeded = false;
+                                    }
+                                    finally
+                                    {
+                                        if (!converionTask.IsCompletedSuccessfully)
+                                        {
+                                            logger.LogDebug("FFmpeg conversion not successful");
+                                            succeded = false;
+                                        }
+                                    }
+                                }
+                            }
+
+                            logger.LogInformation($"FFmpeg Process finished. Successful = {succeded}");
+
+                            if (succeded)
+                            {
+                                if (job.SSIMCheck || applicationService.AlwaysCalculateSSIM)
+                                {
+                                    job.Process.Update(this, "Calculating SSIM");
+
+                                    var arguments = $" -i \"{job.Process.WorkItem.SourceFile}\" -i \"{job.Process.WorkItem.DestinationFile}\" -lavfi  \"[0:v]settb = AVTB,setpts = PTS - STARTPTS[main];[1:v]settb = AVTB,setpts = PTS - STARTPTS[ref];[main][ref]ssim\" -f null -";
+                                    logger.LogDebug($"SSIM arguments: {arguments}");
+
                                     job.Process.Converter = FFmpeg.Conversions.New();
                                     job.Process.Converter.OnDataReceived += (sender, args) => Converter_OnDataReceived(args, job.Process);
                                     job.Process.Converter.OnProgress += (sender, args) => Converter_OnProgress(args, job.Process);
 
-                                    converionTask = job.Process.Converter.Start(arguments, job.Process.cancellationTokenSource.Token);
-                                    logger.LogDebug("FFmpeg conversion started.");
-                                    await converionTask;
-                                    logger.LogDebug("FFmpeg conversion finished.");
-                                }
-                                catch (Exception ex)
-                                {
-                                    job.Process.Update(this);
-                                    job.Log(ex.Message, LogLevel.Error);
-                                    job.Log(ex.InnerException?.Message, LogLevel.Error);
-                                    succeded = false;
-                                }
-                                finally
-                                {
-                                    if (!converionTask.IsCompletedSuccessfully)
+                                    try
                                     {
-                                        logger.LogDebug("FFmpeg conversion not successful");
+                                        logger.LogDebug("FFmpeg starting SSIM.");
+                                        await job.Process.Converter.Start(arguments, job.Process.cancellationTokenSource.Token);
+                                        logger.LogDebug("FFmpeg finished SSIM.");
+                                    }
+                                    catch (OperationCanceledException ocex)
+                                    {
+                                        job.Process.Update(this);
+                                        job.Log(ocex.Message, LogLevel.Error);
+                                        job.Log(ocex.InnerException?.Message, LogLevel.Error);
                                         succeded = false;
                                     }
                                 }
+
+                                if (succeded)
+                                {
+                                    try
+                                    {
+                                        var originalFileSize = new FileInfo(job.Process.WorkItem.SourceFile).Length;
+                                        var newFileSize = new FileInfo(job.Process.WorkItem.DestinationFile).Length;
+
+                                        job.Process.WorkItem.Compression = newFileSize / (decimal)originalFileSize;
+
+                                    }
+                                    catch (Exception ex) when (ex is FileNotFoundException || ex is IOException)
+                                    {
+                                        job.Process.WorkItem.Compression = null;
+                                        logger.LogWarning(ex, "Error fetching file lengths");
+                                    }
+                                }
                             }
+
+                            jobRunner.Succeed();
+
+                            job.Process.WorkItem.Success = succeded;
+                            job.Process.WorkItem.Finished = true;
+                            job.Process.WorkItem.Running = false;
+                            job.Process.Update(this);
                         }
-
-                        logger.LogInformation($"FFmpeg Process finished. Successful = {succeded}");
-
-                        if (succeded)
-                        {
-                            if (job.SSIMCheck || applicationService.AlwaysCalculateSSIM)
-                            {
-                                job.Process.Update(this, "Calculating SSIM");
-
-                                var arguments = $" -i \"{job.Process.WorkItem.SourceFile}\" -i \"{job.Process.WorkItem.DestinationFile}\" -lavfi  \"[0:v]settb = AVTB,setpts = PTS - STARTPTS[main];[1:v]settb = AVTB,setpts = PTS - STARTPTS[ref];[main][ref]ssim\" -f null -";
-                                logger.LogDebug($"SSIM arguments: {arguments}");
-
-                                job.Process.Converter = FFmpeg.Conversions.New();
-                                job.Process.Converter.OnDataReceived += (sender, args) => Converter_OnDataReceived(args, job.Process);
-                                job.Process.Converter.OnProgress += (sender, args) => Converter_OnProgress(args, job.Process);
-
-                                try
-                                {
-                                    logger.LogDebug("FFmpeg starting SSIM.");
-                                    await job.Process.Converter.Start(arguments, job.Process.cancellationTokenSource.Token);
-                                    logger.LogDebug("FFmpeg finished SSIM.");
-                                }
-                                catch (OperationCanceledException ocex)
-                                {
-                                    job.Process.Update(this);
-                                    job.Log(ocex.Message, LogLevel.Error);
-                                    job.Log(ocex.InnerException?.Message, LogLevel.Error);
-                                    succeded = false;
-                                }
-                            }
-
-                            if (succeded)
-                            {
-                                try
-                                {
-                                    var originalFileSize = new FileInfo(job.Process.WorkItem.SourceFile).Length;
-                                    var newFileSize = new FileInfo(job.Process.WorkItem.DestinationFile).Length;
-
-                                    job.Process.WorkItem.Compression = newFileSize / (decimal)originalFileSize;
-
-                                }
-                                catch (Exception ex) when (ex is FileNotFoundException || ex is IOException)
-                                {
-                                    job.Process.WorkItem.Compression = null;
-                                    logger.LogWarning(ex, "Error fetching file lengths");
-                                }
-                            }
-                        }
-
-                        job.Process.WorkItem.Success = succeded;
-                        job.Process.WorkItem.Finished = true;
-                        job.Process.WorkItem.Running = false;
-                        job.Process.Update(this);
                     }
                 }
                 catch (OperationCanceledException)
@@ -178,7 +181,7 @@ namespace Compressarr.JobProcessing
             using (logger.BeginScope("Converter Data Received"))
             {
                 process.Output(e.Data, LogLevel.Debug);
-                
+
                 if (progressReg.TryMatch(e.Data, out var match))
                 {
                     logger.LogTrace(e.Data);

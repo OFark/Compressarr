@@ -50,11 +50,8 @@
                         <CardHeaderActions>
                             @if (!NewJob)
                             {
-                                if (job.JobState != JobState.Running)
-                                {
-                                    <MudIconButton Color="Color.Warning" Icon="@Icons.Material.Outlined.Sync" @onclick="reInitialise" title="Re-Initialise" />
-                                }
-                                <MudIconButton Color="Color.Primary" Icon="@Icons.Material.Outlined.Edit" @onclick="() => { editJob = !editJob; }" />
+                                <MudIconButton Color="Color.Warning" Icon="@Icons.Material.Outlined.Sync" Disabled="@(!job.Condition.SafeToInitialise)" @onclick="reInitialise" title="Re-Initialise" />
+                                <MudIconButton Color="Color.Primary" Icon="@Icons.Material.Outlined.Edit" Disabled="@(!job.Condition.SafeToInitialise)" @onclick="() => { editJob = !editJob; }" />
                             }
                         </CardHeaderActions>
                     </MudCardHeader>
@@ -170,6 +167,12 @@
                                 <MudPaper Class="mt-2" Elevation="0">
                                     <MudProgressLinear Color="Color.Primary" Value="initialisationProgress" />
                                 </MudPaper>
+                                @if (!NewJob)
+                                {
+                                    <MudToolBar>
+                                        <MudButton Variant="Variant.Filled" FullWidth="true" Color="@buttonColour" @onclick="startJob" @onmouseover="() => { mouseOnButton = true; }" @onmouseout="() => { mouseOnButton = false; }">@buttonText</MudButton>
+                                    </MudToolBar>
+                                }
                             }
                             else
                             {
@@ -229,12 +232,6 @@
                             </MudTabPanel>
                         }
                     </MudTabs>
-                    @if (!NewJob)
-                    {
-                        <MudToolBar>
-                            <MudButton Variant="Variant.Filled" FullWidth="true" Color="@buttonColour" @onclick="startJob" @onmouseover="() => { mouseOnButton = true; }" @onmouseout="() => { mouseOnButton = false; }">@buttonText</MudButton>
-                        </MudToolBar>
-                    }
                 }
                 else if (!NewJob)
                 {
@@ -308,48 +305,30 @@
         }
     }
 
-    private string buttonText
-    {
-        get
-        {
-            switch (job.JobState)
-            {
-                case JobState.Testing:
-                    return "Initialising";
-                case JobState.Running:
-                    return mouseOnButton ? "Stop" : "Running";
-                case JobState.Finished:
-                    return mouseOnButton ? "Re-Initialise" : "Finished";
-                case JobState.TestedFail:
-                    return mouseOnButton ? "Re-Initialise" : "Test Failed";
-                case JobState.TestedOK:
-                    return mouseOnButton ? "GO!" : "Ready";
-                case JobState.Waiting:
-                    return mouseOnButton ? "Stop" : "Waiting";
-            }
+    private string buttonText => (mouseOnButton ? job.Condition.SafeToRun ? job.AutoRun ? "Waiting!" : "Go!" : job.Condition.SafeToInitialise ? "Initialise" : job.Condition.CanCancel ? "Cancel" : null : null) ?? job.State.ToString().ToCamelCaseSplit();
 
-            return "";
+
+
+    private Color buttonColour =>
+        job.Condition.SafeToRun && !job.AutoRun ? Color.Primary : job.Condition.SafeToInitialise ? Color.Secondary : job.State == JobState.Error ? Color.Error : Color.Warning;
+
+    private void startJob()
+    {
+        if (job.Condition.SafeToRun)
+        {
+            jobManager.RunJob(job);
+        }
+        else if (job.Condition.SafeToInitialise)
+        {
+            jobManager.InitialiseJob(job);
+        }
+        else if (job.Condition.CanCancel)
+        {
+            jobManager.CancelJob(job);
         }
     }
 
-    private Color buttonColour
-    {
-        get
-        {
-            switch (job.JobState)
-            {
-                case JobState.Testing:
-                case JobState.Running:
-                case JobState.TestedFail:
-                    return Color.Warning;
-
-            }
-
-            return Color.Primary;
-        }
-    }
-
-    private bool running => job.JobState == JobState.Running;
+    private bool running => job.State == JobState.Running;
 
     protected override void OnInitialized()
     {
@@ -375,7 +354,7 @@
 
     private async void reInitialise()
     {
-        await jobManager.InitialiseJob(job, true);
+        await jobManager.InitialiseJob(job);
     }
 
     private void reloadJob()
@@ -401,7 +380,7 @@
             {
                 if (OnAdd.HasDelegate)
                 {
-                    await OnAdd.InvokeAsync();
+                    _ = OnAdd.InvokeAsync();
                 }
             }
 
@@ -426,27 +405,5 @@
         }
     }
 
-    private void startJob()
-    {
-        switch (job.JobState)
-        {
-            case JobState.TestedOK:
-                {
-                    jobManager.RunJob(job);
-                }
-                break;
-            case JobState.TestedFail:
-            case JobState.Finished:
-                {
-                    jobManager.InitialiseJob(job, true);
-                }
-                break;
-            case JobState.Running:
-            case JobState.Waiting:
-                {
-                    jobManager.CancelJob(job);
-                }
-                break;
-        }
-    }
+
 }

@@ -23,7 +23,7 @@ namespace Compressarr.Settings.FFmpegFactory
         public bool Matches { get; set; }
 
         public FilterComparitorBase NumberComparitor { get;  set; }
-        public AudioStreamRule Rule { get; set; }
+        public AudioStreamRule? Rule { get; set; }
         public HashSet<string> Values { get; set; }
     }
 }
