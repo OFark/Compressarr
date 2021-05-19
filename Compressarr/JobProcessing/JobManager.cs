@@ -150,7 +150,7 @@ namespace Compressarr.JobProcessing
                     logger.Log(level, message);
                 };
 
-                if ((job.Condition.SafeToInitialise))
+                if (job.Condition.SafeToInitialise)
                 {
                     Log(job, LogLevel.Information, "Begin Initialisation");
                     job.UpdateCondition((c) => c.Clear());
@@ -215,8 +215,6 @@ namespace Compressarr.JobProcessing
                                                 Fail(job);
                                                 return;
                                             }
-
-                                            wi.Arguments = fFmpegManager.GetArguments(job.Preset, wi.MediaInfo);
 
                                             var destinationpath = job.DestinationFolder;
 
@@ -285,6 +283,7 @@ namespace Compressarr.JobProcessing
                                                 foreach (var wi in job.WorkLoad.Where(wi => wi.MediaInfo == null))
                                                 {
                                                     wi.MediaInfo = await fFmpegManager.GetMediaInfoAsync(wi.SourceFile, wi.MediaHash);
+                                                    wi.Arguments = fFmpegManager.GetArguments(job.Preset, wi.MediaInfo);
 
                                                     job.InitialisationProgress?.Report(++i / job.WorkLoad.Count * 100);
                                                     job.UpdateStatus(this);
