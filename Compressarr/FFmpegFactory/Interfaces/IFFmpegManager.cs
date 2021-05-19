@@ -27,8 +27,8 @@ namespace Compressarr.FFmpegFactory
         Task<WorkItemCheckResult> CheckResult(Job job);
         Task<string> ConvertContainerToExtension(string container);
         Task DeletePresetAsync(FFmpegPreset preset);
-        List<string> GetArguments(FFmpegPreset preset, IMediaInfo mediaInfo);
-        Task<IMediaInfo> GetMediaInfoAsync(string filepath);
+        List<string> GetArguments(FFmpegPreset preset, FFProbeResponse mediaInfo);
+        Task<FFProbeResponse> GetMediaInfoAsync(string filepath, int cacheHash = 0);
         FFmpegPreset GetPreset(string presetName);
     }
 }

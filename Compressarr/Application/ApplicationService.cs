@@ -1,4 +1,5 @@
-﻿using Compressarr.FFmpegFactory;
+﻿using Compressarr.Application.Models;
+using Compressarr.FFmpegFactory;
 using Compressarr.FFmpegFactory.Models;
 using Compressarr.Filtering.Models;
 using Compressarr.JobProcessing.Models;
@@ -15,6 +16,7 @@ using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -37,6 +39,7 @@ namespace Compressarr.Application
             this.fileService = fileService;
 
             AlwaysCalculateSSIM = appSettings?.Value?.AlwaysCalculateSSIM ?? false;
+            CacheMediaInfo = appSettings?.Value?.CacheMediaInfo ?? false;
             LoadMediaInfoOnFilters = appSettings?.Value?.LoadMediaInfoOnFilters ?? false;
             InsertNamesIntoFFmpegPreviews = appSettings?.Value?.InsertNamesIntoFFmpegPreviews ?? false;
 
@@ -78,6 +81,7 @@ namespace Compressarr.Application
 
         //App Settings
         public bool AlwaysCalculateSSIM { get; set; }
+        public bool CacheMediaInfo { get; set; }
         public bool LoadMediaInfoOnFilters { get; set; }
         public bool InsertNamesIntoFFmpegPreviews { get; set; }
 
@@ -105,6 +109,7 @@ namespace Compressarr.Application
                 jsonObj["Settings"] = JToken.FromObject(new AppSettings()
                 {
                     AlwaysCalculateSSIM = AlwaysCalculateSSIM,
+                    CacheMediaInfo = CacheMediaInfo,
                     InsertNamesIntoFFmpegPreviews = InsertNamesIntoFFmpegPreviews,
                     LoadMediaInfoOnFilters = LoadMediaInfoOnFilters
                 });
@@ -115,6 +120,44 @@ namespace Compressarr.Application
             catch (ConfigurationErrorsException)
             {
                 logger.LogError("Error writing app settings");
+            }
+        }
+
+        public async Task<ProcessResponse> RunProcess(string filePath, string arguments)
+        {
+            var response = new ProcessResponse();
+
+            using (var p = new Process())
+            {
+                p.StartInfo = new ProcessStartInfo()
+                {
+                    Arguments = arguments,
+                    CreateNoWindow = true,
+                    FileName = filePath,
+                    RedirectStandardError = true,
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                };
+
+                logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
+                p.Start();
+                response.StdOut = p.StandardOutput.ReadToEnd();
+                response.StdErr = p.StandardError.ReadToEnd();
+                await p.WaitForExitAsync();
+
+                response.ExitCode = p.ExitCode;
+
+                if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(response.StdErr))
+                {
+                    logger.LogError($"Process Error: ({p.ExitCode}) {response.StdErr} <End Of Error>");
+                }
+                else
+                {
+                    response.Success = true;
+                }
+
+                return response;
             }
         }
 

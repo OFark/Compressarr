@@ -6,6 +6,7 @@
         Encode,
         Delete,
         DeleteUnlessOnly
+            //todo: Add Clone option
     }
     public enum AudioStreamRule
     {
@@ -25,7 +26,9 @@
 
     public enum CodecType
     {
+        Attachment,
         Audio,
+        Data,
         Subtitle,
         Video
     }

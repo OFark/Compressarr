@@ -16,6 +16,40 @@ namespace Compressarr.Helpers
             return string.IsNullOrWhiteSpace(text?.ToString()) ? string.Empty : $"{text}{adornment}";
         }
 
+        public static SortedSet<Codec> Decoders(this SortedSet<Codec> codecs)
+        {
+            return new SortedSet<Codec>(codecs.Where(x => x.Decoder));
+        }
+
+        public static SortedSet<Codec> Encoders(this SortedSet<Codec> codecs)
+        {
+            return new SortedSet<Codec>(codecs.Where(x => x.Encoder));
+        }
+
+        /// <summary>
+        /// Gets a Deterministic hash for stability between app domains. (GetHashCode is randomised between app runtimes)
+        /// </summary>
+        /// <param name="str"></param>
+        /// <returns></returns>
+        public static int GetStableHashCode(this string str)
+        {
+            unchecked
+            {
+                int hash1 = 5381;
+                int hash2 = hash1;
+
+                for (int i = 0; i < str.Length && str[i] != '\0'; i += 2)
+                {
+                    hash1 = ((hash1 << 5) + hash1) ^ str[i];
+                    if (i == str.Length - 1 || str[i + 1] == '\0')
+                        break;
+                    hash2 = ((hash2 << 5) + hash2) ^ str[i + 1];
+                }
+
+                return hash1 + (hash2 * 1566083941);
+            }
+        }
+
         /// <summary>
         /// Perform a deep Copy of the object, using Json as a serialization method. NOTE: Private members are not cloned using this method.
         /// </summary>
@@ -50,16 +84,6 @@ namespace Compressarr.Helpers
             return JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(source), deserializeSettings);
         }
 
-        public static SortedSet<Codec> Decoders(this SortedSet<Codec> codecs)
-        {
-            return new SortedSet<Codec>(codecs.Where(x => x.Decoder));
-        }
-
-        public static SortedSet<Codec> Encoders(this SortedSet<Codec> codecs)
-        {
-            return new SortedSet<Codec>(codecs.Where(x => x.Encoder));
-        }
-
         public static string NullIfEmpty(this string text)
         {
             return string.IsNullOrWhiteSpace(text) ? null : text;
@@ -79,6 +103,7 @@ namespace Compressarr.Helpers
         {
             return Regex.Replace(text, "([A-Z])", " $1", RegexOptions.Compiled).Trim();
         }
+
         public static string ToFileSize(this long l)
         {
             return String.Format(new FileSizeFormatProvider(), "{0:fs}", l);
@@ -93,16 +118,15 @@ namespace Compressarr.Helpers
         {
             return percent.HasValue ? Math.Round(percent.Value * 100, decimals).ToString() : null;
         }
+
+        public static string ToStringTimeSeconds(this TimeSpan span)
+        {
+            return span.ToString(@"hh\:mm\:ss");
+        }
         public static bool TryMatch(this Regex reg, string input, out Match match)
         {
             match = reg.Match(input);
             return match.Success;
-        }
-
-        public static string Wrap(this string text, string format)
-        {
-            if (string.IsNullOrWhiteSpace(text)) return null;
-            return string.Format(format, text);
         }
 
         public static HashSet<EncoderOptionValue> WithValues(this HashSet<EncoderOption> encoderOptions, IEnumerable<EncoderOptionValueBase> values = null)
@@ -121,6 +145,12 @@ namespace Compressarr.Helpers
                 eovs.Add(eov);
             }
             return eovs;
+        }
+
+        public static string Wrap(this string text, string format)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return null;
+            return string.Format(format, text);
         }
     }
 }

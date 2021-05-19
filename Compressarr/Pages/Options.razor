@@ -125,13 +125,16 @@
         </MudCardHeader>
         <MudCardContent>
             <MudPaper Elevation="0">
-                <MudSwitch Color="Color.Primary" @bind-Checked="@applicationService.AlwaysCalculateSSIM" Label="Always calculate SSIM after encoding" />
+                <MudSwitch Color="Color.Secondary" @bind-Checked="@applicationService.AlwaysCalculateSSIM" Label="Always calculate SSIM after encoding" />
             </MudPaper>
             <MudPaper Elevation="0">
-                <MudSwitch Color="Color.Primary" @bind-Checked="@applicationService.InsertNamesIntoFFmpegPreviews" Label="Insert file names into FFmpeg previews" />
+                <MudSwitch Color="Color.Secondary" @bind-Checked="@applicationService.CacheMediaInfo" Label="Cache Media Information for faster job initialisation (~10kb per media file)" />
             </MudPaper>
             <MudPaper Elevation="0">
-                <MudSwitch Color="Color.Primary" @bind-Checked="@applicationService.LoadMediaInfoOnFilters" Label="Preload extra Media Info when filtering media." />
+                <MudSwitch Color="Color.Secondary" @bind-Checked="@applicationService.InsertNamesIntoFFmpegPreviews" Label="Insert file names into FFmpeg previews" />
+            </MudPaper>
+            <MudPaper Elevation="0">
+                <MudSwitch Color="Color.Secondary" @bind-Checked="@applicationService.LoadMediaInfoOnFilters" Label="Preload extra Media Info when filtering media." />
             </MudPaper>
 
             <MudSelect T="LogLevel" @bind-Value="logLevel" Label="Log Level">

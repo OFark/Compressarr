@@ -122,7 +122,7 @@
                                         <MudTd DataLabel="Q"><MudText Align="Align.Center">@context.Q</MudText></MudTd>
                                         <MudTd DataLabel="Size"><MudText Align="Align.Center">@context.Size</MudText></MudTd>
                                         <MudTd DataLabel="Time"><MudText Align="Align.Center">@context.Duration</MudText></MudTd>
-                                        <MudTd DataLabel="Length"><MudText Align="Align.Center">@context.TotalLength</MudText></MudTd>
+                                        <MudTd DataLabel="Length"><MudText Align="Align.Center">@context.TotalLength?.ToStringTimeSeconds()</MudText></MudTd>
                                         <MudTd DataLabel="Bitrate"><MudText Align="Align.Center">@context.Bitrate</MudText></MudTd>
                                         <MudTd DataLabel="Speed"><MudText Align="Align.Center">@context.Speed</MudText></MudTd>
                                         <MudTd DataLabel="Finished">

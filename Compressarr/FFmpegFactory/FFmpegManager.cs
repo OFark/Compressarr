@@ -13,6 +13,7 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Xabe.FFmpeg;
 using Compressarr.Helpers;
+using Newtonsoft.Json;
 
 namespace Compressarr.FFmpegFactory
 {
@@ -641,10 +642,10 @@ namespace Compressarr.FFmpegFactory
                 {
                     //Workitem.Duration refers to the processing time frame.
                     logger.LogDebug($"Original Duration: {job.Process.WorkItem.TotalLength}");
-                    logger.LogDebug($"New Duration: {mediaInfo.Duration}");
+                    logger.LogDebug($"New Duration: {mediaInfo.format.Duration}");
 
-                    result.LengthOK = mediaInfo.Duration != default && job.Process.WorkItem.TotalLength.HasValue &&
-                        (long)Math.Round(mediaInfo.Duration.TotalSeconds, 0) == (long)Math.Round(job.Process.WorkItem.TotalLength.Value.TotalSeconds, 0);
+                    result.LengthOK = mediaInfo.format.Duration != default && job.Process.WorkItem.TotalLength.HasValue &&
+                        (long)Math.Round(mediaInfo.format.Duration.TotalSeconds, 0) == (long)Math.Round(job.Process.WorkItem.TotalLength.Value.TotalSeconds, 0); //Check to the nearest second.
                 }
 
                 result.SSIMOK = result.LengthOK &&
@@ -662,7 +663,6 @@ namespace Compressarr.FFmpegFactory
         {
             await applicationService.FFMpegReady.WaitAsync();
 
-            //todo wait for initialisation
             using (logger.BeginScope("Converting container to extension"))
             {
                 logger.LogInformation($"Container name: {container}");
@@ -739,7 +739,7 @@ namespace Compressarr.FFmpegFactory
             }
         }
 
-        public List<string> GetArguments(FFmpegPreset preset, IMediaInfo mediaInfo)
+        public List<string> GetArguments(FFmpegPreset preset, FFProbeResponse mediaInfo)
         {
             applicationService.Initialised.Wait();
 
@@ -752,6 +752,8 @@ namespace Compressarr.FFmpegFactory
             var audioArguments = string.Empty;
 
             var hardwareDecoder = preset.HardwareDecoder.Wrap("-hwaccel {0} ");
+
+            var mapAllElse = " -map 0:s? -c:s copy -map 0:t? -map 0:d? -movflags use_metadata_tags";
 
             //If were treating all audio streams the same
             if (preset.AudioStreamPresets.First().CoversAny)
@@ -770,7 +772,7 @@ namespace Compressarr.FFmpegFactory
             {
                 var i = 0; //for stream output tracking
 
-                foreach (var stream in mediaInfo.AudioStreams)
+                foreach (var stream in mediaInfo.streams)
                 {
                     foreach (var audioPreset in preset.AudioStreamPresets)
                     {
@@ -778,9 +780,9 @@ namespace Compressarr.FFmpegFactory
                             f.Rule switch
                             {
                                 AudioStreamRule.Any => true,
-                                AudioStreamRule.Codec => f.Matches == f.Values.Contains(stream.Codec.ToLower()),
-                                AudioStreamRule.Channels => new List<int>() { stream.Channels }.AsQueryable().Where($"it{f.NumberComparitor.Operator}{f.ChannelValue}").Any(),
-                                AudioStreamRule.Language => stream.Language == null || f.Matches == f.Values.Contains(stream.Language.ToLower()),
+                                AudioStreamRule.Codec => f.Matches == f.Values.Contains(stream.codec_name.ToLower()),
+                                AudioStreamRule.Channels => new List<int>() { stream.channels ?? 0 }.AsQueryable().Where($"it{f.NumberComparitor.Operator}{f.ChannelValue}").Any(),
+                                AudioStreamRule.Language => stream.tags?.language == null || f.Matches == f.Values.Contains(stream.tags?.language.ToLower()),
                                 _ => throw new NotImplementedException()
                             }
                         );
@@ -789,10 +791,10 @@ namespace Compressarr.FFmpegFactory
                         {
                             audioArguments += audioPreset.Action switch
                             {
-                                AudioStreamAction.Copy => $" -map 0:{stream.Index} -c:a:{i++} copy",
+                                AudioStreamAction.Copy => $" -map 0:{stream.index} -c:a:{i++} copy",
                                 AudioStreamAction.Delete => "",
-                                AudioStreamAction.DeleteUnlessOnly => preset.AudioStreamPresets.Last() == audioPreset && i == 0 ? $" -map 0:{stream.Index} -c:a:{i++} copy" : "",
-                                AudioStreamAction.Encode => $" -map 0:{stream.Index} -c:a:{i++} {audioPreset.Encoder.Name}{(string.IsNullOrWhiteSpace(audioPreset.BitRate) ? "" : $" -b:a:{i} ")}{audioPreset.BitRate}",
+                                AudioStreamAction.DeleteUnlessOnly => preset.AudioStreamPresets.Last() == audioPreset && i == 0 ? $" -map 0:{stream.index} -c:a:{i++} copy" : "",
+                                AudioStreamAction.Encode => $" -map 0:{stream.index} -c:a:{i++} {audioPreset.Encoder.Name}{(string.IsNullOrWhiteSpace(audioPreset.BitRate) ? "" : $" -b:a:{i} ")}{audioPreset.BitRate}",
                                 _ => throw new System.NotImplementedException()
                             };
                             break;
@@ -814,27 +816,54 @@ namespace Compressarr.FFmpegFactory
                 var part1Ending = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "NUL" : @"/dev/null";
 
                 args.Add($"{hardwareDecoder}-y -i \"{{0}}\" -map 0:v -c:V {preset.VideoEncoder.Name}{preset.VideoCodecParams} -b:v {preset.VideoBitRate}k{frameRate}{passStr} -an -f null {part1Ending}".Replace("%passnum%", "1"));
-                args.Add($"{hardwareDecoder}-y -i \"{{0}}\" -map 0:v -c:V {preset.VideoEncoder.Name}{preset.VideoCodecParams} -b:v {preset.VideoBitRate}k{frameRate}{passStr}{opArgsStr}{audioArguments} -map 0:s? -c:s copy \"{{1}}\"".Replace("%passnum%", "2"));
+                args.Add($"{hardwareDecoder}-y -i \"{{0}}\" -map 0:v -c:V {preset.VideoEncoder.Name}{preset.VideoCodecParams} -b:v {preset.VideoBitRate}k{frameRate}{passStr}{opArgsStr}{audioArguments}{mapAllElse} \"{{1}}\"".Replace("%passnum%", "2"));
             }
             else
             {
-                args.Add($"{hardwareDecoder}-y -i \"{{0}}\" -map 0:v -c:V {preset.VideoEncoder.Name}{frameRate}{preset.VideoCodecParams}{opArgsStr}{audioArguments} -map 0:s? -c:s copy \"{{1}}\"");
+                args.Add($"{hardwareDecoder}-y -i \"{{0}}\" -map 0:v -c:V {preset.VideoEncoder.Name}{frameRate}{preset.VideoCodecParams}{opArgsStr}{audioArguments}{mapAllElse} \"{{1}}\"");
             }
 
             return args;
         }
 
 
-        public async Task<IMediaInfo> GetMediaInfoAsync(string filepath)
+        public async Task<FFProbeResponse> GetMediaInfoAsync(string filepath, int cacheHash = 0)
         {
-            await applicationService.FFMpegReady.WaitAsync();
-
-            using (logger.BeginScope($"Getting MediaInfo"))
+            using (logger.BeginScope($"Getting MediaInfo: {filepath}", filepath))
             {
-                logger.LogInformation($"File Name: {filepath}");
+                if (cacheHash != 0 && applicationService.CacheMediaInfo)
+                {
+                    if(fileService.HasFile(AppDir.Cache, $"{cacheHash}.json"))
+                    {
+                        var cachedInfo = await fileService.ReadJsonFileAsync<FFProbeResponse>(AppDir.Cache, $"{cacheHash}.json");
+                        if(cachedInfo != null)
+                        {
+                            logger.LogInformation($"Loading Info from cache");
+                            return cachedInfo;
+                        }
+                    }
+                }
+
+                //Wait for FFmpeg to be ready
+                await applicationService.FFMpegReady.WaitAsync();
+
+                    //todo: Add option to cache mediaInfo
+
+                logger.LogInformation($"Loading Info from source");
                 try
                 {
-                    return await FFmpeg.GetMediaInfo(filepath);
+                    var ffProbeResponse = await applicationService.RunProcess(fileService.FFPROBEPath, $"-v 1 -print_format json -show_format -show_streams -find_stream_info \"{filepath}\"");
+
+                    if (ffProbeResponse.Success)
+                    {
+                        var ffProbeInfo = JsonConvert.DeserializeObject<FFProbeResponse>(ffProbeResponse.StdOut);
+                        if (ffProbeInfo != null && cacheHash != 0 && applicationService.CacheMediaInfo)
+                        {
+                            await fileService.WriteTextFileAsync(AppDir.Cache, $"{cacheHash}.json", ffProbeResponse.StdOut);
+                        }
+                        return ffProbeInfo;
+                    }
+                    return null;
                 }
                 catch (ArgumentException aex)
                 {

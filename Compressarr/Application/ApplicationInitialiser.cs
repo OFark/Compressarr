@@ -87,7 +87,7 @@ namespace Compressarr.FFmpegFactory
                             logger.LogDebug("Running on Linux, CHMOD required");
                             foreach (var exe in new string[] { fileService.FFMPEGPath, fileService.FFPROBEPath })
                             {
-                                await RunProcess("/bin/bash", $"-c \"chmod +x {exe}\"");
+                                await applicationService.RunProcess("/bin/bash", $"-c \"chmod +x {exe}\"");
                             }
                         }
                     }
@@ -111,6 +111,7 @@ namespace Compressarr.FFmpegFactory
 
                     Progress("FFmpeg Initialisation complete");
 
+                    //todo: replace this with Task
                     applicationService.FFMpegReady.Set();
 
                     Progress("Initialising Presets");
@@ -196,7 +197,7 @@ namespace Compressarr.FFmpegFactory
 
             var encoders = new Dictionary<CodecType, SortedSet<Encoder>>();
 
-            var result = await RunProcess(fileService.FFMPEGPath, "-encoders -v 1");
+            var result = await applicationService.RunProcess(fileService.FFMPEGPath, "-encoders -v 1");
 
             if (result.Success)
             {
@@ -246,7 +247,7 @@ namespace Compressarr.FFmpegFactory
 
             var hwdecoders = new SortedSet<string>();
 
-            var result = await RunProcess(fileService.FFMPEGPath, "-hwaccels -v 1");
+            var result = await applicationService.RunProcess(fileService.FFMPEGPath, "-hwaccels -v 1");
 
             if (result.Success)
             {
@@ -275,7 +276,7 @@ namespace Compressarr.FFmpegFactory
 
             var codecs = new Dictionary<CodecType, SortedSet<Codec>>();
 
-            var result = await RunProcess(fileService.FFMPEGPath, "-codecs -v 1");
+            var result = await applicationService.RunProcess(fileService.FFMPEGPath, "-codecs -v 1");
 
             if (result.Success)
             {
@@ -328,7 +329,7 @@ namespace Compressarr.FFmpegFactory
 
             var formats = new SortedDictionary<string, string>();
 
-            var result = await RunProcess(fileService.FFMPEGPath, "-formats -v 1");
+            var result = await applicationService.RunProcess(fileService.FFMPEGPath, "-formats -v 1");
 
             if (result.Success)
             {
@@ -373,7 +374,7 @@ namespace Compressarr.FFmpegFactory
                     {
                         logger.LogDebug($"Version file missing. Trying manually");
 
-                        var result = await RunProcess(fileService.FFMPEGPath, "-version");
+                        var result = await applicationService.RunProcess(fileService.FFMPEGPath, "-version");
 
                         if(result.Success)
                         {
@@ -411,44 +412,6 @@ namespace Compressarr.FFmpegFactory
                     logger.LogTrace($"Codec Options file not found.");
                 }
                 return null;
-            }
-        }
-
-        private async Task<ProcessResponse> RunProcess(string filePath, string arguments)
-        {
-            var response = new ProcessResponse();
-
-            using (var p = new Process())
-            {
-                p.StartInfo = new ProcessStartInfo()
-                {
-                    Arguments = arguments,
-                    CreateNoWindow = true,
-                    FileName = filePath,
-                    RedirectStandardError = true,
-                    RedirectStandardOutput = true,
-                    UseShellExecute = false,
-                    WindowStyle = ProcessWindowStyle.Hidden,
-                };
-
-                logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
-                p.Start();
-                response.StdOut = p.StandardOutput.ReadToEnd();
-                response.StdErr = p.StandardError.ReadToEnd();
-                await p.WaitForExitAsync();
-
-                response.ExitCode = p.ExitCode;
-
-                if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(response.StdErr))
-                {
-                    logger.LogError($"Process Error: ({p.ExitCode}) {response.StdErr} <End Of Error>");
-                }
-                else
-                {
-                    response.Success = true;
-                }
-
-                return response;
             }
         }
 

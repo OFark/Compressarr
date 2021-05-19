@@ -11,6 +11,7 @@ namespace Compressarr
     {
         public static void Main(string[] args)
         {
+            //todo: Merge Dockerfiles, build FFmpeg based on ENV
             CreateHostBuilder(args).Build().Run();
         }
 

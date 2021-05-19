@@ -22,6 +22,7 @@ namespace Compressarr.Application
 {
     public enum AppDir
     {
+        Cache,
         CodecOptions,
         Config,
         Debug,
@@ -58,8 +59,19 @@ namespace Compressarr.Application
                                    : RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? GetFilePath(AppDir.FFmpeg, "ffprobe")
                                    : throw new NotSupportedException("Cannot Identify OS");
 
+        public void DeleteFile(string filePath)
+        {
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
+        }
+
+        public Task DumpDebugFile(string fileName, string content) => WriteTextFileAsync(GetFilePath(AppDir.Debug, fileName), content);
+
         public string GetAppDirPath(AppDir dir) => dir switch
         {
+            AppDir.Cache => Path.Combine(ConfigDirectory, "cache"),
             AppDir.CodecOptions => AppEnvironment.IsDevelopment ? "CodecOptions" : Path.Combine(ConfigDirectory, "CodecOptions"),
             AppDir.Config => AppEnvironment.InDocker ? "/config" : AppEnvironment.IsDevelopment ? "config" : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config"),
             AppDir.Debug => Path.Combine(ConfigDirectory, "debug"),
@@ -85,10 +97,8 @@ namespace Compressarr.Application
         public bool HasFile(AppFile file) => File.Exists(GetAppFilePath(file));
 
         public bool HasFile(AppDir dir, string fileName) => File.Exists(Path.Combine(GetAppDirPath(dir), fileName));
-
-        public Task DumpDebugFile(string fileName, string content) => WriteTextFileAsync(Path.Combine(GetAppDirPath(AppDir.Debug), fileName), content);
-
         public Task<T> ReadJsonFileAsync<T>(AppFile file) where T : class => ReadJsonFileAsync<T>(GetAppFilePath(file));
+        public Task<T> ReadJsonFileAsync<T>(AppDir dir, string fileName) where T : class => ReadJsonFileAsync<T>(GetFilePath(dir, fileName));
 
         public async Task<T> ReadJsonFileAsync<T>(string path) where T : class
         {
@@ -141,13 +151,14 @@ namespace Compressarr.Application
                 logger.LogWarning("File does not exist");
                 return null;
             }
-        }        
+        }
 
+        public Task WriteJsonFileAsync(AppDir dir, string fileName, object content) => WriteJsonFileAsync(GetFilePath(dir, fileName), content);
         public Task WriteJsonFileAsync(AppFile file, object content) => WriteJsonFileAsync(GetAppFilePath(file), content);
         public Task WriteJsonFileAsync(string path, object content) =>
             WriteTextFileAsync(path, JsonConvert.SerializeObject(content, new JsonSerializerSettings() { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore }));
 
-
+        public Task WriteTextFileAsync(AppDir dir, string fileName, string content) => WriteTextFileAsync(GetFilePath(dir, fileName), content);
         public Task WriteTextFileAsync(AppFile file, string content) => WriteTextFileAsync(GetAppFilePath(file), content);
 
         public async Task WriteTextFileAsync(string path, string content)
@@ -174,6 +185,7 @@ namespace Compressarr.Application
                 }
             }
         }
+
 
         private SemaphoreSlim GetLock(string path)
         {

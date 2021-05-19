@@ -383,7 +383,7 @@ namespace Compressarr.Services
                         {
                             foreach (var movie in movies.Where(x => applicationService.LoadMediaInfoOnFilters && x.MediaInfo == null))
                             {
-                                movie.MediaInfo = await fFmpegManager.GetMediaInfoAsync($"{applicationService.RadarrSettings.BasePath}{Path.Combine(movie.path, movie.movieFile.relativePath)}");
+                                movie.MediaInfo = await fFmpegManager.GetMediaInfoAsync($"{applicationService.RadarrSettings.BasePath}{Path.Combine(movie.path, movie.movieFile.relativePath)}", movie.GetStableHash());
                                 if (OnUpdate != null)
                                 {
                                     await OnUpdate(this, null);
@@ -433,7 +433,7 @@ namespace Compressarr.Services
                     logger.LogDebug($"Creating new HTTP client.");
                     using (var hc = new HttpClient())
                     {
-                        logger.LogDebug($"Downlading Movie List.");
+                        logger.LogDebug($"Downloading Movie List.");
                         movieJSON = await hc.GetStringAsync(link);
 
                         if (AppEnvironment.IsDevelopment)
@@ -441,12 +441,13 @@ namespace Compressarr.Services
                             _ = fileService.DumpDebugFile("movies.json", movieJSON);
                         }
 
+
+                        //This is here as part of a caching principle, I may use it later, I may not. 
                         if (previousResultsHash != 0)
                         {
                             var newHash = movieJSON.GetHashCode();
                             if (newHash != previousResultsHash)
                             {
-                                //snackbar.Add("Movie List updated", Severity.Info);
                                 previousResultsHash = newHash;
                             }
                         }

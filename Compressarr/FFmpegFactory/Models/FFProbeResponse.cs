@@ -1,5 +1,6 @@
 ﻿using Compressarr.Helpers;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -47,12 +48,20 @@ namespace Compressarr.FFmpegFactory.Models
     {
         public Format format { get; set; }
         public List<Stream> streams { get; set; }
+
+        public IEnumerable<Stream> AttachmentStreams => streams.Where(x => x.codec_type == CodecType.Attachment);
+        public IEnumerable<Stream> AudioStreams => streams.Where(x => x.codec_type == CodecType.Audio);
+        public IEnumerable<Stream> DataStreams => streams.Where(x => x.codec_type == CodecType.Data);
+        public IEnumerable<Stream> SubtitleStreams => streams.Where(x => x.codec_type == CodecType.Subtitle);
+        public IEnumerable<Stream> VideoStreams => streams.Where(x => x.codec_type == CodecType.Video);
     }
 
     public class Format
     {
         public string bit_rate { get; set; }
         public string duration { get; set; }
+        public TimeSpan Duration => TimeSpan.FromSeconds(double.TryParse(duration, out var dur) ? dur : 0);
+            
         public string filename { get; set; }
         public string format_long_name { get; set; }
         public string format_name { get; set; }
@@ -85,7 +94,9 @@ namespace Compressarr.FFmpegFactory.Models
         public string codec_tag { get; set; }
         public string codec_tag_string { get; set; }
         public string codec_time_base { get; set; }
-        public string codec_type { get; set; }
+
+        [JsonConverter(typeof(StringEnumConverter))]
+        public CodecType codec_type { get; set; }
         public int coded_height { get; set; }
         public int coded_width { get; set; }
         public string color_range { get; set; }
@@ -122,9 +133,12 @@ namespace Compressarr.FFmpegFactory.Models
 
     public class Tags
     {
-        public DateTime creation_time { get; set; }
+        public DateTime? creation_time { get; set; }
         public string encoder { get; set; }
         public string language { get; set; }
         public string title { get; set; }
+        public string filename { get; set; }
+        public string mimetype { get; set; }
+        public string handler_name { get; set; }
     }
 }

@@ -1,5 +1,7 @@
-﻿using Compressarr.Filtering;
+﻿using Compressarr.FFmpegFactory.Models;
+using Compressarr.Filtering;
 using Compressarr.Helpers;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
@@ -275,9 +277,16 @@ namespace Compressarr.Services.Models
         [Filter("YouTube Trailer ID")]
         public string youTubeTrailerId { get; set; }
 
-        public IMediaInfo MediaInfo { get; set; }
+        [JsonIgnore]
+        public FFProbeResponse MediaInfo { get; set; }
 
+        [JsonIgnore]
         public bool ShowInfo { get; set; }
+
+        public int GetStableHash()
+        {
+            return JsonConvert.SerializeObject(this).GetStableHashCode();
+        }
     }
 
     public class MovieFile

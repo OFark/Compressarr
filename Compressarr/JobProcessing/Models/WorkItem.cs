@@ -1,4 +1,5 @@
-﻿using Compressarr.Filtering;
+﻿using Compressarr.FFmpegFactory.Models;
+using Compressarr.Filtering;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -20,12 +21,14 @@ namespace Compressarr.JobProcessing.Models
         public bool Finished { get; internal set; } = false;
         public decimal? FPS { get; internal set; }
         public long? Frame { get; internal set; }
-        public IMediaInfo MediaInfo { get; set; }
+        public int MediaHash { get; set; }
+        public FFProbeResponse MediaInfo { get; set; }
         public string MovieName { get; set; }
         public string Name => MovieName ?? SourceFileName;
         public int? Percent { get; internal set; }
         public decimal? Q { get; internal set; }
         public bool Running { get; internal set; } = false;
+        public bool ShowArgs { get; set; }
         public string Size { get; internal set; }
         public MediaSource Source { get; set; }
         public string SourceFile { get; set; }
@@ -34,7 +37,6 @@ namespace Compressarr.JobProcessing.Models
         public string Speed { get; internal set; }
         public decimal? SSIM { get; set; }
         public bool Success { get; internal set; } = false;
-        public TimeSpan? TotalLength { get; internal set; }
-        public bool ShowArgs { get; set; }
+        public TimeSpan? TotalLength => MediaInfo?.format.Duration; //WorkItem Duration is the current process time frame, MediaInfo Duration is the movie length.
     }
 }

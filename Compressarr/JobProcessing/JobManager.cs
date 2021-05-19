@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 
 namespace Compressarr.JobProcessing
 {
@@ -120,24 +121,24 @@ namespace Compressarr.JobProcessing
 
                     var filter = filterManager.ConstructFilterQuery(job.Filter.Filters, out var filterVals);
 
-                    var getMoviesResult = await radarrService.GetMoviesFilteredAsync(filter, filterVals);
+                    var getMoviesResponse = await radarrService.GetMoviesFilteredAsync(filter, filterVals);
 
-                    if (!getMoviesResult.Success)
+                    if (!getMoviesResponse.Success)
                     {
-                        return new ServiceResult<HashSet<WorkItem>>(false, getMoviesResult.ErrorCode, getMoviesResult.ErrorMessage);
+                        return new ServiceResult<HashSet<WorkItem>>(false, getMoviesResponse.ErrorCode, getMoviesResponse.ErrorMessage);
                     }
 
-                    var movies = getMoviesResult.Results;
-                    var files = movies.Select(x => new { x.id, x.MediaInfo, Path = $"{applicationService.RadarrSettings.BasePath}{Path.Combine(x.path, x.movieFile.relativePath)}" }).ToList();
+                    var movies = getMoviesResponse.Results;
+                    var files = movies.Select(x => new { x.id, MediaHash = x.GetStableHash(), x.MediaInfo, Path = $"{applicationService.RadarrSettings.BasePath}{Path.Combine(x.path, x.movieFile.relativePath)}" }).ToList();
 
-                    return new ServiceResult<HashSet<WorkItem>>(true, files.Select(p => new WorkItem() { MediaInfo = p.MediaInfo, Source = job.Filter.MediaSource, SourceID = p.id, SourceFile = p.Path }).ToHashSet());
+                    return new ServiceResult<HashSet<WorkItem>>(true, files.Select(p => new WorkItem() { MediaHash = p.MediaHash, MediaInfo = p.MediaInfo, Source = job.Filter.MediaSource, SourceID = p.id, SourceFile = p.Path }).ToHashSet());
                 }
 
                 logger.LogWarning($"Source ({job.Filter.MediaSource}) is not supported");
                 return new ServiceResult<HashSet<WorkItem>>(false, "404", "Not Implemented");
             }
         }
-        
+
         public async Task InitialiseJob(Job job)
         {
             using (logger.BeginScope("Initialise Job: {job}", job))
@@ -261,8 +262,7 @@ namespace Compressarr.JobProcessing
                                     {
                                         await fileService.WriteTextFileAsync(testFilePath, "This is a write test");
 
-                                        //todo FileManager this 
-                                        File.Delete(testFilePath);
+                                        fileService.DeleteFile(testFilePath);
                                     }
                                     catch (Exception ex)
                                     {
@@ -284,7 +284,7 @@ namespace Compressarr.JobProcessing
                                                 double i = 0;
                                                 foreach (var wi in job.WorkLoad.Where(wi => wi.MediaInfo == null))
                                                 {
-                                                    wi.MediaInfo = await fFmpegManager.GetMediaInfoAsync(wi.SourceFile);
+                                                    wi.MediaInfo = await fFmpegManager.GetMediaInfoAsync(wi.SourceFile, wi.MediaHash);
 
                                                     job.InitialisationProgress?.Report(++i / job.WorkLoad.Count * 100);
                                                     job.UpdateStatus(this);
@@ -401,13 +401,8 @@ namespace Compressarr.JobProcessing
                                 if (!job.Cancel)
                                 {
                                     wi.Success = false;
-                                    //WorkItem Duration is the current process time frame, MediaInfo Duration is the movie length.
-                                    var mediaInfo = await fFmpegManager.GetMediaInfoAsync(wi.SourceFile);
-                                    if (mediaInfo != null)
-                                    {
-                                        wi.TotalLength = TimeSpan.FromSeconds((long)Math.Round(mediaInfo.Duration.TotalSeconds, 0));
-                                    }
-
+                                    
+                                    
                                     Log(job, LogLevel.Debug, $"Now Processing: {wi.SourceFileName}");
                                     job.Process = new FFmpegProcess();
                                     job.Process.OnUpdate += job.UpdateStatus;

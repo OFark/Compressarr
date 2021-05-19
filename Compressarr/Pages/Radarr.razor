@@ -175,46 +175,68 @@
                         <MudCard>
                             <MudBlazor.MudCardContent>
                                 <MudTreeView T="string" ExpandOnClick="true">
-                                    <MudTreeViewItem Value='@($"Duration: {@context.MediaInfo.Duration}")' />
-                                    <MudTreeViewItem Value='@($"Path: {@context.MediaInfo.Path}")' />
-                                    <MudTreeViewItem Value='@($"Size: {@context.MediaInfo.Size}")' />
+                                    <MudTreeViewItem Value='@($"Duration: {@context.MediaInfo.format.Duration.ToStringTimeSeconds()}")' />
+                                    <MudTreeViewItem Value='@($"Path: {@context.path}")' />
+                                    <MudTreeViewItem Value='@($"Size: {@context.MediaInfo.format.size}")' />
+                                    <MudTreeViewItem Value="@($"Attachment Streams: {context.MediaInfo.AttachmentStreams.Count()}")">
+                                        @foreach (var s in context.MediaInfo.AttachmentStreams)
+                                        {
+                                            <MudTreeViewItem Value='@($"Stream: {s.index}")'>
+                                                <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
+                                                <MudTreeViewItem Value='@($"File Name: {s.tags?.filename}")' />
+                                                <MudTreeViewItem Value='@($"MIME Type: {s.tags?.mimetype}")' />
+                                            </MudTreeViewItem>
+                                        }
+                                    </MudTreeViewItem>
                                     <MudTreeViewItem Value="@($"Audio Streams: {context.MediaInfo.AudioStreams.Count()}")">
                                         @foreach (var s in context.MediaInfo.AudioStreams)
                                         {
-                                            <MudTreeViewItem Value='@($"Stream: {s.Index}")'>
-                                                <MudTreeViewItem Value='@($"Bitrate: {s.Bitrate}")' />
-                                                <MudTreeViewItem Value='@($"Channels: {s.Channels}")' />
-                                                <MudTreeViewItem Value='@($"Codec: {s.Codec}")' />
-                                                <MudTreeViewItem Value='@($"Default: {s.Default}")' />
-                                                <MudTreeViewItem Value='@($"Language: {s.Language}")' />
-                                                <MudTreeViewItem Value='@($"Sample Rate: {s.SampleRate}")' />
+                                            <MudTreeViewItem Value='@($"Stream: {s.index}")'>
+                                                <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
+                                                <MudTreeViewItem Value='@($"Bitrate: {s.bit_rate}")' />
+                                                <MudTreeViewItem Value='@($"Channels: {s.channels}")' />
+                                                <MudTreeViewItem Value='@($"Sample Rate: {s.sample_rate}")' />
+                                                <MudTreeViewItem Value='@($"Default: {s.disposition?.@default}")' />
+                                                <MudTreeViewItem Value='@($"Language: {s.tags?.language}")' />
+                                                <MudTreeViewItem Value='@($"Title: {s.tags?.title}")' />
                                             </MudTreeViewItem>
+                                        }
+                                    </MudTreeViewItem>
+                                    <MudTreeViewItem Value="@($"Data Streams: {context.MediaInfo.DataStreams.Count()}")">
+                                        @foreach (var s in context.MediaInfo.DataStreams)
+                                        {
+                                        <MudTreeViewItem Value='@($"Stream: {s.index}")'>
+                                            <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
+                                            <MudTreeViewItem Value='@($"Codec Tag: {s.codec_tag_string}")' />
+                                            <MudTreeViewItem Value='@($"Language: {s.tags?.language}")' />
+                                            <MudTreeViewItem Value='@($"Handler: {s.tags?.handler_name}")' />
+                                        </MudTreeViewItem>
                                         }
                                     </MudTreeViewItem>
                                     <MudTreeViewItem Value="@($"Video Streams: {context.MediaInfo.VideoStreams.Count()}")">
                                         @foreach (var s in context.MediaInfo.VideoStreams)
                                         {
-                                            <MudTreeViewItem Value='@($"Stream: {s.Index}")'>
-                                                <MudTreeViewItem Value='@($"Bitrate: {s.Bitrate}")' />
-                                                <MudTreeViewItem Value='@($"Codec: {s.Codec}")' />
-                                                <MudTreeViewItem Value='@($"Default: {s.Default}")' />
-                                                <MudTreeViewItem Value='@($"Framerate: {s.Framerate}")' />
-                                                <MudTreeViewItem Value='@($"Height: {s.Height}")' />
-                                                <MudTreeViewItem Value='@($"Width: {s.Width}")' />
-                                                <MudTreeViewItem Value='@($"Pixel Format: {s.PixelFormat}")' />
-                                                <MudTreeViewItem Value='@($"Ratio: {s.Ratio}")' />
+                                            <MudTreeViewItem Value='@($"Stream: {s.index}")'>
+                                                <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
+                                                <MudTreeViewItem Value='@($"Bitrate: {s.bit_rate}")' />
+                                                <MudTreeViewItem Value='@($"Framerate: {s.avg_frame_rate}")' />
+                                                <MudTreeViewItem Value='@($"Height: {s.height}")' />
+                                                <MudTreeViewItem Value='@($"Width: {s.width}")' />
+                                                <MudTreeViewItem Value='@($"Pixel Format: {s.pix_fmt}")' />
+                                                <MudTreeViewItem Value='@($"Ratio: {s.display_aspect_ratio}")' />
+                                                <MudTreeViewItem Value='@($"Default: {s.disposition?.@default}")' />
                                             </MudTreeViewItem>
                                         }
                                     </MudTreeViewItem>
                                     <MudTreeViewItem Value="@($"Subtitle Streams: {context.MediaInfo.SubtitleStreams.Count()}")">
                                         @foreach (var s in context.MediaInfo.SubtitleStreams)
                                         {
-                                            <MudTreeViewItem Value='@($"Stream: {s.Index}")'>
-                                                <MudTreeViewItem Value='@($"Codec: {s.Codec}")' />
-                                                <MudTreeViewItem Value='@($"Default: {s.Default}")' />
-                                                <MudTreeViewItem Value='@($"Forced: {s.Forced}")' />
-                                                <MudTreeViewItem Value='@($"Language: {s.Language}")' />
-                                                <MudTreeViewItem Value='@($"Title: {s.Title}")' />
+                                            <MudTreeViewItem Value='@($"Stream: {s.index}")'>
+                                                <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
+                                                <MudTreeViewItem Value='@($"Default: {s.disposition?.@default}")' />
+                                                <MudTreeViewItem Value='@($"Forced: {s.disposition?.forced}")' />
+                                                <MudTreeViewItem Value='@($"Language: {s.tags?.language}")' />
+                                                <MudTreeViewItem Value='@($"Title: {s.tags?.title}")' />
                                             </MudTreeViewItem>
                                         }
                                     </MudTreeViewItem>

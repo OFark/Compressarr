@@ -1,4 +1,5 @@
-﻿using Compressarr.FFmpegFactory;
+﻿using Compressarr.Application.Models;
+using Compressarr.FFmpegFactory;
 using Compressarr.FFmpegFactory.Models;
 using Compressarr.Filtering.Models;
 using Compressarr.JobProcessing.Models;
@@ -37,9 +38,12 @@ namespace Compressarr.Application
         APISettings SonarrSettings { get; set; }
         string State { get; set; }
         Queue<string> StateHistory { get; set; }
+        bool CacheMediaInfo { get; set; }
+
         void Broadcast(string message);
         LogLevel GetLogLevel();
         Task SaveAppSetting();
         Task UpdateLogLevel(LogLevel level);
+        Task<ProcessResponse> RunProcess(string filePath, string arguments);
     }
 }
