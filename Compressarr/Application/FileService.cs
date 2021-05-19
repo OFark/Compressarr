@@ -75,7 +75,7 @@ namespace Compressarr.Application
             AppDir.CodecOptions => AppEnvironment.IsDevelopment ? "CodecOptions" : Path.Combine(ConfigDirectory, "CodecOptions"),
             AppDir.Config => AppEnvironment.InDocker ? "/config" : AppEnvironment.IsDevelopment ? "config" : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config"),
             AppDir.Debug => Path.Combine(ConfigDirectory, "debug"),
-            AppDir.FFmpeg => Path.Combine(AppEnvironment.InNvidiaDocker ? "/usr/local/bin/" : ConfigDirectory, "FFmpeg"),
+            AppDir.FFmpeg => AppEnvironment.InNvidiaDocker ? "/usr/local/bin/" : Path.Combine(ConfigDirectory, "FFmpeg"),
             AppDir.Logs => Path.Combine(ConfigDirectory, "logs"),
             _ => Path.Combine(ConfigDirectory, dir.ToString())
         };
