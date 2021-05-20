@@ -741,7 +741,7 @@ namespace Compressarr.Presets
 
                 if (mediaInfo?.streams != null)
                 {
-                    foreach (var stream in mediaInfo.streams)
+                    foreach (var stream in mediaInfo.AudioStreams)
                     {
                         foreach (var audioPreset in preset.AudioStreamPresets)
                         {
