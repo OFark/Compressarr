@@ -1,15 +1,14 @@
-﻿using Compressarr.FFmpegFactory.Models;
+﻿using Compressarr.FFmpeg.Models;
 using Compressarr.Filtering.Models;
-using Compressarr.JobProcessing;
 using Compressarr.JobProcessing.Models;
+using Compressarr.Presets.Models;
 using Compressarr.Services.Base;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Xabe.FFmpeg;
 
-namespace Compressarr.FFmpegFactory
+namespace Compressarr.Presets
 {
-    public interface IFFmpegManager : IJobDependency
+    public interface IPresetManager : IJobDependency
     {
         SortedSet<Codec> AudioCodecs { get; }
         SortedSet<Encoder> AudioEncoders { get; }
@@ -24,11 +23,9 @@ namespace Compressarr.FFmpegFactory
         List<string> AudioBitrates { get; }
 
         Task AddPresetAsync(FFmpegPreset newPreset);
-        Task<WorkItemCheckResult> CheckResult(Job job);
         Task<string> ConvertContainerToExtension(string container);
         Task DeletePresetAsync(FFmpegPreset preset);
-        List<string> GetArguments(FFmpegPreset preset, FFProbeResponse mediaInfo);
-        Task<FFProbeResponse> GetMediaInfoAsync(string filepath, int cacheHash = 0);
+        Task<List<string>> GetArguments(FFmpegPreset preset, FFProbeResponse mediaInfo);
         FFmpegPreset GetPreset(string presetName);
     }
 }

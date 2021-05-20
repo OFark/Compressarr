@@ -1,4 +1,4 @@
-﻿using Compressarr.FFmpegFactory.Models;
+﻿using Compressarr.Presets.Models;
 using Compressarr.Filtering;
 using Compressarr.Helpers;
 using Newtonsoft.Json;
@@ -6,6 +6,9 @@ using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using Xabe.FFmpeg;
+using Compressarr.FFmpeg.Models;
+using System.Threading.Tasks;
+using System.IO;
 
 namespace Compressarr.Services.Models
 {
@@ -73,7 +76,7 @@ namespace Compressarr.Services.Models
 
         [Filter("Audio - Codec Library", FilterPropertyType.Enum)]
         public string audioCodecLibrary { get; set; }
-        
+
         [Filter("Audio - Format", FilterPropertyType.Enum)]
         public string audioFormat { get; set; }
 
@@ -95,7 +98,7 @@ namespace Compressarr.Services.Models
         [Filter("Run Time")]
         public string runTime { get; set; }
 
-        [Filter("Run Time(F)", FilterOn ="runTime")]
+        [Filter("Run Time(F)", FilterOn = "runTime")]
         public string runTimeNice
         {
             get
@@ -282,6 +285,8 @@ namespace Compressarr.Services.Models
 
         [JsonIgnore]
         public bool ShowInfo { get; set; }
+
+        public string GetFullPath(string basePath) => $"{basePath}{Path.Combine(path, movieFile?.relativePath)}";
 
         public int GetStableHash()
         {

@@ -155,10 +155,8 @@
     }
     <MudTable Items="movies" Dense="true" Striped="true" Hover="true" @ref="table">
         <HeaderContent>
-            @if (applicationService.LoadMediaInfoOnFilters)
-            {
-                <MudTh>Info</MudTh>
-            }
+            <MudTh>Info</MudTh>
+
             @foreach (var p in filterManager.RadarrTableColumns)
             {
                 <MudTh title="@p.Key" @ondblclick="@(() => filterOn(p.FilterOn))">@p.Name</MudTh>
@@ -168,78 +166,93 @@
             <MovieView movie="@context" filterManager="filterManager" OnFilterBy="filterBy" OnUpdate="@(() => StateHasChanged())" />
         </RowTemplate>
         <ChildRowContent>
-            @if (context.ShowInfo)
+            @if (context.ShowInfo && context.MediaInfo != null)
             {
                 <MudTr>
                     <td colspan="99">
                         <MudCard>
                             <MudBlazor.MudCardContent>
                                 <MudTreeView T="string" ExpandOnClick="true">
-                                    <MudTreeViewItem Value='@($"Duration: {@context.MediaInfo.format.Duration.ToStringTimeSeconds()}")' />
+                                    <MudTreeViewItem Value='@($"Duration: {@context.MediaInfo?.format?.Duration.ToStringTimeSeconds()}")' />
                                     <MudTreeViewItem Value='@($"Path: {@context.path}")' />
-                                    <MudTreeViewItem Value='@($"Size: {@context.MediaInfo.format.size}")' />
-                                    <MudTreeViewItem Value="@($"Attachment Streams: {context.MediaInfo.AttachmentStreams.Count()}")">
-                                        @foreach (var s in context.MediaInfo.AttachmentStreams)
-                                        {
-                                            <MudTreeViewItem Value='@($"Stream: {s.index}")'>
-                                                <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
-                                                <MudTreeViewItem Value='@($"File Name: {s.tags?.filename}")' />
-                                                <MudTreeViewItem Value='@($"MIME Type: {s.tags?.mimetype}")' />
-                                            </MudTreeViewItem>
-                                        }
-                                    </MudTreeViewItem>
-                                    <MudTreeViewItem Value="@($"Audio Streams: {context.MediaInfo.AudioStreams.Count()}")">
-                                        @foreach (var s in context.MediaInfo.AudioStreams)
-                                        {
-                                            <MudTreeViewItem Value='@($"Stream: {s.index}")'>
-                                                <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
-                                                <MudTreeViewItem Value='@($"Bitrate: {s.bit_rate}")' />
-                                                <MudTreeViewItem Value='@($"Channels: {s.channels}")' />
-                                                <MudTreeViewItem Value='@($"Sample Rate: {s.sample_rate}")' />
-                                                <MudTreeViewItem Value='@($"Default: {s.disposition?.@default}")' />
-                                                <MudTreeViewItem Value='@($"Language: {s.tags?.language}")' />
-                                                <MudTreeViewItem Value='@($"Title: {s.tags?.title}")' />
-                                            </MudTreeViewItem>
-                                        }
-                                    </MudTreeViewItem>
-                                    <MudTreeViewItem Value="@($"Data Streams: {context.MediaInfo.DataStreams.Count()}")">
-                                        @foreach (var s in context.MediaInfo.DataStreams)
-                                        {
-                                        <MudTreeViewItem Value='@($"Stream: {s.index}")'>
-                                            <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
-                                            <MudTreeViewItem Value='@($"Codec Tag: {s.codec_tag_string}")' />
-                                            <MudTreeViewItem Value='@($"Language: {s.tags?.language}")' />
-                                            <MudTreeViewItem Value='@($"Handler: {s.tags?.handler_name}")' />
+                                    <MudTreeViewItem Value='@($"Size: {@context.MediaInfo?.format?.size}")' />
+                                    @if (context.MediaInfo?.AttachmentStreams != null)
+                                    {
+                                        <MudTreeViewItem Value="@($"Attachment Streams: {context.MediaInfo?.AttachmentStreams?.Count()}")">
+                                            @foreach (var s in context.MediaInfo?.AttachmentStreams)
+                                            {
+                                                <MudTreeViewItem Value='@($"Stream: {s.index}")'>
+                                                    <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
+                                                    <MudTreeViewItem Value='@($"File Name: {s.tags?.filename}")' />
+                                                    <MudTreeViewItem Value='@($"MIME Type: {s.tags?.mimetype}")' />
+                                                </MudTreeViewItem>
+                                            }
                                         </MudTreeViewItem>
-                                        }
-                                    </MudTreeViewItem>
-                                    <MudTreeViewItem Value="@($"Video Streams: {context.MediaInfo.VideoStreams.Count()}")">
-                                        @foreach (var s in context.MediaInfo.VideoStreams)
-                                        {
-                                            <MudTreeViewItem Value='@($"Stream: {s.index}")'>
-                                                <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
-                                                <MudTreeViewItem Value='@($"Bitrate: {s.bit_rate}")' />
-                                                <MudTreeViewItem Value='@($"Framerate: {s.avg_frame_rate}")' />
-                                                <MudTreeViewItem Value='@($"Height: {s.height}")' />
-                                                <MudTreeViewItem Value='@($"Width: {s.width}")' />
-                                                <MudTreeViewItem Value='@($"Pixel Format: {s.pix_fmt}")' />
-                                                <MudTreeViewItem Value='@($"Ratio: {s.display_aspect_ratio}")' />
-                                                <MudTreeViewItem Value='@($"Default: {s.disposition?.@default}")' />
-                                            </MudTreeViewItem>
-                                        }
-                                    </MudTreeViewItem>
-                                    <MudTreeViewItem Value="@($"Subtitle Streams: {context.MediaInfo.SubtitleStreams.Count()}")">
-                                        @foreach (var s in context.MediaInfo.SubtitleStreams)
-                                        {
-                                            <MudTreeViewItem Value='@($"Stream: {s.index}")'>
-                                                <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
-                                                <MudTreeViewItem Value='@($"Default: {s.disposition?.@default}")' />
-                                                <MudTreeViewItem Value='@($"Forced: {s.disposition?.forced}")' />
-                                                <MudTreeViewItem Value='@($"Language: {s.tags?.language}")' />
-                                                <MudTreeViewItem Value='@($"Title: {s.tags?.title}")' />
-                                            </MudTreeViewItem>
-                                        }
-                                    </MudTreeViewItem>
+                                    }
+                                    @if (context.MediaInfo?.AudioStreams != null)
+                                    {
+                                        <MudTreeViewItem Value="@($"Audio Streams: {context.MediaInfo?.AudioStreams.Count()}")">
+                                            @foreach (var s in context.MediaInfo?.AudioStreams)
+                                            {
+                                                <MudTreeViewItem Value='@($"Stream: {s.index}")'>
+                                                    <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
+                                                    <MudTreeViewItem Value='@($"Bitrate: {s.bit_rate}")' />
+                                                    <MudTreeViewItem Value='@($"Channels: {s.channels}")' />
+                                                    <MudTreeViewItem Value='@($"Sample Rate: {s.sample_rate}")' />
+                                                    <MudTreeViewItem Value='@($"Default: {s.disposition?.@default}")' />
+                                                    <MudTreeViewItem Value='@($"Language: {s.tags?.language}")' />
+                                                    <MudTreeViewItem Value='@($"Title: {s.tags?.title}")' />
+                                                </MudTreeViewItem>
+                                            }
+                                        </MudTreeViewItem>
+                                    }
+                                    @if (context.MediaInfo?.DataStreams != null)
+                                    {
+                                        <MudTreeViewItem Value="@($"Data Streams: {context.MediaInfo?.DataStreams.Count()}")">
+                                            @foreach (var s in context.MediaInfo?.DataStreams)
+                                            {
+                                                <MudTreeViewItem Value='@($"Stream: {s.index}")'>
+                                                    <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
+                                                    <MudTreeViewItem Value='@($"Codec Tag: {s.codec_tag_string}")' />
+                                                    <MudTreeViewItem Value='@($"Language: {s.tags?.language}")' />
+                                                    <MudTreeViewItem Value='@($"Handler: {s.tags?.handler_name}")' />
+                                                </MudTreeViewItem>
+                                            }
+                                        </MudTreeViewItem>
+                                    }
+                                    @if (context.MediaInfo?.VideoStreams != null)
+                                    {
+                                        <MudTreeViewItem Value="@($"Video Streams: {context.MediaInfo?.VideoStreams.Count()}")">
+                                            @foreach (var s in context.MediaInfo?.VideoStreams)
+                                            {
+                                                <MudTreeViewItem Value='@($"Stream: {s.index}")'>
+                                                    <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
+                                                    <MudTreeViewItem Value='@($"Bitrate: {s.bit_rate}")' />
+                                                    <MudTreeViewItem Value='@($"Framerate: {s.avg_frame_rate}")' />
+                                                    <MudTreeViewItem Value='@($"Height: {s.height}")' />
+                                                    <MudTreeViewItem Value='@($"Width: {s.width}")' />
+                                                    <MudTreeViewItem Value='@($"Pixel Format: {s.pix_fmt}")' />
+                                                    <MudTreeViewItem Value='@($"Ratio: {s.display_aspect_ratio}")' />
+                                                    <MudTreeViewItem Value='@($"Default: {s.disposition?.@default}")' />
+                                                </MudTreeViewItem>
+                                            }
+                                        </MudTreeViewItem>
+                                    }
+                                    @if (context.MediaInfo?.SubtitleStreams != null)
+                                    {
+                                        <MudTreeViewItem Value="@($"Subtitle Streams: {context.MediaInfo?.SubtitleStreams.Count()}")">
+                                            @foreach (var s in context.MediaInfo?.SubtitleStreams)
+                                            {
+                                                <MudTreeViewItem Value='@($"Stream: {s.index}")'>
+                                                    <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
+                                                    <MudTreeViewItem Value='@($"Default: {s.disposition?.@default}")' />
+                                                    <MudTreeViewItem Value='@($"Forced: {s.disposition?.forced}")' />
+                                                    <MudTreeViewItem Value='@($"Language: {s.tags?.language}")' />
+                                                    <MudTreeViewItem Value='@($"Title: {s.tags?.title}")' />
+                                                </MudTreeViewItem>
+                                            }
+                                        </MudTreeViewItem>
+                                    }
                                 </MudTreeView>
                             </MudBlazor.MudCardContent>
                         </MudCard>
@@ -324,7 +337,7 @@
     {
         dlFilters = new List<DynamicLinqFilter>();
 
-        radarrService.OnUpdate += (o,e) => InvokeAsync(() => StateHasChanged());
+        radarrService.OnUpdate += (o, e) => InvokeAsync(() => StateHasChanged());
 
         base.OnInitialized();
     }

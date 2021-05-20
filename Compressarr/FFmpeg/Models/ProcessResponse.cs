@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Compressarr.Application.Models
+namespace Compressarr.FFmpeg.Models
 {
     public class ProcessResponse
     {

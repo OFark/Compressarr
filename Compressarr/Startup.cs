@@ -1,6 +1,6 @@
 using Compressarr.Application;
-using Compressarr.FFmpegFactory;
-using Compressarr.FFmpegFactory.Models;
+using Compressarr.Presets;
+using Compressarr.Presets.Models;
 using Compressarr.Filtering;
 using Compressarr.Filtering.Models;
 using Compressarr.JobProcessing;
@@ -17,6 +17,7 @@ using Microsoft.Extensions.Hosting;
 using MudBlazor;
 using MudBlazor.Services;
 using System.Collections.Generic;
+using Compressarr.FFmpeg;
 
 namespace Compressarr
 {
@@ -49,9 +50,11 @@ namespace Compressarr
 
             services.AddScoped<ILayoutService, LayoutService>();
 
-            services.AddTransient<IFFmpegManager, FFmpegManager>();
+            services.AddTransient<IFFmpegProcessor, FFmpegProcessor>();
             services.AddTransient<IFilterManager, FilterManager>();
             services.AddTransient<IJobManager, JobManager>();
+            services.AddTransient<IMediaInfoService, MediaInfoService>();
+            services.AddTransient<IPresetManager, PresetManager>();
             services.AddTransient<IRadarrService, RadarrService>();
             services.AddTransient<ISonarrService, SonarrService>();
 

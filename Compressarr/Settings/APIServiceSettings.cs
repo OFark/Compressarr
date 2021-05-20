@@ -1,4 +1,4 @@
-﻿using Compressarr.FFmpegFactory.Models;
+﻿using Compressarr.Presets.Models;
 using Compressarr.Filtering.Models;
 using Compressarr.JobProcessing.Models;
 using System.Collections.Generic;

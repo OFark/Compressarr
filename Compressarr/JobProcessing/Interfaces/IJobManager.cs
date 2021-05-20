@@ -1,4 +1,4 @@
-﻿using Compressarr.FFmpegFactory.Models;
+﻿using Compressarr.Presets.Models;
 using Compressarr.Filtering;
 using Compressarr.Filtering.Models;
 using Compressarr.JobProcessing.Models;
@@ -17,7 +17,6 @@ namespace Compressarr.JobProcessing
         void CancelJob(Job job);
         Task DeleteJob(Job job);
         bool FilterInUse(string filterName);
-        Task<ServiceResult<HashSet<WorkItem>>> GetFiles(Job job);
         Task InitialiseJob(Job job);
         void InitialiseJobs(Filter filter);
         void InitialiseJobs(MediaSource source);

@@ -1,14 +1,14 @@
 ﻿@page "/FFmpeg"
 
 @inject IApplicationService ApplicationService
-@inject IFFmpegManager FFmpegManager
+@inject IPresetManager PresetManager
 @inject ILayoutService LayoutService
 
 @if (appReady)
 {
     <MudExpansionPanels>
 
-        @foreach (var preset in FFmpegManager.Presets)
+        @foreach (var preset in PresetManager.Presets)
         {
             <PresetView preset="preset" />
 
@@ -40,7 +40,7 @@ else
     {
         LayoutService.OnStateChanged += LayoutService_OnStateChanged;
 
-        await ApplicationService.Initialised.WaitAsync();
+        await ApplicationService.InitialisePresets;
         appReady = true;
 
         await base.OnInitializedAsync();

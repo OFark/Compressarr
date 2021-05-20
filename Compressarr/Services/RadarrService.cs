@@ -1,9 +1,10 @@
-﻿using Compressarr.FFmpegFactory;
+﻿using Compressarr.Application;
+using Compressarr.JobProcessing;
 using Compressarr.JobProcessing.Models;
+using Compressarr.Presets;
 using Compressarr.Services.Base;
 using Compressarr.Services.Models;
-using Compressarr.Application;
-using Microsoft.AspNetCore.Html;
+using Compressarr.Settings;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
@@ -13,10 +14,9 @@ using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Net.Http;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
-using Compressarr.Settings;
-using System.Threading;
 
 namespace Compressarr.Services
 {
@@ -25,18 +25,20 @@ namespace Compressarr.Services
 
         private static SemaphoreSlim mediaInfoSemaphore = new(1, 1);
         private readonly IApplicationService applicationService;
-        private readonly IFFmpegManager fFmpegManager;
+        private readonly IPresetManager presetManager;
+        private readonly IProcessManager processManager;
         private readonly IFileService fileService;
         private readonly ILogger<RadarrService> logger;
         private StatusResult _status = null;
 
         private int previousResultsHash;
-        public RadarrService(IFFmpegManager fFmpegManager, IFileService fileService, ILogger<RadarrService> logger, IApplicationService applicationService)
+        public RadarrService(IApplicationService applicationService, IFileService fileService, ILogger<RadarrService> logger, IPresetManager presetManager, IProcessManager processManager)
         {
-            this.fFmpegManager = fFmpegManager;
+            this.applicationService = applicationService;
             this.fileService = fileService;
             this.logger = logger;
-            this.applicationService = applicationService;
+            this.presetManager = presetManager;
+            this.processManager = processManager;
         }
 
         public delegate Task AsyncEventHandler(object sender, EventArgs e);
@@ -70,7 +72,7 @@ namespace Compressarr.Services
                     }
                 }
 
-                
+
                 if (!string.IsNullOrWhiteSpace(MovieFilter))
                 {
                     logger.LogDebug("Filtering Movies");
@@ -78,13 +80,8 @@ namespace Compressarr.Services
                     logger.LogDebug($"Filter Values: {string.Join(", ", MovieFilterValues)}");
 
                     var results = movies.AsQueryable().Where(MovieFilter, MovieFilterValues.ToArray());
-
-                    LoadMediaInfo(results);
-
                     return new(true, results);
                 }
-
-                LoadMediaInfo(movies);
 
                 return new(true, movies);
             }
@@ -370,34 +367,7 @@ namespace Compressarr.Services
                 return ss;
             }
         }
-
-        private void LoadMediaInfo(IEnumerable<Movie> movies)
-        {
-            if (applicationService.LoadMediaInfoOnFilters)
-            {
-                _ = Task.Run(async () =>
-                {
-                    if (await mediaInfoSemaphore.WaitAsync(1000))
-                    {
-                        try
-                        {
-                            foreach (var movie in movies.Where(x => applicationService.LoadMediaInfoOnFilters && x.MediaInfo == null))
-                            {
-                                movie.MediaInfo = await fFmpegManager.GetMediaInfoAsync($"{applicationService.RadarrSettings.BasePath}{Path.Combine(movie.path, movie.movieFile.relativePath)}", movie.GetStableHash());
-                                if (OnUpdate != null)
-                                {
-                                    await OnUpdate(this, null);
-                                }
-                            }
-                        }
-                        finally
-                        {
-                            mediaInfoSemaphore.Release();
-                        }
-                    }
-                });
-            }
-        }
+                
         private async Task<ServiceResult<IEnumerable<Movie>>> RequestMovies()
         {
             using (logger.BeginScope("Requesting Movies"))
@@ -460,7 +430,7 @@ namespace Compressarr.Services
 
                         logger.LogDebug($"Success.");
 
-                        return new (true, moviesArr.Where(m => m.downloaded && m.movieFile != null && m.movieFile.mediaInfo != null).OrderBy(m => m.title).ToHashSet(), new(0, 1, 0));
+                        return new(true, moviesArr.Where(m => m.downloaded && m.movieFile != null && m.movieFile.mediaInfo != null).OrderBy(m => m.title).ToHashSet(), new(0, 1, 0));
                     }
                 }
                 catch (Exception ex)

@@ -1,5 +1,5 @@
 ﻿@inject IApplicationService ApplicationService
-@inject IFFmpegManager FFmpegManager
+@inject IPresetManager PresetManager
 @inject IDialogService DialogService
 @inject ILayoutService LayoutService
 @inject IJobManager JobManager
@@ -13,7 +13,7 @@
         <MudSelect @bind-Value="preset.Container" Label="Container" OffsetY="true" T="string" Strict="true" Class="mb-2">
             <MudSelectItem Value="@("copy")">copy - No change</MudSelectItem>
             <MudDivider />
-            @foreach (var c in FFmpegManager.Containers)
+            @foreach (var c in PresetManager.Containers)
             {
                 <MudSelectItem Value="@c.Key">@c.Key - @c.Value</MudSelectItem>
             }
@@ -25,17 +25,17 @@
                         <MudSelect @bind-Value="preset.VideoEncoder" Label="Video Encoder" OffsetY="true" T="Encoder" Immediate="true" Class="mb-2">
                             <MudSelectItem T="Encoder" Value="@(new ())" />
                             <MudDivider />
-                            @foreach (var c in FFmpegManager.VideoEncoders.Where(x => x.Options != null))
+                            @foreach (var c in PresetManager.VideoEncoders.Where(x => x.Options != null))
                             {
                                 <MudSelectItem Value="@c"><MudIcon Icon="@Icons.Outlined.Article" Style="vertical-align: middle;" /> @c.ToString()</MudSelectItem>
                             }
 
-                            @if (FFmpegManager.VideoEncoders.Any(x => x.Options != null))
+                            @if (PresetManager.VideoEncoders.Any(x => x.Options != null))
                             {
                                 <MudDivider />
                             }
 
-                            @foreach (var c in FFmpegManager.VideoEncoders.Where(x => x.Options == null))
+                            @foreach (var c in PresetManager.VideoEncoders.Where(x => x.Options == null))
                             {
                                 <MudSelectItem Value="@c" />
                             }
@@ -63,17 +63,17 @@
                             {
                                 switch (option.EncoderOption.Type)
                                 {
-                                    case FFmpegFactory.CodecOptionType.Number:
+                                    case Presets.CodecOptionType.Number:
                                         {
                                             <MudNumericField @bind-Value="option.Value" Label="@option.Name" />
                                         }
                                         break;
-                                    case FFmpegFactory.CodecOptionType.Range:
+                                    case Presets.CodecOptionType.Range:
                                         {
                                             <MudSlider @bind-Value="@option.IntValue" T="int?" Max="@option.EncoderOption.Max" Min="option.EncoderOption.Min" Immediate="true" Disabled="@(option.EncoderOption.DisabledByVideoBitRate && disabledVideoBitrate)">@option.Name: @option.Value <MudIconButton Size="Size.Small" Icon="@Icons.Outlined.Delete" OnClick="@(() => { option.IntValue = null; })"></MudIconButton></MudSlider>
                                         }
                                         break;
-                                    case FFmpegFactory.CodecOptionType.Select:
+                                    case Presets.CodecOptionType.Select:
                                         {
                                             <MudSelect @bind-Value="option.Value" Label="@option.Name" Clearable="true" OffsetY="true">
                                                 @foreach (var c in option.EncoderOption.Values)
@@ -83,7 +83,7 @@
                                             </MudSelect>
                                         }
                                         break;
-                                    case FFmpegFactory.CodecOptionType.String:
+                                    case Presets.CodecOptionType.String:
                                         {
                                             <MudTextField @bind-Value="option.Value" Label="@option.Name" />
                                         }
@@ -172,7 +172,7 @@
         using (LayoutService.Working("Saving..."))
         {
 
-            await FFmpegManager.AddPresetAsync(preset);
+            await PresetManager.AddPresetAsync(preset);
 
             JobManager.InitialiseJobs(preset);
 
@@ -198,7 +198,7 @@
 
             if (result ?? false)
             {
-                await FFmpegManager.DeletePresetAsync(preset);
+                await PresetManager.DeletePresetAsync(preset);
                 LayoutService.RaiseChange();
             }
             StateHasChanged();

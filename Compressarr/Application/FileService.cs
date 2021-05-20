@@ -1,5 +1,5 @@
-﻿using Compressarr.FFmpegFactory;
-using Compressarr.FFmpegFactory.Models;
+﻿using Compressarr.Presets;
+using Compressarr.Presets.Models;
 using Compressarr.Filtering.Models;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Settings;

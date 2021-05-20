@@ -1,5 +1,4 @@
 ﻿@page "/options"
-@using Compressarr.FFmpegFactory;
 @using Compressarr.Filtering;
 @using Compressarr.JobProcessing;
 @using Compressarr.Services;
@@ -132,9 +131,6 @@
             </MudPaper>
             <MudPaper Elevation="0">
                 <MudSwitch Color="Color.Secondary" @bind-Checked="@applicationService.InsertNamesIntoFFmpegPreviews" Label="Insert file names into FFmpeg previews" />
-            </MudPaper>
-            <MudPaper Elevation="0">
-                <MudSwitch Color="Color.Secondary" @bind-Checked="@applicationService.LoadMediaInfoOnFilters" Label="Preload extra Media Info when filtering media." />
             </MudPaper>
 
             <MudSelect T="LogLevel" @bind-Value="logLevel" Label="Log Level">

@@ -1,10 +1,8 @@
 ﻿using Compressarr.Application;
-using Compressarr.FFmpegFactory;
-using Compressarr.FFmpegFactory.Models;
+using Compressarr.FFmpeg;
 using Compressarr.Helpers;
 using Compressarr.JobProcessing.Models;
-using Microsoft.AspNetCore.Components;
-using Microsoft.Extensions.Hosting;
+using Compressarr.Presets.Models;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Diagnostics;
@@ -20,22 +18,22 @@ namespace Compressarr.JobProcessing
     //Singleton
     public class ProcessManager : IProcessManager
     {
-        private readonly Regex progressReg = new(@"frame=\s*(\d*)\sfps=\s*([\d\.]*)\sq=\s*(-?[\d\.]*)\ssize=\s*([^\s]*)\stime=\s*([\d:\.]*)\sbitrate=\s*([^\s]*)\sspeed=\s*([\d.]*x)\s*");
-        private readonly Regex ssimReg = new(@"\[Parsed_ssim_4\s@\s\w*\]\sSSIM\sY\:\d\.\d*\s\([inf\d\.]*\)\sU\:\d\.\d*\s\([inf\d\.]*\)\sV\:\d\.\d*\s\([inf\d\.]*\)\sAll\:(\d\.\d*)\s\([inf\d\.]*\)");
-
         private readonly IApplicationService applicationService;
-        private readonly IFFmpegManager ffmpegManager;
         private readonly ILogger<ProcessManager> logger;
 
-        public ProcessManager(IApplicationService applicationService, ILogger<ProcessManager> logger, IFFmpegManager ffmpegManager)
+        private readonly Regex progressReg = new(@"frame= *(\d*) fps= *([\d\.]*) q=*(-?[\d\.]*)(?: q=*-?[\d\.]*)* size= *([^ ]*) time= *([\d:\.]*) bitrate= *([^ ]*) speed= *([\d.]*x) *");
+        readonly SemaphoreSlim semaphore = new(1, 1);
+        private readonly Regex ssimReg = new(@"\[Parsed_ssim_4\s@\s\w*\]\sSSIM\sY\:\d\.\d*\s\([inf\d\.]*\)\sU\:\d\.\d*\s\([inf\d\.]*\)\sV\:\d\.\d*\s\([inf\d\.]*\)\sAll\:(\d\.\d*)\s\([inf\d\.]*\)");
+
+        bool tokenCanceled = false;
+
+        public ProcessManager(IApplicationService applicationService, IFFmpegProcessor fFmpegProcessor, ILogger<ProcessManager> logger, IFileService fileService)
         {
             this.applicationService = applicationService;
-            this.ffmpegManager = ffmpegManager;
             this.logger = logger;
-        }
 
-        readonly SemaphoreSlim semaphore = new(1, 1);
-        bool tokenCanceled = false;
+            Xabe.FFmpeg.FFmpeg.SetExecutablesPath(fileService.GetAppDirPath(AppDir.FFmpeg));
+        }
 
         public async Task Process(Job job)
         {
@@ -45,7 +43,7 @@ namespace Compressarr.JobProcessing
                 {
                     await semaphore.WaitAsync(job.Process.cancellationTokenSource.Token);
 
-                    using(var jobRunner = new JobWorker(job.Condition.Encode))
+                    using (var jobRunner = new JobWorker(job.Condition.Encode))
                     {
 
                         using (logger.BeginScope("FFmpeg Process"))
@@ -69,7 +67,7 @@ namespace Compressarr.JobProcessing
                                     Task<IConversionResult> converionTask = null;
                                     try
                                     {
-                                        job.Process.Converter = FFmpeg.Conversions.New();
+                                        job.Process.Converter = Xabe.FFmpeg.FFmpeg.Conversions.New();
                                         job.Process.Converter.OnDataReceived += (sender, args) => Converter_OnDataReceived(args, job.Process);
                                         job.Process.Converter.OnProgress += (sender, args) => Converter_OnProgress(args, job.Process);
 
@@ -107,7 +105,7 @@ namespace Compressarr.JobProcessing
                                     var arguments = $" -i \"{job.Process.WorkItem.SourceFile}\" -i \"{job.Process.WorkItem.DestinationFile}\" -lavfi  \"[0:v]settb = AVTB,setpts = PTS - STARTPTS[main];[1:v]settb = AVTB,setpts = PTS - STARTPTS[ref];[main][ref]ssim\" -f null -";
                                     logger.LogDebug($"SSIM arguments: {arguments}");
 
-                                    job.Process.Converter = FFmpeg.Conversions.New();
+                                    job.Process.Converter = Xabe.FFmpeg.FFmpeg.Conversions.New();
                                     job.Process.Converter.OnDataReceived += (sender, args) => Converter_OnDataReceived(args, job.Process);
                                     job.Process.Converter.OnProgress += (sender, args) => Converter_OnProgress(args, job.Process);
 
@@ -165,7 +163,6 @@ namespace Compressarr.JobProcessing
                     semaphore.Release();
             }
         }
-
         private void Converter_OnDataReceived(DataReceivedEventArgs e, FFmpegProcess process)
         {
             //Conversion:

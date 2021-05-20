@@ -10,7 +10,6 @@ namespace Compressarr.JobProcessing.Models
 
         public ConditionSwitch Process { get; set; } = new();
         public ConditionSwitch Initialise { get; set; } = new();
-        public ConditionSwitch LoadMediaInfo { get; set; } = new();
         public ConditionSwitch Encode { get; set; } = new();
         public ConditionSwitch Test { get; set; } = new();
         public ConditionSwitch BuildWorkLoad { get; set; } = new();
@@ -18,16 +17,15 @@ namespace Compressarr.JobProcessing.Models
         {
             Process = new();
             Initialise = new();
-            LoadMediaInfo = new();
             Encode = new();
             Test = new();
             BuildWorkLoad = new();
         }
 
-        public bool SafeToInitialise => !Process.Processing && !Initialise.Processing && !LoadMediaInfo.Processing;
+        public bool SafeToInitialise => !Process.Processing && !Initialise.Processing;
 
-        public bool SafeToRun => !Process.Processing && Initialise.Succeeded;
+        public bool SafeToRun => !Process.Started && Initialise.Succeeded;
 
-        public bool CanCancel => Process.Processing || (Initialise.Succeeded && LoadMediaInfo.Processing);
+        public bool CanCancel => Process.Processing;
     }
 }

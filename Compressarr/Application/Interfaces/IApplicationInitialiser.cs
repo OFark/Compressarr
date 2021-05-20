@@ -2,7 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Compressarr.FFmpegFactory
+namespace Compressarr.Presets
 {
     public interface IApplicationInitialiser
     {

@@ -7,7 +7,7 @@ using System.Linq;
 using System.Threading;
 using Xabe.FFmpeg;
 
-namespace Compressarr.FFmpegFactory.Models
+namespace Compressarr.Presets.Models
 {
     public class FFmpegProcess
     {

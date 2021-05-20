@@ -1,4 +1,4 @@
-﻿@inject IFFmpegManager FFmpegManager
+﻿@inject IPresetManager PresetManager
 @inject ILayoutService LayoutService
 
 <MudCard Class="my-2">
@@ -33,7 +33,7 @@
 
                         <MudItem sm="3">
                             <MudSelect T="Encoder" @bind-Value="AudioStreamPreset.Encoder" Label="Encoder">
-                                @foreach (var ae in FFmpegManager.AudioEncoders)
+                                @foreach (var ae in PresetManager.AudioEncoders)
                                 {
                                     <MudSelectItem Value="ae" />
                                 }
@@ -41,7 +41,7 @@
                         </MudItem>
                         <MudItem sm="4">
                             <MudSelect T="string" OffsetY="true" Clearable="true" @bind-Value="AudioStreamPreset.BitRate" Label="Bit Rate">
-                                @foreach (var b in FFmpegManager.AudioBitrates)
+                                @foreach (var b in PresetManager.AudioBitrates)
                                 {
                                     <MudSelectItem Value="b" />
                                 }

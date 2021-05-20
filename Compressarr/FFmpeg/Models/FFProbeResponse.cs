@@ -1,12 +1,12 @@
 ﻿using Compressarr.Helpers;
+using Compressarr.Presets;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 
-namespace Compressarr.FFmpegFactory.Models
+namespace Compressarr.FFmpeg.Models
 {
     public class Disposition
     {
@@ -49,11 +49,11 @@ namespace Compressarr.FFmpegFactory.Models
         public Format format { get; set; }
         public List<Stream> streams { get; set; }
 
-        public IEnumerable<Stream> AttachmentStreams => streams.Where(x => x.codec_type == CodecType.Attachment);
-        public IEnumerable<Stream> AudioStreams => streams.Where(x => x.codec_type == CodecType.Audio);
-        public IEnumerable<Stream> DataStreams => streams.Where(x => x.codec_type == CodecType.Data);
-        public IEnumerable<Stream> SubtitleStreams => streams.Where(x => x.codec_type == CodecType.Subtitle);
-        public IEnumerable<Stream> VideoStreams => streams.Where(x => x.codec_type == CodecType.Video);
+        public IEnumerable<Stream> AttachmentStreams => streams?.Where(x => x != null && x.codec_type == CodecType.Attachment);
+        public IEnumerable<Stream> AudioStreams => streams?.Where(x => x != null && x.codec_type == CodecType.Audio);
+        public IEnumerable<Stream> DataStreams => streams?.Where(x => x != null && x.codec_type == CodecType.Data);
+        public IEnumerable<Stream> SubtitleStreams => streams?.Where(x => x != null && x.codec_type == CodecType.Subtitle);
+        public IEnumerable<Stream> VideoStreams => streams?.Where(x => x != null && x.codec_type == CodecType.Video);
     }
 
     public class Format

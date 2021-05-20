@@ -1,4 +1,4 @@
-﻿@inject IFFmpegManager FFmpegManager
+﻿@inject IPresetManager PresetManager
 @inject ILayoutService LayoutService
 
 <MudGrid>
@@ -22,7 +22,7 @@
 
                 <MudItem sm="3">
                     <MudSelect OffsetY="true" T="FilterComparitor" @bind-Value="AudioStreamPresetFilter.NumberComparitor" Converter="fcConverter">
-                        @foreach (var nc in FFmpegManager.NumberComparitors)
+                        @foreach (var nc in PresetManager.NumberComparitors)
                         {
                             <MudSelectItem Value="nc" />
                         }
@@ -43,7 +43,7 @@
 
                 <MudItem sm="GetSize(6)">
                     <MudSelect OffsetY="true" T="string" MultiSelection="true" @bind-SelectedValues="AudioStreamPresetFilter.Values" Label="Codec">
-                        @foreach (var codec in FFmpegManager.AudioCodecs.Decoders())
+                        @foreach (var codec in PresetManager.AudioCodecs.Decoders())
                         {
                             <MudSelectItem Value="@codec.Name"></MudSelectItem>
                         }
@@ -59,7 +59,7 @@
 
                 <MudItem sm="GetSize(6)">
                     <MudSelect T="string" MultiSelection="true" @bind-SelectedValues="AudioStreamPresetFilter.Values">
-                        @foreach (var language in FFmpegManager.LanguageCodes.OrderByDescending(l => l.Key == "eng").ThenBy(l => l.Value))
+                        @foreach (var language in PresetManager.LanguageCodes.OrderByDescending(l => l.Key == "eng").ThenBy(l => l.Value))
                         {
                             <MudSelectItem Value="@language.Key">@language.Value</MudSelectItem>
                         }

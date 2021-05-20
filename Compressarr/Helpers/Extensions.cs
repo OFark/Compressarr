@@ -1,4 +1,4 @@
-﻿using Compressarr.FFmpegFactory.Models;
+﻿using Compressarr.Presets.Models;
 using Compressarr.Settings.FFmpegFactory;
 using Newtonsoft.Json;
 using System;

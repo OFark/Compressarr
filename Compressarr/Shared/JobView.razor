@@ -1,17 +1,12 @@
-﻿@using Compressarr.FFmpegFactory;
-@using Compressarr.Filtering;
-@using Compressarr.JobProcessing;
-@using Compressarr.Pages.Services;
-@using Compressarr.Helpers;
-
-@implements IDisposable
+﻿@implements IDisposable
 
 @inject IApplicationService applicationService
-@inject IFFmpegManager fFmpegManager
+@inject IDialogService DialogService
 @inject IFilterManager filterManager
 @inject IJobManager jobManager
 @inject ILayoutService layoutService
-@inject IDialogService DialogService
+@inject IMediaInfoService mediaInfoService
+@inject IPresetManager presetManager
 
 
 <MudExpansionPanel Class="job">
@@ -66,7 +61,7 @@
                                     }
                                 </MudSelect>
                                 <MudSelect T="string" Required="true" Label="Preset" @bind-Value="job.PresetName">
-                                    @foreach (var c in fFmpegManager.Presets)
+                                    @foreach (var c in presetManager.Presets)
                                     {
                                         <MudSelectItem Value="@c.Name">@c.ToString()</MudSelectItem>
                                     }
@@ -106,14 +101,7 @@
                                     </HeaderContent>
                                     <RowTemplate>
                                         <MudTd>
-                                            @if (context.MediaInfo != null)
-                                                    {
-                                                <MudIconButton Size="Size.Small" Icon="@(context.ShowArgs ? Icons.Outlined.Cancel : Icons.Outlined.Info)" OnClick="@(() => context.ShowArgs = !context.ShowArgs)"></MudIconButton>
-                                                    }
-                                                    else
-                                                    {
-                                                <MudIcon Icon="@Icons.Outlined.Sync"></MudIcon>
-                                                    }
+                                            <MudIconButton Size="Size.Small" Icon="@(context.ShowArgs ? Icons.Outlined.Cancel : Icons.Outlined.Info)" OnClick="@(() => toggleArgs(context))"></MudIconButton>
                                         </MudTd>
                                         <MudTd DataLabel="Name">@context.SourceFileName</MudTd>
                                         <MudTd DataLabel="Percent"><MudText Align="Align.Center">@context.Percent.Adorn("%")</MudText></MudTd>
@@ -146,18 +134,32 @@
                                     <ChildRowContent>
                                         @if (context.ShowArgs)
                                                 {
-                                            <MudTr>
-                                                <td colspan="14">
-                                                    <MudPaper>
-                                                        <MudList Dense="true">
-                                                            @foreach (var arg in context.Arguments.Select(x => applicationService.InsertNamesIntoFFmpegPreviews ? string.Format(x, context.SourceFile, context.DestinationFile) : x))
-                                                                    {
-                                                                <MudListItem>@arg</MudListItem>
-                                                                    }
-                                                        </MudList>
-                                                    </MudPaper>
-                                                </td>
-                                            </MudTr>
+                                            @if (context.Arguments != null)
+                                                    {
+                                                <MudTr>
+                                                    <td colspan="14">
+                                                        <MudPaper Elevation="0">
+                                                            <MudList Dense="true">
+                                                                @foreach (var arg in context.Arguments.Select(x => applicationService.InsertNamesIntoFFmpegPreviews ? string.Format(x, context.SourceFile, context.DestinationFile) : x))
+                                                                        {
+                                                                    <MudListItem>@arg</MudListItem>
+                                                                        }
+                                                            </MudList>
+                                                        </MudPaper>
+                                                    </td>
+                                                </MudTr>
+                                                    }
+
+                                                    else
+                                                    {
+                                                <MudTr>
+                                                    <td colspan="14">
+                                                        <MudPaper Elevation="0" Class="pa-2">
+                                                            <MudProgressLinear Indeterminate="true" Color="Color.Secondary" />
+                                                        </MudPaper>
+                                                    </td>
+                                                </MudTr>
+                                                    }
                                                 }
                                     </ChildRowContent>
                                     <PagerContent>
@@ -305,12 +307,12 @@
         }
     }
 
-    private string buttonText => (mouseOnButton ? job.Condition.SafeToRun ? job.AutoRun ? "Waiting!" : "Go!" : job.Condition.SafeToInitialise ? "Initialise" : job.Condition.CanCancel ? "Cancel" : null : null) ?? job.State.ToString().ToCamelCaseSplit();
+    private string buttonText => (mouseOnButton ? job.Condition.SafeToRun ? "Go!" : job.Condition.SafeToInitialise ? "Initialise" : job.Condition.CanCancel ? "Cancel" : null : null) ?? job.State.ToString().ToCamelCaseSplit();
 
 
 
     private Color buttonColour =>
-        job.Condition.SafeToRun && !job.AutoRun ? Color.Primary : job.Condition.SafeToInitialise ? Color.Secondary : job.State == JobState.Error ? Color.Error : Color.Warning;
+        job.Condition.SafeToRun ? Color.Primary : job.Condition.SafeToInitialise ? Color.Secondary : job.State == JobState.Error ? Color.Error : Color.Warning;
 
     private void startJob()
     {
@@ -326,6 +328,16 @@
         {
             jobManager.CancelJob(job);
         }
+    }
+
+    private async Task toggleArgs(WorkItem wi)
+    {
+        wi.ShowArgs = !wi.ShowArgs;
+
+        StateHasChanged();
+
+        wi.Arguments ??= await presetManager.GetArguments(job.Preset, await mediaInfoService.GetMediaInfo(wi.Source, wi.SourceFile));
+        StateHasChanged();
     }
 
     private bool running => job.State == JobState.Running;

@@ -1,4 +1,4 @@
-﻿namespace Compressarr.FFmpegFactory
+﻿namespace Compressarr.Presets
 {
     public enum AudioStreamAction
     {

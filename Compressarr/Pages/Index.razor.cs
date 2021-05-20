@@ -1,4 +1,4 @@
-﻿using Compressarr.FFmpegFactory;
+﻿using Compressarr.Presets;
 using Compressarr.Filtering;
 using Compressarr.JobProcessing;
 using Compressarr.JobProcessing.Models;
@@ -15,7 +15,7 @@ namespace Compressarr.Pages
     public partial class Index
     {
         [Inject]
-        IFFmpegManager FFmpegManager { get; set; }
+        IPresetManager presetManager { get; set; }
         [Inject]
         IFilterManager FilterManager { get; set; }
         [Inject]
@@ -49,7 +49,7 @@ namespace Compressarr.Pages
             radarrStatus = await RadarrService.GetStatus();
             sonarrStatus = await SonarrService.GetStatus();
             filterStatus = await FilterManager.GetStatus();
-            presetStatus = await FFmpegManager.GetStatus();
+            presetStatus = await presetManager.GetStatus();
 
             await base.OnInitializedAsync();
         }

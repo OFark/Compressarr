@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Compressarr.FFmpegFactory.Models
+namespace Compressarr.Presets.Models
 {
     public class FFmpegAudioStreamPreset :FFmpegAudioStreamPresetBase, ICloneable<FFmpegAudioStreamPreset>
     {

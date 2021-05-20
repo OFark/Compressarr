@@ -1,4 +1,4 @@
-﻿using Compressarr.FFmpegFactory.Models;
+﻿using Compressarr.Presets.Models;
 using Compressarr.Filtering.Models;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Services.Base;
@@ -14,22 +14,22 @@ using System.Threading.Tasks;
 using Xabe.FFmpeg;
 using Compressarr.Helpers;
 using Newtonsoft.Json;
+using Compressarr.FFmpeg.Models;
 
-namespace Compressarr.FFmpegFactory
+namespace Compressarr.Presets
 {
-    public class FFmpegManager : IFFmpegManager
+    public class PresetManager : IPresetManager
     {
 
         private readonly IApplicationService applicationService;
         private readonly IFileService fileService;
-        private readonly ILogger<FFmpegManager> logger;
-        public FFmpegManager(IFileService fileService, ILogger<FFmpegManager> logger, IApplicationService applicationService)
+        private readonly ILogger<PresetManager> logger;
+
+        public PresetManager(IFileService fileService, ILogger<PresetManager> logger, IApplicationService applicationService)
         {
             this.fileService = fileService;
             this.logger = logger;
             this.applicationService = applicationService;
-
-            FFmpeg.SetExecutablesPath(fileService.GetAppDirPath(AppDir.FFmpeg));
         }
 
         public List<string> AudioBitrates
@@ -626,42 +626,9 @@ namespace Compressarr.FFmpegFactory
             }
         }
 
-        public async Task<WorkItemCheckResult> CheckResult(Job job)
-        {
-
-            using (logger.BeginScope("Checking Results."))
-            {
-                if (job?.Process?.WorkItem == null)
-                {
-                    return null;
-                }
-                var result = new WorkItemCheckResult(job.Process.WorkItem);
-
-                var mediaInfo = await GetMediaInfoAsync(job.Process.WorkItem.DestinationFile);
-                if (mediaInfo != null)
-                {
-                    //Workitem.Duration refers to the processing time frame.
-                    logger.LogDebug($"Original Duration: {job.Process.WorkItem.TotalLength}");
-                    logger.LogDebug($"New Duration: {mediaInfo.format.Duration}");
-
-                    result.LengthOK = mediaInfo.format.Duration != default && job.Process.WorkItem.TotalLength.HasValue &&
-                        (long)Math.Round(mediaInfo.format.Duration.TotalSeconds, 0) == (long)Math.Round(job.Process.WorkItem.TotalLength.Value.TotalSeconds, 0); //Check to the nearest second.
-                }
-
-                result.SSIMOK = result.LengthOK &&
-                    (!job.SSIMCheck || job.MinSSIM <= job.Process.WorkItem.SSIM);
-
-
-                result.SizeOK = result.SSIMOK &&
-                    (!job.SizeCheck || job.MaxCompression >= job.Process.WorkItem.Compression);
-
-                return result;
-            }
-        }
-
         public async Task<string> ConvertContainerToExtension(string container)
         {
-            await applicationService.FFMpegReady.WaitAsync();
+            await applicationService.InitialiseFFmpeg;
 
             using (logger.BeginScope("Converting container to extension"))
             {
@@ -739,9 +706,9 @@ namespace Compressarr.FFmpegFactory
             }
         }
 
-        public List<string> GetArguments(FFmpegPreset preset, FFProbeResponse mediaInfo)
+        public async Task<List<string>> GetArguments(FFmpegPreset preset, FFProbeResponse mediaInfo)
         {
-            applicationService.Initialised.Wait();
+            await applicationService.InitialisePresets;
 
             List<string> args = new();
 
@@ -772,32 +739,35 @@ namespace Compressarr.FFmpegFactory
             {
                 var i = 0; //for stream output tracking
 
-                foreach (var stream in mediaInfo.streams)
+                if (mediaInfo?.streams != null)
                 {
-                    foreach (var audioPreset in preset.AudioStreamPresets)
+                    foreach (var stream in mediaInfo.streams)
                     {
-                        var match = audioPreset.Filters.All(f =>
-                            f.Rule switch
-                            {
-                                AudioStreamRule.Any => true,
-                                AudioStreamRule.Codec => f.Matches == f.Values.Contains(stream.codec_name.ToLower()),
-                                AudioStreamRule.Channels => new List<int>() { stream.channels ?? 0 }.AsQueryable().Where($"it{f.NumberComparitor.Operator}{f.ChannelValue}").Any(),
-                                AudioStreamRule.Language => stream.tags?.language == null || f.Matches == f.Values.Contains(stream.tags?.language.ToLower()),
-                                _ => throw new NotImplementedException()
-                            }
-                        );
-
-                        if (match)
+                        foreach (var audioPreset in preset.AudioStreamPresets)
                         {
-                            audioArguments += audioPreset.Action switch
+                            var match = audioPreset.Filters.All(f =>
+                                f.Rule switch
+                                {
+                                    AudioStreamRule.Any => true,
+                                    AudioStreamRule.Codec => f.Matches == f.Values.Contains(stream.codec_name.ToLower()),
+                                    AudioStreamRule.Channels => new List<int>() { stream.channels ?? 0 }.AsQueryable().Where($"it{f.NumberComparitor.Operator}{f.ChannelValue}").Any(),
+                                    AudioStreamRule.Language => stream.tags?.language == null || f.Matches == f.Values.Contains(stream.tags?.language.ToLower()),
+                                    _ => throw new NotImplementedException()
+                                }
+                            );
+
+                            if (match)
                             {
-                                AudioStreamAction.Copy => $" -map 0:{stream.index} -c:a:{i++} copy",
-                                AudioStreamAction.Delete => "",
-                                AudioStreamAction.DeleteUnlessOnly => preset.AudioStreamPresets.Last() == audioPreset && i == 0 ? $" -map 0:{stream.index} -c:a:{i++} copy" : "",
-                                AudioStreamAction.Encode => $" -map 0:{stream.index} -c:a:{i++} {audioPreset.Encoder.Name}{(string.IsNullOrWhiteSpace(audioPreset.BitRate) ? "" : $" -b:a:{i} ")}{audioPreset.BitRate}",
-                                _ => throw new System.NotImplementedException()
-                            };
-                            break;
+                                audioArguments += audioPreset.Action switch
+                                {
+                                    AudioStreamAction.Copy => $" -map 0:{stream.index} -c:a:{i++} copy",
+                                    AudioStreamAction.Delete => "",
+                                    AudioStreamAction.DeleteUnlessOnly => preset.AudioStreamPresets.Last() == audioPreset && i == 0 ? $" -map 0:{stream.index} -c:a:{i++} copy" : "",
+                                    AudioStreamAction.Encode => $" -map 0:{stream.index} -c:a:{i++} {audioPreset.Encoder.Name}{(string.IsNullOrWhiteSpace(audioPreset.BitRate) ? "" : $" -b:a:{i} ")}{audioPreset.BitRate}",
+                                    _ => throw new System.NotImplementedException()
+                                };
+                                break;
+                            }
                         }
                     }
                 }
@@ -824,54 +794,7 @@ namespace Compressarr.FFmpegFactory
             }
 
             return args;
-        }
-
-
-        public async Task<FFProbeResponse> GetMediaInfoAsync(string filepath, int cacheHash = 0)
-        {
-            using (logger.BeginScope($"Getting MediaInfo: {filepath}", filepath))
-            {
-                if (cacheHash != 0 && applicationService.CacheMediaInfo)
-                {
-                    if(fileService.HasFile(AppDir.Cache, $"{cacheHash}.json"))
-                    {
-                        var cachedInfo = await fileService.ReadJsonFileAsync<FFProbeResponse>(AppDir.Cache, $"{cacheHash}.json");
-                        if(cachedInfo != null)
-                        {
-                            logger.LogInformation($"Loading Info from cache");
-                            return cachedInfo;
-                        }
-                    }
-                }
-
-                //Wait for FFmpeg to be ready
-                await applicationService.FFMpegReady.WaitAsync();
-
-                    //todo: Add option to cache mediaInfo
-
-                logger.LogInformation($"Loading Info from source");
-                try
-                {
-                    var ffProbeResponse = await applicationService.RunProcess(fileService.FFPROBEPath, $"-v 1 -print_format json -show_format -show_streams -find_stream_info \"{filepath}\"");
-
-                    if (ffProbeResponse.Success)
-                    {
-                        var ffProbeInfo = JsonConvert.DeserializeObject<FFProbeResponse>(ffProbeResponse.StdOut);
-                        if (ffProbeInfo != null && cacheHash != 0 && applicationService.CacheMediaInfo)
-                        {
-                            await fileService.WriteTextFileAsync(AppDir.Cache, $"{cacheHash}.json", ffProbeResponse.StdOut);
-                        }
-                        return ffProbeInfo;
-                    }
-                    return null;
-                }
-                catch (ArgumentException aex)
-                {
-                    logger.LogError(aex.ToString());
-                    return null;
-                }
-            }
-        }
+        }        
 
         public FFmpegPreset GetPreset(string presetName) => Presets.FirstOrDefault(p => p.Name == presetName);
 

@@ -1,5 +1,5 @@
-﻿using Compressarr.FFmpegFactory;
-using Compressarr.FFmpegFactory.Models;
+﻿using Compressarr.Presets;
+using Compressarr.Presets.Models;
 using Compressarr.Filtering;
 using Compressarr.Filtering.Models;
 using Microsoft.Extensions.Logging;
@@ -19,8 +19,6 @@ namespace Compressarr.JobProcessing.Models
         public event EventHandler StatusUpdate;
 
         public bool AutoImport { get; set; }
-
-        public bool AutoRun { get; set; }
 
         [JsonIgnore]
         public bool Cancel { get; internal set; } = false;
@@ -93,14 +91,7 @@ namespace Compressarr.JobProcessing.Models
                 {
                     ConditionState.NotStarted => JobState.Testing,
                     ConditionState.Processing => JobState.BuildingWorkLoad,
-                    ConditionState.Succeeded => Condition.LoadMediaInfo.State switch
-                    {
-                        ConditionState.NotStarted => JobState.Testing,
-                        ConditionState.Processing => JobState.LoadingMediaInfo,
-                        ConditionState.Succeeded => JobState.Testing,
-                        ConditionState.Failed => JobState.Error,
-                        _ => throw new NotImplementedException(),
-                    },
+                    ConditionState.Succeeded => JobState.Testing,
                     ConditionState.Failed => JobState.Error,
                     _ => throw new NotImplementedException()
                 },
@@ -116,25 +107,18 @@ namespace Compressarr.JobProcessing.Models
                 {
                     ConditionState.NotStarted => JobState.Error,
                     ConditionState.Processing => JobState.Error,
-                    ConditionState.Succeeded => Condition.LoadMediaInfo.State switch
+                    ConditionState.Succeeded => Condition.Process.State switch
                     {
-                        ConditionState.NotStarted => JobState.Error,
-                        ConditionState.Processing => JobState.LoadingMediaInfo,
-                        ConditionState.Succeeded => Condition.Process.State switch
+                        ConditionState.NotStarted => JobState.Ready,
+                        ConditionState.Processing => Condition.Encode.State switch
                         {
-                            ConditionState.NotStarted => JobState.Ready,
-                            ConditionState.Processing => Condition.Encode.State switch
-                            {
-                                ConditionState.NotStarted => JobState.Waiting,
-                                ConditionState.Processing => JobState.Running,
-                                ConditionState.Succeeded => JobState.Waiting,
-                                ConditionState.Failed => Cancel ? JobState.Cancelled : JobState.Error,
-                                _ => throw new NotImplementedException(),
-                            },
-                            ConditionState.Succeeded => JobState.Finished,
+                            ConditionState.NotStarted => JobState.Waiting,
+                            ConditionState.Processing => JobState.Running,
+                            ConditionState.Succeeded => JobState.Waiting,
                             ConditionState.Failed => Cancel ? JobState.Cancelled : JobState.Error,
                             _ => throw new NotImplementedException(),
                         },
+                        ConditionState.Succeeded => JobState.Finished,
                         ConditionState.Failed => Cancel ? JobState.Cancelled : JobState.Error,
                         _ => throw new NotImplementedException(),
                     },
@@ -177,6 +161,13 @@ namespace Compressarr.JobProcessing.Models
             {
                 Log($"Job {Name} changed from {State} to {js}.", LogLevel.Information);
             }
+            StatusUpdate?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void UpdateMovieInfo()
+        {
+            InitialisationProgress?.Report(WorkLoad.Count(w => w.Movie?.MediaInfo != null) / WorkLoad.Count() * 100);
+
             StatusUpdate?.Invoke(this, EventArgs.Empty);
         }
 
