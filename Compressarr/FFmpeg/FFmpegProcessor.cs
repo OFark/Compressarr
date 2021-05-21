@@ -130,7 +130,7 @@ namespace Compressarr.FFmpeg
 
                     if (result.Success)
                     {
-                        var regPattern = @"^ ?([D ])([E ]) (?!=)([^ ]*) *([^\r]*)";
+                        var regPattern = @"^ ?([D ])([E ]) (?!=)([^ ]*) *(.*)$";
                         var reg = new Regex(regPattern, RegexOptions.IgnoreCase | RegexOptions.Multiline);
                         logger.LogDebug($"Regex matching pattern: \"{regPattern}\"");
 
