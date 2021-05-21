@@ -1,4 +1,5 @@
-﻿using Compressarr.Filtering.Models;
+﻿using Compressarr.FFmpeg.Models;
+using Compressarr.Filtering.Models;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Presets;
 using Compressarr.Presets.Models;
@@ -19,7 +20,7 @@ namespace Compressarr.Application
 
         bool AlwaysCalculateSSIM { get; set; }
         Dictionary<CodecType, SortedSet<Codec>> Codecs { get; set; }
-        SortedDictionary<string, string> Containers { get; set; }
+        SortedSet<ContainerResponse> Containers { get; set; }
         Dictionary<CodecType, SortedSet<Encoder>> Encoders { get; set; }
         string FFmpegVersion { get; set; }
         HashSet<Filter> Filters { get; set; }

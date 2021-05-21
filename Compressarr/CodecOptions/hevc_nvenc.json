@@ -32,7 +32,7 @@
       "p6",
       "p7"
     ],
-    "Arg": "-preset <val>"
+    "Arg": "-preset:v <val>"
   },
   {
     "Name": "Profile",

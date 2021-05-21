@@ -1,4 +1,5 @@
-﻿using Compressarr.Filtering.Models;
+﻿using Compressarr.FFmpeg.Models;
+using Compressarr.Filtering.Models;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Presets;
 using Compressarr.Presets.Models;
@@ -11,7 +12,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
@@ -60,7 +60,7 @@ namespace Compressarr.Application
         public bool CacheMediaInfo { get; set; }
         public CancellationToken AppStoppingCancellationToken { get; set; }
         public Dictionary<CodecType, SortedSet<Codec>> Codecs { get; set; }
-        public SortedDictionary<string, string> Containers { get; set; }
+        public SortedSet<ContainerResponse> Containers { get; set; }
         public Dictionary<CodecType, SortedSet<Encoder>> Encoders { get; set; }
         public string FFmpegVersion { get; set; }
         public HashSet<Filter> Filters { get; set; }

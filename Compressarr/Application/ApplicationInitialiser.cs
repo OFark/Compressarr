@@ -1,5 +1,6 @@
 ﻿using Compressarr.Application;
 using Compressarr.FFmpeg;
+using Compressarr.FFmpeg.Models;
 using Compressarr.JobProcessing;
 using Compressarr.Presets.Models;
 using Microsoft.Extensions.Logging;
@@ -252,7 +253,7 @@ namespace Compressarr.Presets
             return null;
         }
 
-        private async Task<SortedDictionary<string, string>> GetAvailableContainersAsync()
+        private async Task<SortedSet<ContainerResponse>> GetAvailableContainersAsync()
         {
             logger.LogDebug($"Get Available Containers.");
 
@@ -262,7 +263,7 @@ namespace Compressarr.Presets
 
             if (result.Success)
             {
-                return new(result.Results.ToDictionary(c => c.Name, c => c.Description));
+                return new(result.Results);
             }
 
             return null;

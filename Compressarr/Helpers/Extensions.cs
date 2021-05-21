@@ -129,6 +129,9 @@ namespace Compressarr.Helpers
             return match.Success;
         }
 
+        public static string JoinWithIfNotNull(this string seperator, params string[] values) => string.Join(seperator, values.Where(x => !string.IsNullOrWhiteSpace(x)));
+
+
         public static HashSet<EncoderOptionValue> WithValues(this HashSet<EncoderOption> encoderOptions, IEnumerable<EncoderOptionValueBase> values = null)
         {
             var eovs = new HashSet<EncoderOptionValue>();

@@ -12,7 +12,7 @@ namespace Compressarr.Presets
     {
         SortedSet<Codec> AudioCodecs { get; }
         SortedSet<Encoder> AudioEncoders { get; }
-        SortedDictionary<string, string> Containers { get; }
+        SortedSet<ContainerResponse> Containers { get; }
         Dictionary<string, string> LanguageCodes { get; }
         List<FilterComparitor> NumberComparitors { get; }
         HashSet<FFmpegPreset> Presets { get; }

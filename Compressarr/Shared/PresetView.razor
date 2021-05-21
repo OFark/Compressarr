@@ -15,7 +15,7 @@
             <MudDivider />
             @foreach (var c in PresetManager.Containers)
             {
-                <MudSelectItem Value="@c.Key">@c.Key - @c.Value</MudSelectItem>
+                <MudSelectItem Value="@c.Name">@c</MudSelectItem>
             }
         </MudSelect>
         <MudGrid>
