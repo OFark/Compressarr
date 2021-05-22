@@ -229,21 +229,14 @@ namespace Compressarr.Filtering
                     }
                     else
                     {
-                        switch (dlFilter.Property.PropertyType)
+                        filterStr = dlFilter.Property.PropertyType switch
                         {
-                            case FilterPropertyType.DateTime:
-                            case FilterPropertyType.Enum:
-                            case FilterPropertyType.String:
-                                {
-                                    filterStr = $" {dlFilter.LogicalOperator} {dlFilter.Property.Value}{dlFilter.Comparitor.Operator}\"{dlFilter.Value}\"";
-                                }
-                                break;
-                            default:
-                                {
-                                    filterStr = $" {dlFilter.LogicalOperator} {dlFilter.Property.Value}{dlFilter.Comparitor.Operator}{dlFilter.Value}";
-                                }
-                                break;
-                        }
+                            var x when
+                            x == FilterPropertyType.DateTime ||
+                            x == FilterPropertyType.String => $" {dlFilter.LogicalOperator} {dlFilter.Property.Value}{dlFilter.Comparitor.Operator}\"{dlFilter.Value}\"",
+                            FilterPropertyType.Enum => $" {dlFilter.LogicalOperator} ( {string.Join(dlFilter.Comparitor.Operator == " == " ? " or " : " and ", (dlFilter.Values ?? new HashSet<string> { dlFilter.Value }).Select(x => $"{dlFilter.Property.Value}{dlFilter.Comparitor.Operator}\"{x}\""))} )",
+                            _ => filterStr = $" {dlFilter.LogicalOperator} {dlFilter.Property.Value}{dlFilter.Comparitor.Operator}{dlFilter.Value}"
+                        };
                     }
 
                     if (dlFilter.Comparitor.IsParamMethod)

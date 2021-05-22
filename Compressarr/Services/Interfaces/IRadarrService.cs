@@ -11,9 +11,6 @@ namespace Compressarr.Services
 {
     public interface IRadarrService : IJobDependency
     {
-        
-        event RadarrService.AsyncEventHandler OnUpdate;
-
         public long MovieCount { get; }
 
         string MovieFilter { get; set; }

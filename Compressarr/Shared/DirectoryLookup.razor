@@ -78,7 +78,7 @@
             else
             {
                 Folder = null;
-                FolderChanged.InvokeAsync(null);
+                InvokeAsync(() => FolderChanged.InvokeAsync(null));
             }
         });
 

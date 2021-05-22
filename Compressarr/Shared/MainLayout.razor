@@ -66,23 +66,15 @@
     {
         ApplicationService.OnBroadcast += (s, message) =>
         {
-            if (Dispatcher.CreateDefault().CheckAccess())
+            InvokeAsync(() =>
             {
                 Snackbar.Add(message);
                 StateHasChanged();
-            }
-            else
-            {
-                InvokeAsync(() =>
-                {
-                    Snackbar.Add(message);
-                    StateHasChanged();
-                });
-            }
+            });
         };
 
         base.OnInitialized();
-    }
+}
 
 
 

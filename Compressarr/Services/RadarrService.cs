@@ -43,8 +43,6 @@ namespace Compressarr.Services
 
         public delegate Task AsyncEventHandler(object sender, EventArgs e);
 
-        public event AsyncEventHandler OnUpdate;
-
         public long MovieCount => movies?.Count() ?? 0;
         public string MovieFilter { get; set; }
         public IEnumerable<string> MovieFilterValues { get; set; }
@@ -71,7 +69,6 @@ namespace Compressarr.Services
                         return moviesRequest;
                     }
                 }
-
 
                 if (!string.IsNullOrWhiteSpace(MovieFilter))
                 {

@@ -262,7 +262,7 @@
                 radarrTestResponse = ss.ErrorMessage;
                 showRadarrStatus = true;
             }
-            StateHasChanged();
+            _=  InvokeAsync(StateHasChanged);
         }
     }
 
@@ -292,7 +292,7 @@
                 sonarrTestResponse = ss.ErrorMessage;
                 showSonarrStatus = true;
             }
-            StateHasChanged();
+            _ = InvokeAsync(StateHasChanged);
         }
     }
 

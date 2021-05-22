@@ -210,6 +210,8 @@ namespace Compressarr.JobProcessing
             process.WorkItem.Duration = args.Duration;
             process.WorkItem.Percent = args.Percent;
 
+            // todo: If size looks to be over original option to abandon
+
             process.Update();
         }
     }

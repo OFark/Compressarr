@@ -78,14 +78,14 @@
 
     protected override void OnInitialized()
     {
-        LayoutService.OnStateChanged += (o, e) => StateHasChanged();
+        LayoutService.OnStateChanged += (o, e) => InvokeAsync(StateHasChanged);
         base.OnInitialized();
     }
 
     private void DeleteFilter(FFmpegAudioStreamPresetFilter filter)
     {
         AudioStreamPreset.Filters.Remove(filter);
-        StateHasChanged();
+        InvokeAsync(StateHasChanged);
     }
 
     private void copy()

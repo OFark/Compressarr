@@ -101,7 +101,7 @@
 
                                             if (filterValueResults.Success)
                                             {
-                                                <MudSelect @bind-Value="filterValue" Required="true">
+                                                <MudSelect @bind-Value="filterValue" MultiSelection="true" Required="true" @bind-SelectedValues="filterValues">
                                                     @foreach (var key in filterValueResults.Results)
                                                                     {
                                                         <MudSelectItem Value="@key" />
@@ -163,7 +163,7 @@
             }
         </HeaderContent>
         <RowTemplate>
-            <MovieView movie="@context" filterManager="filterManager" OnFilterBy="filterBy" OnUpdate="@(() => StateHasChanged())" />
+            <MovieView movie="@context" filterManager="filterManager" OnFilterBy="filterBy" OnUpdate="@(() => InvokeAsync(StateHasChanged))" />
         </RowTemplate>
         <ChildRowContent>
             @if (context.ShowInfo && context.MediaInfo != null)
@@ -268,25 +268,20 @@
 
 @code {
 
-    // todo: Add multi select to enum style filters
-
     private IEnumerable<Compressarr.Services.Models.Movie> Movies { get; set; }
 
     private bool showSaveDialog = false;
-    private bool showingMovies = false;
-
-    private long movieCount = 0;
-
+    
     private string AlertMessage = null;
 
     private string filter = "";
-    private List<string> filterValues;
 
     private string newFilterTextButton = "Add";
 
     private string filterPropertyStr = "title";
     private string filterComparitorStr = "==";
     private string filterValue;
+    private HashSet<string> filterValues = null;
 
     private decimal filterIntValue
     {
@@ -301,7 +296,6 @@
     }
 
     private string filterName = "";
-    private string filterStr = "";
     private string filterSelected
     {
         get
@@ -316,7 +310,7 @@
             {
                 dlFilters = filter.Filters.ToList().JsonClone();
                 showSaveDialog = true;
-                filterUpdate();
+                _ = filterUpdate();
             }
             else
             {
@@ -340,8 +334,6 @@
     {
         dlFilters = new List<DynamicLinqFilter>();
 
-        radarrService.OnUpdate += (o, e) => InvokeAsync(() => StateHasChanged());
-
         base.OnInitialized();
     }
 
@@ -358,7 +350,8 @@
 
         if (FilterProperty != null && FilterComparitor != null && !string.IsNullOrWhiteSpace(filterValue))
         {
-            var dlFilter = new DynamicLinqFilter(FilterProperty, FilterComparitor, filterValue);
+            var dlFilter = GetCurrentFilter();
+
 
             if (dlFilters.Count == 0)
             {
@@ -372,7 +365,7 @@
             dlFilters.Add(dlFilter);
             resetFilterInputs();
 
-            filterUpdate();
+            await filterUpdate();
         }
 
     }
@@ -381,7 +374,7 @@
     {
         dlFilters = new List<DynamicLinqFilter>();
         filterName = null;
-        filterUpdate();
+        await filterUpdate();
     }
 
     private void filterBy(KeyValuePair<string, object> filter)
@@ -394,14 +387,19 @@
     {
         filterPropertyStr = filter;
         filterValue = null;
+        filterValues = null;
     }
+
+    private DynamicLinqFilter GetCurrentFilter() => new DynamicLinqFilter(FilterProperty, FilterComparitor, filterValue, filterValues);
+
+
 
     private async void groupFilter(DynamicLinqFilter filter)
     {
 
         if (FilterProperty != null && FilterComparitor != null && !string.IsNullOrWhiteSpace(filterValue))
         {
-            var dlFilter = new DynamicLinqFilter(FilterProperty, FilterComparitor, filterValue);
+            var dlFilter = GetCurrentFilter();
             dlFilter.LogicalOperator = "or";
 
             if (filter.IsGroup)
@@ -410,7 +408,7 @@
             }
             else
             {
-                var cloneFilter = new DynamicLinqFilter(filter.Property, filter.Comparitor, filter.Value);
+                var cloneFilter = filter.Clone();
                 cloneFilter.IsFirst = true;
 
                 filter.SubFilters = new List<DynamicLinqFilter>();
@@ -419,14 +417,15 @@
                 filter.Comparitor = null;
                 filter.Property = null;
                 filter.Value = null;
+                filter.Values = null;
             }
 
             resetFilterInputs();
-            filterUpdate();
+            await filterUpdate();
         }
     }
 
-    private void deleteFilter(DynamicLinqFilter filter)
+    private async void deleteFilter(DynamicLinqFilter filter)
     {
         if (dlFilters.Contains(filter))
         {
@@ -455,7 +454,7 @@
             }
         }
 
-        filterUpdate();
+        await filterUpdate();
     }
 
     private async void deleteSavedFilter()
@@ -497,23 +496,25 @@
         filterValue = null;
     }
 
-    private async void filterUpdate()
+    private async Task filterUpdate()
     {
+        List<string> filterArguments;
+
         if (dlFilters.Any())
         {
-            filter = filterManager.ConstructFilterQuery(dlFilters, out filterValues);
+            filter = filterManager.ConstructFilterQuery(dlFilters, out filterArguments);
             var formatStr = System.Text.RegularExpressions.Regex.Replace(filter, @"@(\d)", "\"{$1}\"");
             newFilterTextButton = "And";
         }
         else
         {
             filter = string.Empty;
-            filterValues = new();
+            filterArguments = new();
             newFilterTextButton = "Add";
         }
 
         radarrService.MovieFilter = filter;
-        radarrService.MovieFilterValues = filterValues;
+        radarrService.MovieFilterValues = filterArguments;
 
         await RefreshMovies(this, null);
 
@@ -532,7 +533,7 @@
             AlertMessage = _result.ErrorString;
         }
 
-        _ = InvokeAsync(() => StateHasChanged());
+        _ = InvokeAsync(StateHasChanged);
     }
 
     private async Task LoadMovies()
@@ -543,7 +544,7 @@
         {
             await RefreshMovies(this, null);
 
-            StateHasChanged();
+            _ = InvokeAsync(StateHasChanged);
         }
     }
 

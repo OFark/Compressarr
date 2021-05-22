@@ -246,14 +246,14 @@
 </MudExpansionPanel>
 
 @code {
-    [Parameter]
-    public Compressarr.JobProcessing.Models.Job job { get; set; }
+        [Parameter]
+        public Compressarr.JobProcessing.Models.Job job { get; set; }
 
-    [Parameter]
-    public bool NewJob { get; set; }
+        [Parameter]
+        public bool NewJob { get; set; }
 
-    [Parameter]
-    public EventCallback OnAdd { get; set; }
+        [Parameter]
+        public EventCallback OnAdd { get; set; }
 
 
     private bool canReload, editJob, mouseOnButton;
@@ -334,10 +334,10 @@
     {
         wi.ShowArgs = !wi.ShowArgs;
 
-        StateHasChanged();
+        await InvokeAsync(StateHasChanged);
 
         wi.Arguments ??= await presetManager.GetArguments(job.Preset, await mediaInfoService.GetMediaInfo(wi.Source, wi.SourceFile));
-        StateHasChanged();
+        await InvokeAsync(StateHasChanged);
     }
 
     private bool running => job.State == JobState.Running;
@@ -351,7 +351,7 @@
     private void jobProgress(double val)
     {
         initialisationProgress = val;
-        StateHasChanged();
+        InvokeAsync(StateHasChanged);
     }
 
     void IDisposable.Dispose()
@@ -361,7 +361,7 @@
 
     private void jobStatusUpdate(object caller, EventArgs args)
     {
-        InvokeAsync(() => StateHasChanged());
+        InvokeAsync(StateHasChanged);
     }
 
     private async void reInitialise()
@@ -375,7 +375,7 @@
         {
             job = jobManager.ReloadJob(job);
             canReload = false;
-            StateHasChanged();
+            InvokeAsync(StateHasChanged);
         }
     }
 
@@ -393,10 +393,13 @@
                 if (OnAdd.HasDelegate)
                 {
                     _ = OnAdd.InvokeAsync();
+                    return;
                 }
             }
-
-            StateHasChanged();
+            else
+            {
+                await InvokeAsync(StateHasChanged);
+            }
         }
     }
 
@@ -412,7 +415,7 @@
             if (result ?? false)
             {
                 await jobManager.DeleteJob(job);
-                StateHasChanged();
+                await InvokeAsync(StateHasChanged);
             }
         }
     }

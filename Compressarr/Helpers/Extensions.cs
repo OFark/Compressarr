@@ -1,5 +1,6 @@
 ﻿using Compressarr.Presets.Models;
 using Compressarr.Settings.FFmpegFactory;
+using Microsoft.AspNetCore.Components;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -130,8 +131,7 @@ namespace Compressarr.Helpers
         }
 
         public static string JoinWithIfNotNull(this string seperator, params string[] values) => string.Join(seperator, values.Where(x => !string.IsNullOrWhiteSpace(x)));
-
-
+                
         public static HashSet<EncoderOptionValue> WithValues(this HashSet<EncoderOption> encoderOptions, IEnumerable<EncoderOptionValueBase> values = null)
         {
             var eovs = new HashSet<EncoderOptionValue>();

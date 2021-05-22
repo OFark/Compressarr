@@ -132,7 +132,7 @@
 
     protected override void OnInitialized()
     {
-        LayoutService.OnStateChanged += (o, e) => StateHasChanged();
+        LayoutService.OnStateChanged += (o, e) => InvokeAsync(StateHasChanged);
         base.OnInitialized();
     }
 
@@ -152,7 +152,7 @@
                 preset.AudioStreamPresets.RemoveRange(indexofRemoval, preset.AudioStreamPresets.Count() - indexofRemoval);
             }
         }
-        StateHasChanged();
+        InvokeAsync(StateHasChanged);
     }
 
     private void CopyAudioStreamPreset(FFmpegAudioStreamPreset asPreset)
@@ -163,7 +163,7 @@
         {
             var clone = asPreset.Clone();
             preset.AudioStreamPresets.Insert(index, clone);
-            StateHasChanged();
+            InvokeAsync(StateHasChanged);
         }
     }
 
@@ -182,7 +182,7 @@
             }
 
             LayoutService.RaiseChange();
-            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
         }
     }
 
@@ -201,7 +201,7 @@
                 await PresetManager.DeletePresetAsync(preset);
                 LayoutService.RaiseChange();
             }
-            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
         }
     }
 }

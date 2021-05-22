@@ -29,7 +29,7 @@ namespace Compressarr.Pages
         [Inject]
         IApplicationService settingsManager { get; set; }
 
-        private Job newJob = new ();
+        private Job newJob = new();
 
         private StatusResult filterStatus = new();
         private StatusResult presetStatus = new();

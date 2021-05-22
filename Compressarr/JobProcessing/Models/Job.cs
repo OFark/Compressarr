@@ -14,6 +14,7 @@ namespace Compressarr.JobProcessing.Models
 {
     public class Job
     {
+        [JsonIgnore]
         public JobCondition Condition = new();
 
         public event EventHandler StatusUpdate;
