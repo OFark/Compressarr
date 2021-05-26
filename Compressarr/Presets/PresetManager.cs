@@ -1,20 +1,21 @@
-﻿using Compressarr.Presets.Models;
+﻿using Compressarr.Application;
+using Compressarr.FFmpeg;
+using Compressarr.FFmpeg.Models;
 using Compressarr.Filtering.Models;
+using Compressarr.Helpers;
+using Compressarr.JobProcessing;
 using Compressarr.JobProcessing.Models;
+using Compressarr.Presets.Models;
 using Compressarr.Services.Base;
-using Compressarr.Application;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
-using Xabe.FFmpeg;
-using Compressarr.Helpers;
-using Newtonsoft.Json;
-using Compressarr.FFmpeg.Models;
 
 namespace Compressarr.Presets
 {
@@ -24,12 +25,15 @@ namespace Compressarr.Presets
         private readonly IApplicationService applicationService;
         private readonly IFileService fileService;
         private readonly ILogger<PresetManager> logger;
-
-        public PresetManager(IFileService fileService, ILogger<PresetManager> logger, IApplicationService applicationService)
+        private readonly IMediaInfoService mediaInfoService;
+        private readonly IProcessManager processManager;
+        public PresetManager(IApplicationService applicationService, IFileService fileService, ILogger<PresetManager> logger, IMediaInfoService mediaInfoService, IProcessManager processManager)
         {
+            this.applicationService = applicationService;
             this.fileService = fileService;
             this.logger = logger;
-            this.applicationService = applicationService;
+            this.mediaInfoService = mediaInfoService;
+            this.processManager = processManager;
         }
 
         public List<string> AudioBitrates
@@ -626,66 +630,6 @@ namespace Compressarr.Presets
             }
         }
 
-        public async Task<string> ConvertContainerToExtension(string container)
-        {
-            await applicationService.InitialiseFFmpeg;
-
-            using (logger.BeginScope("Converting container to extension"))
-            {
-                logger.LogInformation($"Container name: {container}");
-
-                if (container == "copy")
-                {
-                    return null;
-                }
-
-                var p = new Process();
-                p.StartInfo.UseShellExecute = false;
-                p.StartInfo.RedirectStandardOutput = true;
-                p.StartInfo.RedirectStandardError = true;
-                p.StartInfo.FileName = fileService.FFMPEGPath;
-                p.StartInfo.Arguments = $"-v 1 -h muxer={container}";
-
-                logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
-                p.Start();
-                var output = p.StandardOutput.ReadToEnd();
-                var error = p.StandardError.ReadToEnd();
-                await p.WaitForExitAsync();
-
-                if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(error))
-                {
-                    logger.LogError($"Process Error: ({p.ExitCode}) {error} <End Of Error>");
-                }
-
-                var formatLines = output.Split("\n").ToList();
-
-                foreach (var line in formatLines)
-                {
-                    if (line.Trim().StartsWith("Common extensions:"))
-                    {
-                        var lineSplit = line.Split(":");
-                        if (lineSplit.Length == 2)
-                        {
-                            var extensions = lineSplit[1].Trim().TrimEnd('.');
-
-                            var splitExtensions = extensions.Split(",");
-
-                            if (splitExtensions.Length > 0)
-                            {
-                                return splitExtensions[0];
-                            }
-                        }
-                    }
-                    else
-                    {
-                        logger.LogDebug($"No common extensions found.");
-                    }
-                }
-
-                return container;
-            }
-        }
-
         public async Task DeletePresetAsync(FFmpegPreset preset)
         {
 
@@ -706,95 +650,145 @@ namespace Compressarr.Presets
             }
         }
 
-        public async Task<List<string>> GetArguments(FFmpegPreset preset, FFProbeResponse mediaInfo)
+        public async Task<List<string>> GetArguments(FFmpegPreset preset, WorkItem wi)
         {
-            await applicationService.InitialisePresets;
 
-            List<string> args = new();
-
-            var frameRate = preset.FrameRate.HasValue ? $" -r {preset.FrameRate}" : "";
-            var opArgsStr = string.IsNullOrWhiteSpace(preset.OptionalArguments) ? "" : $" {preset.OptionalArguments.Trim()}";
-            var passStr = " -pass %passnum%";
-
-            var audioArguments = string.Empty;
-
-            var hardwareDecoder = preset.HardwareDecoder.Wrap("-hwaccel {0} ");
-
-            var mapAllElse = " -map 0:s? -c:s copy -map 0:t? -map 0:d? -movflags use_metadata_tags";
-
-            //If were treating all audio streams the same
-            if (preset.AudioStreamPresets.First().CoversAny)
+            using (logger.BeginScope("Get Arguments"))
             {
-                var audioPreset = preset.AudioStreamPresets.First();
-                audioArguments = audioPreset.Action switch
-                {
-                    AudioStreamAction.Copy => " -map 0:a? -c:a copy",
-                    AudioStreamAction.Delete => "",
-                    AudioStreamAction.DeleteUnlessOnly => " -map 0:a:0? -c:a copy",
-                    AudioStreamAction.Encode => $" -map 0:a? -c:a {audioPreset.Encoder.Name}{(string.IsNullOrWhiteSpace(audioPreset.BitRate) ? "" : " -b:a ")}{audioPreset.BitRate}",
-                    _ => throw new System.NotImplementedException()
-                };
-            }
-            else
-            {
-                var i = 0; //for stream output tracking
+                await applicationService.InitialisePresets;
 
-                if (mediaInfo?.streams != null)
+                var mediaInfo = await mediaInfoService.GetMediaInfo(wi.Source, wi.SourceFile);
+                var filePath = wi.SourceFile;
+
+                List<string> args = new();
+
+                var frameRate = preset.FrameRate.HasValue ? $" -r {preset.FrameRate}" : "";
+                var opArgsStr = string.IsNullOrWhiteSpace(preset.OptionalArguments) ? "" : $" {preset.OptionalArguments.Trim()}";
+                var passStr = " -pass %passnum%";
+
+                var audioArguments = string.Empty;
+
+                var hardwareDecoder = preset.HardwareDecoder.Wrap("-hwaccel {0} ");
+
+                var mapAllElse = " -map 0:s? -c:s copy -map 0:t? -map 0:d? -movflags use_metadata_tags";
+
+                logger.LogInformation("Calculating Audio Arguments");
+                //If were treating all audio streams the same
+                if (preset.AudioStreamPresets.First().CoversAny)
                 {
-                    foreach (var stream in mediaInfo.AudioStreams)
+                    var audioPreset = preset.AudioStreamPresets.First();
+                    audioArguments = audioPreset.Action switch
                     {
-                        foreach (var audioPreset in preset.AudioStreamPresets)
-                        {
-                            var match = audioPreset.Filters.All(f =>
-                                f.Rule switch
-                                {
-                                    AudioStreamRule.Any => true,
-                                    AudioStreamRule.Codec => f.Matches == f.Values.Contains(stream.codec_name.ToLower()),
-                                    AudioStreamRule.Channels => new List<int>() { stream.channels ?? 0 }.AsQueryable().Where($"it{f.NumberComparitor.Operator}{f.ChannelValue}").Any(),
-                                    AudioStreamRule.Language => stream.tags?.language == null || f.Matches == f.Values.Contains(stream.tags?.language.ToLower()),
-                                    _ => throw new NotImplementedException()
-                                }
-                            );
+                        AudioStreamAction.Copy => " -map 0:a? -c:a copy",
+                        AudioStreamAction.Delete => "",
+                        AudioStreamAction.DeleteUnlessOnly => " -map 0:a:0? -c:a copy",
+                        AudioStreamAction.Encode => $" -map 0:a? -c:a {audioPreset.Encoder.Name}{(string.IsNullOrWhiteSpace(audioPreset.BitRate) ? "" : " -b:a ")}{audioPreset.BitRate}",
+                        _ => throw new System.NotImplementedException()
+                    };
+                }
+                else
+                {
+                    var i = 0; //for stream output tracking
 
-                            if (match)
+                    if (mediaInfo?.streams != null)
+                    {
+                        foreach (var stream in mediaInfo.AudioStreams)
+                        {
+                            foreach (var audioPreset in preset.AudioStreamPresets)
                             {
-                                audioArguments += audioPreset.Action switch
+                                var match = audioPreset.Filters.All(f =>
+                                    f.Rule switch
+                                    {
+                                        AudioStreamRule.Any => true,
+                                        AudioStreamRule.Codec => f.Matches == f.Values.Contains(stream.codec_name.ToLower()),
+                                        AudioStreamRule.Channels => new List<int>() { stream.channels ?? 0 }.AsQueryable().Where($"it{f.NumberComparitor.Operator}{f.ChannelValue}").Any(),
+                                        AudioStreamRule.Language => stream.tags?.language == null || f.Matches == f.Values.Contains(stream.tags?.language.ToLower()),
+                                        _ => throw new NotImplementedException()
+                                    }
+                                );
+
+                                if (match)
                                 {
-                                    AudioStreamAction.Copy => $" -map 0:{stream.index} -c:a:{i++} copy",
-                                    AudioStreamAction.Delete => "",
-                                    AudioStreamAction.DeleteUnlessOnly => preset.AudioStreamPresets.Last() == audioPreset && i == 0 ? $" -map 0:{stream.index} -c:a:{i++} copy" : "",
-                                    AudioStreamAction.Encode => $" -map 0:{stream.index} -c:a:{i++} {audioPreset.Encoder.Name}{(string.IsNullOrWhiteSpace(audioPreset.BitRate) ? "" : $" -b:a:{i} ")}{audioPreset.BitRate}",
-                                    _ => throw new System.NotImplementedException()
-                                };
-                                break;
+                                    var audioStreamMap = $" -map 0:{stream.index} -c:a:{i++}";
+                                    audioArguments += audioPreset.Action switch
+                                    {
+                                        AudioStreamAction.Copy => $"{audioStreamMap} copy",
+                                        AudioStreamAction.Delete => "",
+                                        AudioStreamAction.DeleteUnlessOnly => preset.AudioStreamPresets.Last() == audioPreset && i == 0 ? $"{audioStreamMap} copy" : "",
+                                        AudioStreamAction.Encode => $"{audioStreamMap} {audioPreset.Encoder.Name}{(string.IsNullOrWhiteSpace(audioPreset.BitRate) ? "" : $" -b:a:{i} ")}{audioPreset.BitRate}",
+                                        _ => throw new System.NotImplementedException()
+                                    };
+                                    break;
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            if (preset.VideoBitRate.HasValue)
-            {
-                if (preset.VideoCodecOptions != null)
+                logger.LogDebug($"Audio Arguments: {audioArguments}");
+
+                logger.LogInformation("Calculating Video Arguments");
+                var videoArguments = string.Empty;
+
+                if (preset.VideoEncoder.IsCopy)
                 {
-                    if (preset.VideoCodecOptions.Any(vco => vco.EncoderOption.IncludePass))
+                    videoArguments = " -map 0:v -c:v copy";
+                }
+                else
+                {
+                    if (mediaInfo?.streams != null)
                     {
-                        passStr = string.Empty;
+                        var i = 0; //for stream output tracking
+
+                        foreach (var vstream in mediaInfo.VideoStreams)
+                        {
+                            var videoStreamMap = $" -map 0:{vstream.index} -c:v:{i++}";
+
+                            if (vstream.disposition.attached_pic)
+                            {
+                                videoArguments += $"{videoStreamMap} copy";
+                            }
+                            else
+                            {
+                                if (preset.VideoBitRate.HasValue)
+                                {
+                                    if (preset.VideoCodecOptions != null)
+                                    {
+                                        if (preset.VideoCodecOptions.Any(vco => vco.EncoderOption.IncludePass))
+                                        {
+                                            passStr = string.Empty;
+                                        }
+                                    }
+                                    videoArguments += $"{videoStreamMap} {preset.VideoEncoder.Name}{await GetVideoCodecParams(preset, wi)} -b:v {preset.VideoBitRate}k{frameRate}{passStr}";
+                                }
+                                else
+                                {
+                                    videoArguments += $"{videoStreamMap} {preset.VideoEncoder.Name}{await GetVideoCodecParams(preset, wi)}{frameRate}";
+                                }
+                            }
+                        }
                     }
                 }
 
-                var part1Ending = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "NUL" : @"/dev/null";
+                logger.LogDebug($"Video Arguments: {videoArguments}");
 
-                args.Add($"{hardwareDecoder}-y -i \"{{0}}\" -map 0:v -c:V {preset.VideoEncoder.Name}{preset.VideoCodecParams} -b:v {preset.VideoBitRate}k{frameRate}{passStr} -an -f null {part1Ending}".Replace("%passnum%", "1"));
-                args.Add($"{hardwareDecoder}-y -i \"{{0}}\" -map 0:v -c:V {preset.VideoEncoder.Name}{preset.VideoCodecParams} -b:v {preset.VideoBitRate}k{frameRate}{passStr}{opArgsStr}{audioArguments}{mapAllElse} \"{{1}}\"".Replace("%passnum%", "2"));
-            }
-            else
-            {
-                args.Add($"{hardwareDecoder}-y -i \"{{0}}\" -map 0:v -c:V {preset.VideoEncoder.Name}{frameRate}{preset.VideoCodecParams}{opArgsStr}{audioArguments}{mapAllElse} \"{{1}}\"");
-            }
+                if (preset.VideoBitRate.HasValue)
+                {
 
-            return args;
-        }        
+
+                    var part1Ending = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "NUL" : @"/dev/null";
+
+                    args.Add($"{hardwareDecoder}-y -i \"{{0}}\" {videoArguments} -an -f null {part1Ending}".Replace("%passnum%", "1"));
+                    args.Add($"{hardwareDecoder}-y -i \"{{0}}\" {videoArguments}{opArgsStr}{audioArguments}{mapAllElse} \"{{1}}\"".Replace("%passnum%", "2"));
+                }
+                else
+                {
+                    args.Add($"{hardwareDecoder}-y -i \"{{0}}\" {videoArguments}{opArgsStr}{audioArguments}{mapAllElse} \"{{1}}\"");
+                }
+
+                return args;
+            }
+        }
 
         public FFmpegPreset GetPreset(string presetName) => Presets.FirstOrDefault(p => p.Name == presetName);
 
@@ -810,6 +804,170 @@ namespace Compressarr.Presets
             });
         }
 
+        private async Task<string> CalculateBestOptions(FFmpegPreset preset, WorkItem wi)
+        {
+            using (logger.BeginScope("Calculating Best Encoder Options"))
+            {
+                var tempFile = Path.Combine(Path.GetTempPath(), $"directCopy.{preset.ContainerExtension}");
+                var tempEncFile = Path.Combine(Path.GetTempPath(), $"encFile.{preset.ContainerExtension}");
 
+                var sampleTime = "120";
+
+                var temparg = $"-y -i \"{wi.SourceFile}\" -codec copy -t {sampleTime} -ss {sampleTime}  \"{tempFile}\" ";
+
+                await processManager.EncodeAVideo(null, null, null, temparg, new());
+
+                var origSize = new FileInfo(tempFile).Length;
+
+                var hardwareDecoder = preset.HardwareDecoder.Wrap("-hwaccel {0} ");
+                var frameRate = preset.FrameRate.HasValue ? $" -r {preset.FrameRate}" : "";
+
+                var result = string.Empty;
+
+                wi.ArgCalcResults = new List<AutoPresetTest>();
+                var testSuite = wi.ArgCalcResults;
+
+                wi.Update();
+
+                foreach (var option in preset.VideoCodecOptions.Where(o => o.AutoCalculate).Select(x => x.EncoderOption))
+                {
+                    var range = new List<string>();
+                    switch (option.Type)
+                    {
+                        case CodecOptionType.Range:
+                        case CodecOptionType.Number:
+                            {
+                                range = Enumerable.Range(Math.Min(option.AutoTune.Start, option.AutoTune.End), Math.Abs(option.AutoTune.End - option.AutoTune.Start) + 1).OrderBy(x => Math.Abs(x - option.AutoTune.Start)).Select(i => i.ToString()).ToList();
+                            }
+                            break;
+                        case CodecOptionType.Select:
+                        case CodecOptionType.String:
+                            {
+                                range = option.AutoTune.Values;
+                            }
+                            break;
+                    }
+
+                    var SSIMTest = new AutoPresetTest(option.Arg);
+
+                    foreach (var i in range)
+                    {
+                        var key = i;
+                        SSIMTest.AutoPresetResultSet.Add(i.Trim(), null);
+                    }
+
+                    wi.ArgCalcResults.Add(SSIMTest);
+                }
+
+                wi.Update();
+
+                foreach (var test in wi.ArgCalcResults)
+                {
+
+                    test.Argument = $" {result} {test.Argument}";
+
+                    foreach (var i in test.AutoPresetResultSet)
+                    {
+                        test.AutoPresetResultSet[i.Key] = new();
+                        test.AutoPresetResultSet[i.Key].Processing = true;
+                        wi.Update();
+
+                        var autoTuneStr = $" {test.Argument.Replace("<val>", i.Key)}";
+                        var arg = $"{hardwareDecoder} -y -i \"{tempFile}\" -map 0:V -c:V {preset.VideoEncoder.Name}{autoTuneStr} {frameRate}  \"{tempEncFile}\" ";
+                        logger.LogInformation($"Trying: {arg}");
+
+                        await processManager.EncodeAVideo(null, null, (sender, args) =>
+                        {
+                            test.AutoPresetResultSet[i.Key].EncodingProgress = args.Percent;
+                            wi.Update();
+                        }, arg, new());
+
+                        var size = new FileInfo(tempEncFile).Length;
+                        test.AutoPresetResultSet[i.Key].AddSize(size, origSize);
+                        wi.Update();
+
+                        var ssimResult = await processManager.CalculateSSIM(null, null, (sender, args) =>
+                        {
+                            test.AutoPresetResultSet[i.Key].SSIMProgress = args.Percent;
+                            wi.Update();
+                        }, tempFile, tempEncFile, new());
+
+                        if (ssimResult.Success)
+                        {
+                            test.AutoPresetResultSet[i.Key].SSIM = ssimResult.SSIM;
+                            logger.LogDebug($"SSIM: {ssimResult.SSIM}, Size: {size.ToFileSize()} {Math.Round((decimal)size / origSize * 100M, 2).Adorn("%")}");
+                        }
+
+                        test.AutoPresetResultSet[i.Key].Processing = false;
+                        wi.Update();
+                    }
+
+                    logger.LogDebug($"SSIM results: {string.Join("\r\n", test.AutoPresetResultSet.Select(d => $"{d.Key} | {d.Value.SSIM} | {d.Value.Size.ToFileSize()}"))}");
+
+                    var bestVal = test.AutoPresetResultSet.Where(x => x.Value != null && x.Value.Size < origSize).OrderByDescending(x => x.Value.SSIM).ThenBy(x => x.Value.Size).FirstOrDefault();
+
+                    if (bestVal.Equals(default(KeyValuePair<string, AutoPresetResult>)))
+                    {
+                        bestVal = test.AutoPresetResultSet.OrderBy(x => x.Value.Size).FirstOrDefault();
+                    }
+
+                    bestVal.Value.Best = true;
+
+                    logger.LogInformation($"Best Val: {bestVal.Value.SSIM}, Size: {bestVal.Value.Size.ToFileSize()} {Math.Round((decimal)bestVal.Value.Size / origSize * 100M, 2).Adorn("%")}");
+
+                    result = $" {test.Argument.Replace("<val>", bestVal.Key.Trim())}";
+
+                    logger.LogInformation($"Best Argument: {result}");
+
+                    wi.Update();
+                }
+                wi.Update();
+                return result;
+            }
+        }
+        private async Task<string> GetVideoCodecParams(FFmpegPreset preset, WorkItem wi)
+        {
+            using (logger.BeginScope("Get Video Codec Parameters"))
+            {
+
+                var sb = new System.Text.StringBuilder();
+                if (preset.VideoCodecOptions != null)
+                {
+                    foreach (var vco in preset.VideoCodecOptions.Where(x => !string.IsNullOrWhiteSpace(x.Value) && x.AutoCalculate == false))
+                    {
+
+                        var param = $" {vco.EncoderOption.Arg.Replace("<val>", vco.Value.Trim())}";
+
+                        if (preset.VideoBitRate.HasValue)
+                        {
+                            if (vco.EncoderOption.IncludePass)
+                            {
+                                param += " pass=%passnum%";
+                            }
+
+                            if (!vco.EncoderOption.DisabledByVideoBitRate)
+                            {
+                                sb.Append(param);
+                            }
+                        }
+                        else
+                        {
+                            sb.Append(param);
+                        }
+                    }
+
+                    if (preset.VideoCodecOptions.Any(x => x.AutoCalculate))
+                    {
+                        logger.LogInformation($"Now Calculating Best values");
+                        var calVals = await CalculateBestOptions(preset, wi);
+                        logger.LogDebug($"Calculated: {calVals}");
+
+                        sb.Append(calVals);
+                    }
+                }
+
+                return sb.ToString();
+            }
+        }
     }
 }

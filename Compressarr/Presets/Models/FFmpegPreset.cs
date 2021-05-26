@@ -59,40 +59,6 @@ namespace Compressarr.Presets.Models
             }
         }
 
-        internal string VideoCodecParams
-        {
-            get
-            {
-                var sb = new StringBuilder();
-                if (VideoCodecOptions != null)
-                {
-                    foreach (var vco in VideoCodecOptions)
-                    {
-                        if (VideoBitRate.HasValue)
-                        {
-                            if (vco.EncoderOption.IncludePass)
-                            {
-                                sb.Append($" {vco.EncoderOption.Arg.Replace("<val>", $"{vco.Value} pass=%passnum%".Trim())}");
-                            }
-                            else if (!string.IsNullOrWhiteSpace(vco.Value))
-                            {
-                                if (!vco.EncoderOption.DisabledByVideoBitRate)
-                                {
-                                    sb.Append($" {vco.EncoderOption.Arg.Replace("<val>", $"{vco.Value}".Trim())}");
-                                }
-                            }
-                        }
-                        else if (!string.IsNullOrWhiteSpace(vco.Value))
-                        {
-                            sb.Append($" {vco.EncoderOption.Arg.Replace("<val>", $"{vco.Value}".Trim())}");
-                        }
-                    }
-                }
-
-                return sb.ToString();
-            }
-        }
-
         public override string ToString()
         {
             return string.Join(" | ", (new List<string>() { VideoEncoder?.Name, Name }).Where(x => !string.IsNullOrWhiteSpace(x)));

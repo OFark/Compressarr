@@ -6,7 +6,11 @@
     "Min": 0,
     "Max": 51,
     "Arg": "-cq <val>",
-    "DisabledByVideoBitRate": true
+    "DisabledByVideoBitRate": true,
+    "AutoTune": {
+      "Start": 28,
+      "End": 18
+    }
   },
   {
     "Name": "Preset",
@@ -32,18 +36,20 @@
       "p6",
       "p7"
     ],
-    "Arg": "-preset:v <val>"
+    "Arg": "-preset:v <val>",
+    "AutoTune": {
+      "Values": [
+        "fast",
+        "medium",
+        "slow",
+        "llhp",
+        "llhq",
+        "lossless",
+        "losslesshp"
+      ]
+    }
   },
-  {
-    "Name": "Profile",
-    "Type": "Select",
-    "Values": [
-      "main",
-      "main10",
-      "rext"
-    ],
-    "Arg": "-profile <val>"
-  },
+
   {
     "Name": "Tune",
     "Type": "Select",
@@ -53,7 +59,25 @@
       "ull",
       "lossless"
     ],
-    "Arg": "-tune <val>"
+    "Arg": "-tune <val>",
+    "AutoTune": {
+      "Values": [
+        "hq",
+        "ll",
+        "ull",
+        "lossless"
+      ]
+    }
+  },
+  {
+    "Name": "Profile",
+    "Type": "Select",
+    "Values": [
+      "main",
+      "main10",
+      "rext"
+    ],
+    "Arg": "-profile:v <val>"
   },
   {
     "Name": "Rate Control",

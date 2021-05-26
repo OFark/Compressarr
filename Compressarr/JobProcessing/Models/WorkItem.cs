@@ -1,4 +1,5 @@
 ﻿using Compressarr.Filtering;
+using Compressarr.Presets.Models;
 using Compressarr.Services.Models;
 using System;
 using System.Collections.Generic;
@@ -19,6 +20,14 @@ namespace Compressarr.JobProcessing.Models
             Movie = movie;
         }
 
+        public event EventHandler<string> OnUpdate;
+
+        public void Update(string message = null)
+        {
+            OnUpdate?.Invoke(this, message);
+        }
+
+        public List<AutoPresetTest> ArgCalcResults { get; set; }
         public Movie Movie { get; set; }
         public IEnumerable<string> Arguments { get; set; }
         public string Bitrate { get; internal set; }
@@ -36,6 +45,7 @@ namespace Compressarr.JobProcessing.Models
         public decimal? Q { get; internal set; }
         public bool Running { get; internal set; } = false;
         public bool ShowArgs { get; set; }
+        public bool CalcBest { get; set; }
         public string Size { get; internal set; }
         public MediaSource Source { get; set; }
         public string SourceFile { get; set; }
@@ -44,6 +54,6 @@ namespace Compressarr.JobProcessing.Models
         public string Speed { get; internal set; }
         public decimal? SSIM { get; set; }
         public bool Success { get; internal set; } = false;
-        public TimeSpan? TotalLength { get; set; } //WorkItem Duration is the current process time frame, MediaInfo Duration is the movie length.
+        public TimeSpan? TotalLength => Movie?.MediaInfo?.format?.Duration; //WorkItem Duration is the current process time frame, MediaInfo Duration is the movie length.
     }
 }

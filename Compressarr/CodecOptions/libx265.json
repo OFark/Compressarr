@@ -6,7 +6,11 @@
     "Min": 0,
     "Max": 51,
     "Arg": "-crf <val>",
-    "DisabledByVideoBitRate": true
+    "DisabledByVideoBitRate": true,
+    "AutoTune": {
+      "Start": 28,
+      "End": 18
+    }
   },
   {
     "Name": "Preset",
@@ -23,7 +27,20 @@
       "veryslow",
       "placebo"
     ],
-    "Arg": "-preset <val>"
+    "Arg": "-preset <val>",
+    "AutoTune": {
+      "Values": [
+        "ultrafast",
+        "superfast",
+        "veryfast",
+        "faster",
+        "fast",
+        "medium",
+        "slow",
+        "slower",
+        "veryslow"
+      ]
+    }
   },
   {
     "Name": "Tune",
@@ -34,7 +51,15 @@
       "grain",
       "zerolatency"
     ],
-    "Arg": "-tune <val>"
+    "Arg": "-tune <val>",
+    "AutoTune": {
+      "Values": [
+        "animation",
+        "fastdecode",
+        "grain",
+        "zerolatency"
+      ]
+    }
   },
   {
     "Name": "Parameters",

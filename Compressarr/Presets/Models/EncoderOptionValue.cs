@@ -19,6 +19,7 @@ namespace Compressarr.Presets.Models
         {
             Name = valueBase?.Name;
             Value = valueBase?.Value;
+            AutoCalculate = valueBase?.AutoCalculate ?? false;
         }
 
         public int? IntValue

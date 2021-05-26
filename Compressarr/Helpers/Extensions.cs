@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Components;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -110,14 +111,27 @@ namespace Compressarr.Helpers
             return String.Format(new FileSizeFormatProvider(), "{0:fs}", l);
         }
 
+        public static void Clear<T>(this EventHandler<T> eh)
+        {
+            foreach (Delegate d in eh.GetInvocationList())
+            {
+                eh -= (EventHandler<T>)d;
+            }
+        }
+
         public static string ToFileSize(this int l)
         {
             return String.Format(new FileSizeFormatProvider(), "{0:fs}", l);
         }
 
+        public static string ToPercent(this decimal percent, int decimals = 0)
+        {
+            return Math.Round(percent * 100, decimals).ToString();
+        }
+
         public static string ToPercent(this decimal? percent, int decimals = 0)
         {
-            return percent.HasValue ? Math.Round(percent.Value * 100, decimals).ToString() : null;
+            return percent.HasValue ? ToPercent(percent.Value, decimals).ToString() : null;
         }
 
         public static string ToStringTimeSeconds(this TimeSpan span)
@@ -131,7 +145,7 @@ namespace Compressarr.Helpers
         }
 
         public static string JoinWithIfNotNull(this string seperator, params string[] values) => string.Join(seperator, values.Where(x => !string.IsNullOrWhiteSpace(x)));
-                
+
         public static HashSet<EncoderOptionValue> WithValues(this HashSet<EncoderOption> encoderOptions, IEnumerable<EncoderOptionValueBase> values = null)
         {
             var eovs = new HashSet<EncoderOptionValue>();

@@ -196,6 +196,35 @@ namespace Compressarr.FFmpeg
             }
         }
 
+        public async Task<FFResult<string>> ConvertContainerToExtension(string container)
+        {
+            await applicationService.InitialiseFFmpeg;
+
+            using (logger.BeginScope("Converting container to extension"))
+            {
+                logger.LogInformation($"Container name: {container}");
+
+                if (container == "copy")
+                {
+                    return new(false, (string)null);
+                }
+
+                var result = await RunProcess(FFProcess.FFmpeg, $"-v 1 -h muxer={container}");
+
+                if (result.Success)
+                {
+                    var reg = new Regex(@"^ *Common extensions: (\w*)(?:,\w*)*\.", RegexOptions.IgnoreCase | RegexOptions.Multiline);
+                    var match = reg.Match(result.StdOut);
+                    if (match != null)
+                    {
+                        return new(true, match.Groups[1].Value);
+                    }
+                }
+
+                return new(false, container);
+            }
+        }
+
         public async Task<FFResult<FFProbeResponse>> GetFFProbeInfo(string filePath)
         {
             using (logger.BeginScope("GetFFProbeInfo: {filePath}", filePath))

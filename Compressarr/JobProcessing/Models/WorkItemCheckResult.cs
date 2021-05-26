@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Compressarr.Helpers;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -21,6 +22,6 @@ namespace Compressarr.JobProcessing.Models
         public bool AllGood => LengthOK && SSIMOK && SizeOK;
 
         public string Result =>
-            LengthOK ? SSIMOK ? SizeOK ? "Passed Checks" : $"File size above threshold ({Math.Round((workItem.Compression ?? 0) * 100, 2)}%)" : $"File similarity below threshold ({Math.Round((workItem.SSIM ?? 0) * 100, 2)}%)" : "File length mismatch";
+            LengthOK ? SSIMOK ? SizeOK ? "Passed Checks" : $"File size above threshold ({workItem.Compression.ToPercent(2).Adorn("%")})" : $"File similarity below threshold ({workItem.SSIM.ToPercent(2).Adorn("%")})" : "File length mismatch";
     }
 }

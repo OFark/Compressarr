@@ -5,6 +5,7 @@ namespace Compressarr.FFmpeg
 {
     public interface IFFmpegProcessor
     {
+        Task<FFResult<string>> ConvertContainerToExtension(string container);
         Task<FFResult<CodecResponse>> GetAvailableCodecsAsync();
         Task<FFResult<ContainerResponse>> GetAvailableContainersAsync();
         Task<FFResult<EncoderResponse>> GetAvailableEncodersAsync();

@@ -115,7 +115,7 @@ namespace Compressarr.JobProcessing
                     logger.LogDebug($"New Duration: {mediaInfo?.format?.Duration}");
 
                     result.LengthOK = mediaInfo?.format?.Duration != default && job.Process.WorkItem.TotalLength.HasValue &&
-                        (long)Math.Round(mediaInfo.format.Duration.TotalSeconds, 0) == (long)Math.Round(job.Process.WorkItem.TotalLength.Value.TotalSeconds, 0); //Check to the nearest second.
+                        Math.Abs(mediaInfo.format.Duration.TotalSeconds - job.Process.WorkItem.TotalLength.Value.TotalSeconds) < 1; //Check to the nearest second.
                 }
 
                 result.SSIMOK = result.LengthOK &&
@@ -170,7 +170,7 @@ namespace Compressarr.JobProcessing
                     job.UpdateCondition((c) => c.Clear());
 
                     logger.LogDebug($"Job will initialise.");
-                    using (var jobInit = new JobWorker(job.Condition.Initialise))
+                    using (var jobInit = new JobWorker(job.Condition.Initialise, job.UpdateStatus))
                     {
                         job.Filter = filterManager.GetFilter(job.FilterName);
                         job.Preset = presetManager.GetPreset(job.PresetName);
@@ -178,9 +178,10 @@ namespace Compressarr.JobProcessing
 
                         if (job.Preset != null)
                         {
-                            job.Preset.ContainerExtension = await presetManager.ConvertContainerToExtension(job.Preset.Container);
+                            var getContainerExtension = await fFmpegProcessor.ConvertContainerToExtension(job.Preset.Container);
+                            job.Preset.ContainerExtension = getContainerExtension.Result;
                             logger.LogDebug($"Container Extension set to {job.Preset.ContainerExtension}");
-                            using (var jobTest = new JobWorker(job.Condition.Test))
+                            using (var jobTest = new JobWorker(job.Condition.Test, job.UpdateStatus))
                             {
 
                                 job.Cancel = false;
@@ -213,13 +214,15 @@ namespace Compressarr.JobProcessing
 
                                     Log(job, LogLevel.Debug, "Files Returned", "Building Workload");
 
-                                    using (var jobWorkLoad = new JobWorker(job.Condition.BuildWorkLoad))
+                                    using (var jobWorkLoad = new JobWorker(job.Condition.BuildWorkLoad, job.UpdateStatus))
                                     {
 
                                         double i = 0;
                                         job.WorkLoad = getFilesResults.Results.ToHashSet();
                                         foreach (var wi in job.WorkLoad)
                                         {
+                                            wi.OnUpdate += job.UpdateStatus;
+
                                             var file = new FileInfo(wi.SourceFile);
                                             if (!file.Exists)
                                             {
@@ -364,7 +367,7 @@ namespace Compressarr.JobProcessing
             {
                 if (job.Condition.SafeToRun)
                 {
-                    using (var jobCompleter = new JobWorker(job.Condition.Process))
+                    using (var jobCompleter = new JobWorker(job.Condition.Process, job.UpdateStatus))
                     {
                         Log(job, LogLevel.Information, $"Started Job at: {DateTime.Now}");
 
@@ -376,14 +379,10 @@ namespace Compressarr.JobProcessing
                                 {
                                     wi.Success = false;
 
-                                    var mediaInfo = await mediaInfoService.GetMediaInfo(wi.Source, wi.SourceFile);
-
-                                    wi.TotalLength = mediaInfo?.format?.Duration;
-                                    wi.Arguments ??= await presetManager.GetArguments(job.Preset, mediaInfo);
+                                    wi.Arguments ??= await presetManager.GetArguments(job.Preset, wi);
 
                                     Log(job, LogLevel.Debug, $"Now Processing: {wi.SourceFileName}");
                                     job.Process = new FFmpegProcess();
-                                    job.Process.OnUpdate += job.UpdateStatus;
                                     job.Process.WorkItem = wi;
                                     await processManager.Process(job);
 
@@ -438,7 +437,7 @@ namespace Compressarr.JobProcessing
                         }
                         catch (Exception ex)
                         {
-                            Log(job, LogLevel.Error, ex.Message);
+                            Log(job, LogLevel.Error, ex.ToString());
                             return;
                         }
                     }
@@ -454,7 +453,7 @@ namespace Compressarr.JobProcessing
                 {
                     job.Process.cont = false;
                     job.Log("Job Stop requested", LogLevel.Information);
-                    if (job.Process.Converter != null)
+                    if (job.Condition.Process.Processing)
                     {
                         logger.LogDebug("Cancellation Token Set");
                         job.Process.cancellationTokenSource.Cancel();

@@ -128,16 +128,16 @@
                                                         }
                                             </MudText>
                                         </MudTd>
-                                        <MudTd DataLabel="SSIM"><MudText Align="Align.Center">@context.SSIM.ToPercent().Adorn("%")</MudText></MudTd>
-                                        <MudTd DataLabel="Compression"><MudText Align="Align.Center">@context.Compression.ToPercent().Adorn("%")</MudText></MudTd>
+                                        <MudTd DataLabel="SSIM"><MudText Align="Align.Center">@context.SSIM.ToPercent(2).Adorn("%")</MudText></MudTd>
+                                        <MudTd DataLabel="Compression"><MudText Align="Align.Center">@context.Compression.ToPercent(2).Adorn("%")</MudText></MudTd>
                                     </RowTemplate>
                                     <ChildRowContent>
-                                        @if (context.ShowArgs)
+                                        @if (context.ShowArgs || context.Running)
                                                 {
-                                            @if (context.Arguments != null)
-                                                    {
-                                                <MudTr>
-                                                    <td colspan="14">
+                                            <MudTr>
+                                                <MudTd colspan="14">
+                                                    @if (context.Arguments != null)
+                                                            {
                                                         <MudPaper Elevation="0">
                                                             <MudList Dense="true">
                                                                 @foreach (var arg in context.Arguments.Select(x => applicationService.InsertNamesIntoFFmpegPreviews ? string.Format(x, context.SourceFile, context.DestinationFile) : x))
@@ -146,20 +146,74 @@
                                                                         }
                                                             </MudList>
                                                         </MudPaper>
-                                                    </td>
-                                                </MudTr>
-                                                    }
 
-                                                    else
-                                                    {
-                                                <MudTr>
-                                                    <td colspan="14">
+                                                            }
+                                                            else if (context.ArgCalcResults != null)
+                                                            {
+                                                        <MudSimpleTable Dense="true">
+                                                            <thead>
+                                                                @foreach (var arg in context.ArgCalcResults)
+                                                                        {
+                                                                    <MudTd>@arg.Argument</MudTd>
+                                                                        }
+                                                            </thead>
+                                                            <tbody>
+                                                                <MudTr>
+                                                                    @foreach (var arg in context.ArgCalcResults)
+                                                                            {
+                                                                        <MudTd valign="top">
+                                                                            <MudTable Dense="true" Items="arg.AutoPresetResultSet" Style="vertical-align: auto">
+                                                                                <HeaderContent>
+                                                                                    <MudTh>val</MudTh>
+                                                                                    <MudTh>SSIM</MudTh>
+                                                                                    <MudTh>Compression</MudTh>
+                                                                                </HeaderContent>
+                                                                                <RowTemplate Context="TestContext">
+                                                                                    <MudTd>@TestContext.Key</MudTd>
+                                                                                    @if (TestContext.Value != null)
+                                                                                            {
+                                                                                        <MudTd>
+                                                                                            @if (@TestContext.Value.SSIM > 0)
+                                                                                                    {
+                                                                                                @TestContext.Value.SSIM.ToPercent(2).Adorn("%");
+                                                                                                    }
+                                                                                                    else
+                                                                                                    {
+                                                                                                <MudProgressLinear Color="Color.Dark" Value="@TestContext.Value.SSIMProgress" />
+                                                                                                    }
+                                                                                        </MudTd>
+                                                                                        <MudTd>
+                                                                                            @if (TestContext.Value.Size > 0)
+                                                                                                    {
+                                                                                                @:@TestContext.Value.Percent.Adorn("%") - @TestContext.Value.Size.ToFileSize()
+                                                                                                    }
+                                                                                                    else
+                                                                                                    {
+                                                                                                <MudProgressLinear Color="Color.Dark" Value="@TestContext.Value.EncodingProgress" />
+                                                                                                    }
+                                                                                        </MudTd>
+                                                                                            }
+                                                                                            else
+                                                                                            {
+                                                                                        <MudTd>&nbsp;</MudTd>
+                                                                                        <MudTd>&nbsp;</MudTd>
+                                                                                            }
+                                                                                </RowTemplate>
+                                                                            </MudTable>
+                                                                        </MudTd>
+                                                                            }
+                                                                </MudTr>
+                                                            </tbody>
+                                                        </MudSimpleTable>
+                                                            }
+                                                    @if (context.Arguments == null || context.Running)
+                                                            {
                                                         <MudPaper Elevation="0" Class="pa-2">
                                                             <MudProgressLinear Indeterminate="true" Color="Color.Secondary" />
                                                         </MudPaper>
-                                                    </td>
-                                                </MudTr>
-                                                    }
+                                                            }
+                                                </MudTd>
+                                            </MudTr>
                                                 }
                                     </ChildRowContent>
                                     <PagerContent>
@@ -246,14 +300,14 @@
 </MudExpansionPanel>
 
 @code {
-        [Parameter]
-        public Compressarr.JobProcessing.Models.Job job { get; set; }
+    [Parameter]
+    public Compressarr.JobProcessing.Models.Job job { get; set; }
 
-        [Parameter]
-        public bool NewJob { get; set; }
+    [Parameter]
+    public bool NewJob { get; set; }
 
-        [Parameter]
-        public EventCallback OnAdd { get; set; }
+    [Parameter]
+    public EventCallback OnAdd { get; set; }
 
 
     private bool canReload, editJob, mouseOnButton;
@@ -336,7 +390,7 @@
 
         await InvokeAsync(StateHasChanged);
 
-        wi.Arguments ??= await presetManager.GetArguments(job.Preset, await mediaInfoService.GetMediaInfo(wi.Source, wi.SourceFile));
+        wi.Arguments ??= await presetManager.GetArguments(job.Preset, wi);
         await InvokeAsync(StateHasChanged);
     }
 

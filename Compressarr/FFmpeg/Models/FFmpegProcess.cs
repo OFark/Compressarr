@@ -11,6 +11,7 @@ namespace Compressarr.Presets.Models
 {
     public class FFmpegProcess
     {
+        //Yes it really is assigned to. Twice in fact.
         internal IConversion Converter;
 
         internal CancellationTokenSource cancellationTokenSource = new ();
@@ -18,8 +19,6 @@ namespace Compressarr.Presets.Models
         internal bool cont = false;
 
         internal WorkItem WorkItem;
-
-        public event EventHandler<string> OnUpdate;
 
         public bool Succeded;
 
@@ -32,14 +31,14 @@ namespace Compressarr.Presets.Models
             if (!string.IsNullOrWhiteSpace(message))
             {
                 Console = (Console ?? ImmutableSortedSet.Create<JobEvent>()).Add(new JobEvent(level, message)).TakeLast(100).ToImmutableSortedSet();
-                Update();
+                WorkItem?.Update();
             }
         }
 
-        public void Update(object sender = null, string message = null)
-        {
+        //public void Update(string message = null)
+        //{
 
-            OnUpdate?.Invoke(sender, message);
-        }
+        //    WorkItem?.Update(message);
+        //}
     }
 }

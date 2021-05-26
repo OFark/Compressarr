@@ -49,10 +49,15 @@ namespace Compressarr.FFmpeg.Models
         public Format format { get; set; }
         public List<Stream> streams { get; set; }
 
+        [JsonIgnore]
         public IEnumerable<Stream> AttachmentStreams => streams?.Where(x => x != null && x.codec_type == CodecType.Attachment);
+        [JsonIgnore]
         public IEnumerable<Stream> AudioStreams => streams?.Where(x => x != null && x.codec_type == CodecType.Audio);
+        [JsonIgnore]
         public IEnumerable<Stream> DataStreams => streams?.Where(x => x != null && x.codec_type == CodecType.Data);
+        [JsonIgnore]
         public IEnumerable<Stream> SubtitleStreams => streams?.Where(x => x != null && x.codec_type == CodecType.Subtitle);
+        [JsonIgnore]
         public IEnumerable<Stream> VideoStreams => streams?.Where(x => x != null && x.codec_type == CodecType.Video);
     }
 

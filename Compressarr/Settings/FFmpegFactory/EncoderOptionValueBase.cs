@@ -17,9 +17,11 @@ namespace Compressarr.Settings.FFmpegFactory
         {
             Name = eov?.Name;
             Value = eov?.Value;
+            AutoCalculate = eov?.AutoCalculate ?? false;
         }
 
         public string Name { get; set; }
         public string Value { get; set; }
+        public bool AutoCalculate { get; set; }
     }
 }

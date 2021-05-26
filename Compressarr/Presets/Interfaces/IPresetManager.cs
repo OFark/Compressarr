@@ -3,6 +3,7 @@ using Compressarr.Filtering.Models;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Presets.Models;
 using Compressarr.Services.Base;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -22,10 +23,10 @@ namespace Compressarr.Presets
         SortedSet<Encoder> VideoEncoders { get; }
         List<string> AudioBitrates { get; }
 
+
         Task AddPresetAsync(FFmpegPreset newPreset);
-        Task<string> ConvertContainerToExtension(string container);
         Task DeletePresetAsync(FFmpegPreset preset);
-        Task<List<string>> GetArguments(FFmpegPreset preset, FFProbeResponse mediaInfo);
+        Task<List<string>> GetArguments(FFmpegPreset preset, WorkItem wi);
         FFmpegPreset GetPreset(string presetName);
     }
 }

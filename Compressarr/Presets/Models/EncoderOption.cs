@@ -9,6 +9,7 @@ namespace Compressarr.Presets.Models
     public class EncoderOption
     {
         public string Arg { get; set; }
+        public EncoderAutoTune AutoTune { get; set; }
         public bool DisabledByVideoBitRate { get; set; }
         public bool IncludePass { get; set; }
         public int Max { get; set; }
