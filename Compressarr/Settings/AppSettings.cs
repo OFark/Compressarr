@@ -10,6 +10,7 @@ namespace Compressarr.Settings
         public bool AlwaysCalculateSSIM { get; set; }
         public bool CacheMediaInfo { get; set; }
         public bool InsertNamesIntoFFmpegPreviews { get; set; }
+        public TimeSpan? ArgCalcSampleLength { get; set; }
 
     }
 }

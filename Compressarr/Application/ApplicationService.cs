@@ -34,6 +34,7 @@ namespace Compressarr.Application
             this.fileService = fileService;
 
             AlwaysCalculateSSIM = appSettings?.Value?.AlwaysCalculateSSIM ?? false;
+            ArgCalcSampleLength = appSettings?.Value?.ArgCalcSampleLength ?? new TimeSpan(0, 2, 0);
             CacheMediaInfo = appSettings?.Value?.CacheMediaInfo ?? false;
             InsertNamesIntoFFmpegPreviews = appSettings?.Value?.InsertNamesIntoFFmpegPreviews ?? false;
 
@@ -56,6 +57,7 @@ namespace Compressarr.Application
 
         //App Settings
         public bool AlwaysCalculateSSIM { get; set; }
+        public TimeSpan? ArgCalcSampleLength { get; set; }
 
         public bool CacheMediaInfo { get; set; }
         public CancellationToken AppStoppingCancellationToken { get; set; }
@@ -65,7 +67,7 @@ namespace Compressarr.Application
         public string FFmpegVersion { get; set; }
         public HashSet<Filter> Filters { get; set; }
         public SortedSet<string> HardwareDecoders { get; set; }
-      
+
         public bool InsertNamesIntoFFmpegPreviews { get; set; }
         public HashSet<Job> Jobs { get; set; }
         public IEnumerable<Movie> Movies { get; set; }
@@ -99,6 +101,7 @@ namespace Compressarr.Application
                 jsonObj["Settings"] = JToken.FromObject(new AppSettings()
                 {
                     AlwaysCalculateSSIM = AlwaysCalculateSSIM,
+                    ArgCalcSampleLength = ArgCalcSampleLength ?? new TimeSpan(0, 2, 0),
                     CacheMediaInfo = CacheMediaInfo,
                     InsertNamesIntoFFmpegPreviews = InsertNamesIntoFFmpegPreviews
                 });

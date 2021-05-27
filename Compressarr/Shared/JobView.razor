@@ -14,7 +14,10 @@
         <MudText>
             @if (NewJob)
             {
-                <MudFab Size="Size.Small" Icon="@Icons.Outlined.PlaylistAdd" Color="Color.Dark" Class="mr-3" />
+                <MudAvatar Color="Color.Dark" Class="mr-3" Style="vertical-align: middle;" >
+                    <MudIcon Icon="@Icons.Outlined.PlaylistAdd" />
+                </MudAvatar>
+                @:New Job
             }
             else
             {
@@ -26,10 +29,7 @@
                 {
                     <MudAvatar Image="@FilterImageSrc" Style="vertical-align: middle;" Class="mr-3" />
                 }
-            }
-            @(NewJob ? "New Job" : $"{@job.FilterName} | {@job.Preset} => {@job.DestinationFolder}")
-            @if (!NewJob)
-            {
+                @:@job.FilterName | @job.Preset => @job.DestinationFolder
                 <MudChip Color="@buttonColour">@buttonText</MudChip>
             }
         </MudText>
@@ -102,6 +102,10 @@
                                     <RowTemplate>
                                         <MudTd>
                                             <MudIconButton Size="Size.Small" Icon="@(context.ShowArgs ? Icons.Outlined.Cancel : Icons.Outlined.Info)" OnClick="@(() => toggleArgs(context))"></MudIconButton>
+                                            @if ((context.ShowArgs && context.Arguments == null) || job.Condition.Process.Processing)
+                                                    {
+                                                <MudProgressCircular Class="ml-2" Style="vertical-align: middle;" Size="Size.Small" Indeterminate="true" Color="Color.Secondary" />
+                                                    }
                                         </MudTd>
                                         <MudTd DataLabel="Name">@context.SourceFileName</MudTd>
                                         <MudTd DataLabel="Percent"><MudText Align="Align.Center">@context.Percent.Adorn("%")</MudText></MudTd>
@@ -132,7 +136,7 @@
                                         <MudTd DataLabel="Compression"><MudText Align="Align.Center">@context.Compression.ToPercent(2).Adorn("%")</MudText></MudTd>
                                     </RowTemplate>
                                     <ChildRowContent>
-                                        @if (context.ShowArgs || context.Running)
+                                        @if (context.ShowArgs || (job.Condition.Process.Processing && context.Arguments == null))
                                                 {
                                             <MudTr>
                                                 <MudTd colspan="14">
@@ -146,7 +150,6 @@
                                                                         }
                                                             </MudList>
                                                         </MudPaper>
-
                                                             }
                                                             else if (context.ArgCalcResults != null)
                                                             {
@@ -206,14 +209,23 @@
                                                             </tbody>
                                                         </MudSimpleTable>
                                                             }
-                                                    @if (context.Arguments == null || context.Running)
-                                                            {
-                                                        <MudPaper Elevation="0" Class="pa-2">
-                                                            <MudProgressLinear Indeterminate="true" Color="Color.Secondary" />
-                                                        </MudPaper>
-                                                            }
                                                 </MudTd>
                                             </MudTr>
+                                            @if (context.ShowArgs && context.Console != null && context.Console.Any())
+                                                    {
+                                                <MudTr>
+                                                    <MudTd UserAttributes="@(new() { { "colspan", 14 } })">
+                                                        <MudPaper Outlined="false" Square="true" class="jobEventsScrollWrapper">
+                                                            <MudPaper Square="true" Class="mud-theme-dark pa-2 jobEvents">
+                                                                @foreach (var e in context.Console)
+                                                                        {
+                                                                    <MudText Class="event" Color="e.Color" Typo="Typo.body2">@e.Message</MudText>
+                                                                        }
+                                                            </MudPaper>
+                                                        </MudPaper>
+                                                    </MudTd>
+                                                </MudTr>
+                                                    }
                                                 }
                                     </ChildRowContent>
                                     <PagerContent>
@@ -259,35 +271,18 @@
             <MudItem xs="12">
                 @if (job.Events?.Any() ?? false)
                 {
-                    <MudTabs>
-                        <MudTabPanel Text="Log" Icon="@Icons.Outlined.Article">
-                            <MudPaper Outlined="false" Square="true" class="jobEventsScrollWrapper">
-                                <MudPaper Square="true" Class="mud-theme-dark pa-2 jobEvents">
-                                    @if (job.Events != null)
-                                    {
-                                        @foreach (var e in job.Events)
-                                        {
-                                            <MudText Class="event" Color="e.Color" Typo="Typo.body2">@e.Date.ToString("HH:mm:ss") - @e.Message</MudText>
-                                        }
-                                    }
-                                </MudPaper>
-                            </MudPaper>
-
-                        </MudTabPanel>
-                        @if (job?.Process?.Console != null)
-                        {
-                            <MudTabPanel Text="Console" Icon="@Icons.Filled.Article">
-                                <MudPaper Outlined="false" Square="true" class="jobEventsScrollWrapper">
-                                    <MudPaper Square="true" Class="mud-theme-dark pa-2 jobEvents">
-                                        @foreach (var e in job.Process.Console)
-                                        {
-                                            <MudText Class="event" Color="e.Color" Typo="Typo.body2">@e.Message</MudText>
-                                        }
-                                    </MudPaper>
-                                </MudPaper>
-                            </MudTabPanel>
-                        }
-                    </MudTabs>
+                    <MudText Typo="Typo.h5"><MudIcon Icon="@Icons.Outlined.Article" Color="Color.Primary" /> Log</MudText>
+                    <MudPaper Outlined="false" Square="true" class="jobEventsScrollWrapper">
+                        <MudPaper Square="true" Class="mud-theme-dark pa-2 jobEvents">
+                            @if (job.Events != null)
+                            {
+                                @foreach (var e in job.Events)
+                                {
+                                    <MudText Class="event" Color="e.Color" Typo="Typo.body2">@e.Date.ToString("HH:mm:ss") - @e.Message</MudText>
+                                }
+                            }
+                        </MudPaper>
+                    </MudPaper>
                 }
                 else if (!NewJob)
                 {
@@ -321,6 +316,15 @@
     private string FilterType => job?.Filter?.MediaSource.ToString().ToLower();
 
     private double initialisationProgress;
+
+    private CancellationTokenSource cancellationTokenSource;
+
+
+    protected override void OnInitialized()
+    {
+        job.StatusUpdate += jobStatusUpdate;
+        job.InitialisationProgress = new Progress<double>(jobProgress);
+    }
 
 
     private int? minSSIM
@@ -390,17 +394,29 @@
 
         await InvokeAsync(StateHasChanged);
 
-        wi.Arguments ??= await presetManager.GetArguments(job.Preset, wi);
+        if (wi.ShowArgs)
+        {
+            cancellationTokenSource = new();
+        }
+        else
+        {
+            cancellationTokenSource.Cancel();
+        }
+
+        if (wi.Arguments == null && !job.Condition.Prepare.Processing)
+        {
+            var results = await presetManager.GetArguments(job.Preset, wi, cancellationTokenSource.Token);
+            if (results.Success)
+            {
+                wi.Arguments = results.Arguments;
+            }
+        }
         await InvokeAsync(StateHasChanged);
     }
 
     private bool running => job.State == JobState.Running;
 
-    protected override void OnInitialized()
-    {
-        job.StatusUpdate += jobStatusUpdate;
-        job.InitialisationProgress = new Progress<double>(jobProgress);
-    }
+
 
     private void jobProgress(double val)
     {

@@ -7,12 +7,6 @@ namespace Compressarr.Presets.Models
 {
     public class AutoPresetResult
     {
-
-        public AutoPresetResult()
-        {
-
-        }
-
         public bool Best { get; set; }
 
         public double EncodingProgress { get; set; }

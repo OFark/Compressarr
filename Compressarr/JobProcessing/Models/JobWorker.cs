@@ -5,8 +5,8 @@ namespace Compressarr.JobProcessing.Models
     public class JobWorker : IDisposable
     {
         private readonly ConditionSwitch conditionSwitch;
-        private EventHandler<string> OnUpdate;
-        public JobWorker(ConditionSwitch condition, EventHandler<string> updateCondition)
+        private EventHandler<Update> OnUpdate;
+        public JobWorker(ConditionSwitch condition, EventHandler<Update> updateCondition)
         {
             conditionSwitch = condition;
             condition.Start();

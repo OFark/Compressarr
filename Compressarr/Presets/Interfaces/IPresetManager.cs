@@ -5,6 +5,7 @@ using Compressarr.Presets.Models;
 using Compressarr.Services.Base;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Compressarr.Presets
@@ -26,7 +27,7 @@ namespace Compressarr.Presets
 
         Task AddPresetAsync(FFmpegPreset newPreset);
         Task DeletePresetAsync(FFmpegPreset preset);
-        Task<List<string>> GetArguments(FFmpegPreset preset, WorkItem wi);
+        Task<GetArgumentsResult> GetArguments(FFmpegPreset preset, WorkItem wi, CancellationToken token);
         FFmpegPreset GetPreset(string presetName);
     }
 }

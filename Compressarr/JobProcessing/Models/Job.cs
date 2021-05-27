@@ -9,6 +9,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading;
 
 namespace Compressarr.JobProcessing.Models
 {
@@ -17,12 +18,23 @@ namespace Compressarr.JobProcessing.Models
         [JsonIgnore]
         public JobCondition Condition = new();
 
+        [JsonIgnore]
+        internal CancellationTokenSource CancellationTokenSource = new();
+
+        internal CancellationToken CancellationToken => CancellationTokenSource.Token;
+
         public event EventHandler StatusUpdate;
 
         public bool AutoImport { get; set; }
 
-        [JsonIgnore]
-        public bool Cancel { get; internal set; } = false;
+        public void Cancel()
+        {
+            if (CancellationToken.CanBeCanceled)
+                CancellationTokenSource.Cancel();
+        }
+
+        public bool Cancelled => CancellationToken.IsCancellationRequested;
+         
 
         public string DestinationFolder { get; set; }
 
@@ -42,25 +54,8 @@ namespace Compressarr.JobProcessing.Models
         [JsonIgnore]
         public bool Initialised { get; set; }
         [JsonIgnore]
-        public Action<LogLevel, string> LogAction { get; set; }
+        public Action<Update> LogAction { get; set; }
 
-        //var r = State switch
-        //{
-        //    JobState.BuildingWorkLoad => throw new NotImplementedException(),
-        //    JobState.Cancelled => throw new NotImplementedException(),
-        //    JobState.Error => throw new NotImplementedException(),
-        //    JobState.Finished => throw new NotImplementedException(),
-        //    JobState.Initialising => throw new NotImplementedException(),
-        //    JobState.LoadingMediaInfo => throw new NotImplementedException(),
-        //    JobState.New => throw new NotImplementedException(),
-        //    JobState.Ready => throw new NotImplementedException(),
-        //    JobState.Running => throw new NotImplementedException(),
-        //    JobState.TestedFail => throw new NotImplementedException(),
-        //    JobState.TestedOK => throw new NotImplementedException(),
-        //    JobState.Testing => throw new NotImplementedException(),
-        //    JobState.Waiting => throw new NotImplementedException(),
-        //    _ => throw new NotImplementedException(),
-        //}
         public decimal? MaxCompression { get; set; }
 
         public decimal? MinSSIM { get; set; }
@@ -74,13 +69,12 @@ namespace Compressarr.JobProcessing.Models
         public string PresetName { get; set; }
 
         [JsonIgnore]
-        public FFmpegProcess Process { get; internal set; }
+        public WorkItem CurrentWorkItem { get; set; }
 
         public bool SizeCheck => AutoImport && MaxCompression.HasValue;
 
         [JsonIgnore]
         public bool SSIMCheck => AutoImport && MinSSIM.HasValue;
-
         [JsonIgnore]
         public JobState State => Condition.Initialise.State switch
         {
@@ -113,14 +107,21 @@ namespace Compressarr.JobProcessing.Models
                         ConditionState.NotStarted => JobState.Ready,
                         ConditionState.Processing => Condition.Encode.State switch
                         {
-                            ConditionState.NotStarted => JobState.Waiting,
+                            ConditionState.NotStarted => Condition.Prepare.State switch
+                            {
+                                ConditionState.NotStarted => JobState.Waiting,
+                                ConditionState.Processing => JobState.Preparing,
+                                ConditionState.Succeeded => JobState.Waiting,
+                                ConditionState.Failed => Cancelled ? JobState.Cancelled : JobState.Error,
+                                _ => throw new NotImplementedException(),
+                            },
                             ConditionState.Processing => JobState.Running,
                             ConditionState.Succeeded => JobState.Waiting,
-                            ConditionState.Failed => Cancel ? JobState.Cancelled : JobState.Error,
+                            ConditionState.Failed => Cancelled ? JobState.Cancelled : JobState.Error,
                             _ => throw new NotImplementedException(),
                         },
                         ConditionState.Succeeded => JobState.Finished,
-                        ConditionState.Failed => Cancel ? JobState.Cancelled : JobState.Error,
+                        ConditionState.Failed => Cancelled ? JobState.Cancelled : JobState.Error,
                         _ => throw new NotImplementedException(),
                     },
                     ConditionState.Failed => JobState.Error,
@@ -135,16 +136,13 @@ namespace Compressarr.JobProcessing.Models
         [JsonIgnore]
         public HashSet<WorkItem> WorkLoad { get; internal set; }
 
-        public void Log(string message, LogLevel level)
+        public void Log(Update update)
         {
-            if (!string.IsNullOrWhiteSpace(message))
+            if (!string.IsNullOrWhiteSpace(update.Message))
             {
-                if (LogAction != null)
-                {
-                    LogAction.Invoke(level, message);
-                }
+                LogAction?.Invoke(update);
 
-                Events = (Events ?? ImmutableSortedSet.Create<JobEvent>()).Add(new JobEvent(level, message));
+                Events = (Events ?? ImmutableSortedSet.Create<JobEvent>()).Add(new JobEvent(update));
                 StatusUpdate?.Invoke(this, EventArgs.Empty);
 
             }
@@ -160,23 +158,23 @@ namespace Compressarr.JobProcessing.Models
             action.Invoke(Condition);
             if (State != js)
             {
-                Log($"Job {Name} changed from {State} to {js}.", LogLevel.Information);
+                Log(new($"Job {Name} changed from {State} to {js}.", LogLevel.Information));
             }
             StatusUpdate?.Invoke(this, EventArgs.Empty);
         }
 
-        public void UpdateMovieInfo()
-        {
-            InitialisationProgress?.Report(WorkLoad.Count(w => w.Movie?.MediaInfo != null) / WorkLoad.Count() * 100);
+        //public void UpdateMovieInfo()
+        //{
+        //    InitialisationProgress?.Report(WorkLoad.Count(w => w.Movie?.MediaInfo != null) / WorkLoad.Count() * 100);
 
-            StatusUpdate?.Invoke(this, EventArgs.Empty);
-        }
+        //    StatusUpdate?.Invoke(this, EventArgs.Empty);
+        //}
 
-        public void UpdateStatus(object sender, string message = null)
+        public void UpdateStatus(object sender, Update update = null)
         {
-            if (!string.IsNullOrWhiteSpace(message))
+            if (!string.IsNullOrWhiteSpace(update?.Message))
             {
-                Log(message, LogLevel.Debug);
+                Log(update);
             }
 
             StatusUpdate?.Invoke(sender, EventArgs.Empty);

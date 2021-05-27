@@ -30,16 +30,16 @@ namespace Compressarr.JobProcessing
             Xabe.FFmpeg.FFmpeg.SetExecutablesPath(fileService.GetAppDirPath(AppDir.FFmpeg));
         }
 
-        public Regex ProgressReg { get => new(@"frame= *(\d*) fps= *([\d\.]*) q=*(-?[\d\.]*)(?: q=*-?[\d\.]*)* size= *([^ ]*) time= *([\d:\.]*) bitrate= *([^ ]*) speed= *([\d.]*x) *"); }
-        public Regex SSIMReg { get => new(@"\[Parsed_ssim_4\s@\s\w*\]\sSSIM\sY\:\d\.\d*\s\([inf\d\.]*\)\sU\:\d\.\d*\s\([inf\d\.]*\)\sV\:\d\.\d*\s\([inf\d\.]*\)\sAll\:(\d\.\d*)\s\([inf\d\.]*\)"); }
+        public static Regex ProgressReg { get => new(@"frame= *(\d*) fps= *([\d\.]*) q=*(-?[\d\.]*)(?: q=*-?[\d\.]*)* size= *([^ ]*) time= *([\d:\.]*) bitrate= *([^ ]*) speed= *([\d.]*x) *"); }
+        public static Regex SSIMReg { get => new(@"\[Parsed_ssim_4\s@\s\w*\]\sSSIM\sY\:\d\.\d*\s\([inf\d\.]*\)\sU\:\d\.\d*\s\([inf\d\.]*\)\sV\:\d\.\d*\s\([inf\d\.]*\)\sAll\:(\d\.\d*)\s\([inf\d\.]*\)"); }
 
-        public async Task<SSIMResult> CalculateSSIM(IConversion converter, DataReceivedEventHandler dataRecieved, ConversionProgressEventHandler dataProgress, string sourceFile, string destinationFile, CancellationToken token)
+        public async Task<SSIMResult> CalculateSSIM(DataReceivedEventHandler dataRecieved, ConversionProgressEventHandler dataProgress, string sourceFile, string destinationFile, CancellationToken token)
         {
             var arguments = $" -i \"{sourceFile}\" -i \"{destinationFile}\" -lavfi  \"[0:v]settb = AVTB,setpts = PTS - STARTPTS[main];[1:v]settb = AVTB,setpts = PTS - STARTPTS[ref];[main][ref]ssim\" -f null -";
             logger.LogDebug($"SSIM arguments: {arguments}");
 
             decimal ssim = default;
-            converter = Xabe.FFmpeg.FFmpeg.Conversions.New();
+            var converter = Xabe.FFmpeg.FFmpeg.Conversions.New();
             converter.OnDataReceived += (sender, e) =>
             {
                 if (SSIMReg.TryMatch(e.Data, out var ssimMatch))
@@ -79,11 +79,11 @@ namespace Compressarr.JobProcessing
             }
         }
 
-        public async Task<EncodingResult> EncodeAVideo(IConversion converter, DataReceivedEventHandler dataRecieved, ConversionProgressEventHandler dataProgress, string arguments, CancellationToken token)
+        public async Task<EncodingResult> EncodeAVideo(DataReceivedEventHandler dataRecieved, ConversionProgressEventHandler dataProgress, string arguments, CancellationToken token)
         {
             try
             {
-                converter = Xabe.FFmpeg.FFmpeg.Conversions.New();
+                var converter = Xabe.FFmpeg.FFmpeg.Conversions.New();
                 converter.OnDataReceived += dataRecieved;
                 converter.OnProgress += dataProgress;
 
@@ -103,15 +103,15 @@ namespace Compressarr.JobProcessing
             }
         }
 
-        public async Task Process(Job job)
+        public async Task Process(WorkItem workItem, CancellationToken token)
         {
             try
             {
                 try
                 {
-                    await semaphore.WaitAsync(job.Process.cancellationTokenSource.Token);
+                    await semaphore.WaitAsync(token);
 
-                    using (var jobRunner = new JobWorker(job.Condition.Encode, job.UpdateStatus))
+                    using (var jobRunner = new JobWorker(workItem.Job.Condition.Encode, workItem.Job.UpdateStatus))
                     {
 
                         using (logger.BeginScope("FFmpeg Process"))
@@ -120,25 +120,21 @@ namespace Compressarr.JobProcessing
 
                             var succeded = true;
 
-                            job.Process.cont = true;
-
-                            job.Process.WorkItem.Running = true;
+                            
                             logger.LogDebug("FFmpeg process work item starting.");
 
-                            foreach (var arg in job.Process.WorkItem.Arguments)
+                            foreach (var arg in workItem.Arguments)
                             {
-                                if (job.Process.cont && succeded)
+                                if (succeded)
                                 {
-                                    var arguments = string.Format(arg, job.Process.WorkItem.SourceFile, job.Process.WorkItem.DestinationFile);
+                                    var arguments = string.Format(arg, workItem.SourceFile, workItem.DestinationFile);
                                     logger.LogDebug($"FFmpeg Process arguments: \"{arguments}\"");
 
-                                    var result = await EncodeAVideo(job.Process.Converter, (sender, args) => Converter_OnDataReceived(args, job.Process), (sender, args) => Converter_OnProgress(args, job.Process), arguments, job.Process.cancellationTokenSource.Token);
+                                    var result = await EncodeAVideo((sender, args) => Converter_OnDataReceived(args, workItem), (sender, args) => Converter_OnProgress(args, workItem), arguments, token);
 
                                     if (!result.Success)
                                     {
-                                        job.Process.WorkItem.Update();
-                                        job.Log(result.Exception.ToString(), LogLevel.Error);
-                                        job.Log(result.Exception.InnerException?.Message, LogLevel.Error);
+                                        workItem.Update(result.Exception);
                                         succeded = false;
                                     }
                                 }
@@ -148,49 +144,45 @@ namespace Compressarr.JobProcessing
 
                             if (succeded)
                             {
-                                if (job.SSIMCheck || applicationService.AlwaysCalculateSSIM)
+                                try
                                 {
-                                    job.Process.WorkItem.Update("Calculating SSIM");
+                                    var originalFileSize = new FileInfo(workItem.SourceFile).Length;
+                                    var newFileSize = new FileInfo(workItem.DestinationFile).Length;
 
-                                    var result = await CalculateSSIM(job.Process.Converter, (sender, args) => Converter_OnDataReceived(args, job.Process), (sender, args) => Converter_OnProgress(args, job.Process), job.Process.WorkItem.SourceFile, job.Process.WorkItem.DestinationFile, job.Process.cancellationTokenSource.Token);
+                                    workItem.Compression = newFileSize / (decimal)originalFileSize;
+                                    workItem.Update();
+
+                                }
+                                catch (Exception ex) when (ex is FileNotFoundException || ex is IOException)
+                                {
+                                    workItem = null;
+                                    workItem.Update(new Update(ex, LogLevel.Warning));
+                                    logger.LogWarning(ex, "Error fetching file lengths");
+                                }
+
+                                if (workItem.Job.SSIMCheck || applicationService.AlwaysCalculateSSIM)
+                                {
+                                    workItem.Update("Calculating SSIM");
+
+                                    var result = await CalculateSSIM((sender, args) => Converter_OnDataReceived(args, workItem), (sender, args) => Converter_OnProgress(args, workItem), workItem.SourceFile, workItem.DestinationFile, token);
 
                                     succeded = result.Success;
                                     if(succeded)
                                     {
-                                        job.Process.WorkItem.SSIM = result.SSIM;
+                                        workItem.SSIM = result.SSIM;
                                     }
                                     else
                                     {
-                                        job.Process.WorkItem.Update();
-                                        job.Log(result.Exception.Message, LogLevel.Error);
-                                        job.Log(result.Exception.InnerException?.Message, LogLevel.Error);
-                                    }
-                                }
-
-                                if (succeded)
-                                {
-                                    try
-                                    {
-                                        var originalFileSize = new FileInfo(job.Process.WorkItem.SourceFile).Length;
-                                        var newFileSize = new FileInfo(job.Process.WorkItem.DestinationFile).Length;
-
-                                        job.Process.WorkItem.Compression = newFileSize / (decimal)originalFileSize;
-
-                                    }
-                                    catch (Exception ex) when (ex is FileNotFoundException || ex is IOException)
-                                    {
-                                        job.Process.WorkItem.Compression = null;
-                                        logger.LogWarning(ex, "Error fetching file lengths");
+                                        workItem.Update(result.Exception);
                                     }
                                 }
                             }
 
                             jobRunner.Succeed();
 
-                            job.Process.WorkItem.Success = succeded;
-                            job.Process.WorkItem.Finished = true;
-                            job.Process.WorkItem.Running = false;
-                            job.Process.WorkItem.Update();
+                            workItem.Success = succeded;
+                            workItem.Finished = true;
+                            workItem.Update();
                         }
                     }
                 }
@@ -206,7 +198,7 @@ namespace Compressarr.JobProcessing
                     semaphore.Release();
             }
         }
-        private void Converter_OnDataReceived(DataReceivedEventArgs e, FFmpegProcess process)
+        private void Converter_OnDataReceived(DataReceivedEventArgs e, WorkItem wi)
         {
             //Conversion:
             //"frame= 2171 fps= 58 q=-0.0 size=    4396kB time=00:01:28.50 bitrate= 406.9kbits/s speed=2.38x    ";
@@ -220,22 +212,23 @@ namespace Compressarr.JobProcessing
 
             using (logger.BeginScope("Converter Data Received"))
             {
-                process.Output(e.Data, LogLevel.Debug);
 
                 if (ProgressReg.TryMatch(e.Data, out var match))
                 {
+                    wi.Output(new(e.Data, LogLevel.Debug), true);
                     logger.LogTrace(e.Data);
-                    if (long.TryParse(match.Groups[1].Value.Trim(), out var frame)) process.WorkItem.Frame = frame;
-                    if (decimal.TryParse(match.Groups[2].Value.Trim(), out var fps)) process.WorkItem.FPS = fps;
-                    if (decimal.TryParse(match.Groups[3].Value.Trim(), out var q)) process.WorkItem.Q = q;
-                    process.WorkItem.Size = match.Groups[4].Value.Trim();
-                    process.WorkItem.Bitrate = match.Groups[6].Value.Trim();
-                    process.WorkItem.Speed = match.Groups[7].Value.Trim();
-                    process.WorkItem.Update();
+                    if (long.TryParse(match.Groups[1].Value.Trim(), out var frame)) wi.Frame = frame;
+                    if (decimal.TryParse(match.Groups[2].Value.Trim(), out var fps)) wi.FPS = fps;
+                    if (decimal.TryParse(match.Groups[3].Value.Trim(), out var q)) wi.Q = q;
+                    wi.Size = match.Groups[4].Value.Trim();
+                    wi.Bitrate = match.Groups[6].Value.Trim();
+                    wi.Speed = match.Groups[7].Value.Trim();
+                    wi.Update();
                 }
                 else if (SSIMReg.TryMatch(e.Data, out var ssimMatch))
                 {
                     logger.LogInformation($"SSIM: {ssimMatch}");
+                    wi.Output(new($"SSIM: {ssimMatch}"));
                 }
                 else
                 {
@@ -244,15 +237,15 @@ namespace Compressarr.JobProcessing
             }
         }
 
-        private void Converter_OnProgress(ConversionProgressEventArgs args, FFmpegProcess process)
+        private void Converter_OnProgress(ConversionProgressEventArgs args, WorkItem wi)
         {
             //Here Duration is the current time frame;
-            process.WorkItem.Duration = args.Duration;
-            process.WorkItem.Percent = args.Percent;
+            wi.Duration = args.Duration;
+            wi.Percent = args.Percent;
 
             // todo: If size looks to be over original option to abandon
 
-            process.WorkItem.Update();
+            wi.Update();
         }
     }
 }

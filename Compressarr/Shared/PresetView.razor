@@ -6,7 +6,20 @@
 
 <MudExpansionPanel Class="job">
     <TitleContent>
-        <MudText>@(NewPreset ? "New Preset" : preset.ToString())</MudText>
+        <MudText>
+            @if (NewPreset)
+            {
+                <MudAvatar Color="Color.Dark" Class="mr-3" Style="vertical-align: middle;" >
+                    <MudIcon Icon="@Icons.Outlined.PlaylistAdd" />
+                </MudAvatar>
+                @:New Preset
+            }
+            else
+            {
+                <MudAvatar Rounded="true" Image="https://upload.wikimedia.org/wikipedia/commons/thumb/7/76/FFmpeg_icon.svg/1024px-FFmpeg_icon.svg.png" Style="vertical-align: middle;" Class="mr-3" />
+                @:@preset.ToString()
+            }
+        </MudText>
     </TitleContent>
     <ChildContent>
         <MudTextField @bind-Value="preset.Name" Label="Name" Class="mb-2" />
@@ -71,7 +84,7 @@
 
                                                 @if (option.EncoderOption.AutoTune != null)
                                                 {
-                                            <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.IntValue = null; option.AutoCalculate = toggled; })" />
+                                                    <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.IntValue = null; option.AutoCalculate = toggled; })" />
                                                 }
                                             </MudToolBar>
                                         }
@@ -83,7 +96,7 @@
                                                 <MudIconButton Size="Size.Small" Icon="@Icons.Outlined.Clear" OnClick="@(() => { option.IntValue = null; })" Disabled="@(option.AutoCalculate)" />
                                                 @if (option.EncoderOption.AutoTune != null)
                                                 {
-                                            <MudToggleIconButton Size="Size.Small" Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.Value = null; option.AutoCalculate = toggled; })" />
+                                                    <MudToggleIconButton Size="Size.Small" Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.Value = null; option.AutoCalculate = toggled; })" />
                                                 }
                                             </MudSlider>
 
@@ -100,7 +113,7 @@
                                                 </MudSelect>
                                                 @if (option.EncoderOption.AutoTune != null)
                                                 {
-                                                    <MudToggleIconButton  Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.Value = null; option.AutoCalculate = toggled; })" />
+                                                    <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.Value = null; option.AutoCalculate = toggled; })" />
                                                 }
                                             </MudToolBar>
                                         }
@@ -112,7 +125,7 @@
 
                                                 @if (option.EncoderOption.AutoTune != null)
                                                 {
-                                            <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.Value = null; option.AutoCalculate = toggled; })" />
+                                                    <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.Value = null; option.AutoCalculate = toggled; })" />
                                                 }
                                             </MudToolBar>
                                         }

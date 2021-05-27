@@ -13,11 +13,8 @@ namespace Compressarr.JobProcessing
 {
     public interface IProcessManager
     {
-        Regex ProgressReg { get; }
-        Regex SSIMReg { get; }
-
-        Task<SSIMResult> CalculateSSIM(IConversion converter, DataReceivedEventHandler dataRecieved, ConversionProgressEventHandler dataProgress, string sourceFile, string destinationFile, CancellationToken token);
-        Task<EncodingResult> EncodeAVideo(IConversion converter, DataReceivedEventHandler dataRecieved, ConversionProgressEventHandler dataProgress, string arguments, CancellationToken token);
-        Task Process(Job job);
+        Task<SSIMResult> CalculateSSIM(DataReceivedEventHandler dataRecieved, ConversionProgressEventHandler dataProgress, string sourceFile, string destinationFile, CancellationToken token);
+        Task<EncodingResult> EncodeAVideo(DataReceivedEventHandler dataRecieved, ConversionProgressEventHandler dataProgress, string arguments, CancellationToken token);
+        Task Process(WorkItem workItem, CancellationToken token);
     }
 }

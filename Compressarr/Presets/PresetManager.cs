@@ -15,6 +15,7 @@ using System.IO;
 using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Compressarr.Presets
@@ -650,7 +651,7 @@ namespace Compressarr.Presets
             }
         }
 
-        public async Task<List<string>> GetArguments(FFmpegPreset preset, WorkItem wi)
+        public async Task<GetArgumentsResult> GetArguments(FFmpegPreset preset, WorkItem wi, CancellationToken token)
         {
 
             using (logger.BeginScope("Get Arguments"))
@@ -759,13 +760,15 @@ namespace Compressarr.Presets
                                             passStr = string.Empty;
                                         }
                                     }
-                                    videoArguments += $"{videoStreamMap} {preset.VideoEncoder.Name}{await GetVideoCodecParams(preset, wi)} -b:v {preset.VideoBitRate}k{frameRate}{passStr}";
+                                    videoArguments += $"{videoStreamMap} {preset.VideoEncoder.Name}{await GetVideoCodecParams(preset, wi, token)} -b:v {preset.VideoBitRate}k{frameRate}{passStr}";
                                 }
                                 else
                                 {
-                                    videoArguments += $"{videoStreamMap} {preset.VideoEncoder.Name}{await GetVideoCodecParams(preset, wi)}{frameRate}";
+                                    videoArguments += $"{videoStreamMap} {preset.VideoEncoder.Name}{await GetVideoCodecParams(preset, wi, token)}{frameRate}";
                                 }
                             }
+
+                            if (token.IsCancellationRequested) return new(false);
                         }
                     }
                 }
@@ -786,7 +789,9 @@ namespace Compressarr.Presets
                     args.Add($"{hardwareDecoder}-y -i \"{{0}}\" {videoArguments}{opArgsStr}{audioArguments}{mapAllElse} \"{{1}}\"");
                 }
 
-                return args;
+                if (token.IsCancellationRequested) return new(false);
+
+                return new(args);
             }
         }
 
@@ -804,18 +809,22 @@ namespace Compressarr.Presets
             });
         }
 
-        private async Task<string> CalculateBestOptions(FFmpegPreset preset, WorkItem wi)
+        private async Task<string> CalculateBestOptions(FFmpegPreset preset, WorkItem wi, CancellationToken token)
         {
             using (logger.BeginScope("Calculating Best Encoder Options"))
             {
                 var tempFile = Path.Combine(Path.GetTempPath(), $"directCopy.{preset.ContainerExtension}");
                 var tempEncFile = Path.Combine(Path.GetTempPath(), $"encFile.{preset.ContainerExtension}");
 
-                var sampleTime = "120";
+                var sampleTime = applicationService.ArgCalcSampleLength.Value.TotalSeconds;
 
                 var temparg = $"-y -i \"{wi.SourceFile}\" -codec copy -t {sampleTime} -ss {sampleTime}  \"{tempFile}\" ";
 
-                await processManager.EncodeAVideo(null, null, null, temparg, new());
+                var encodeResult = await processManager.EncodeAVideo(null, null, temparg, token);
+                if (!encodeResult.Success)
+                {
+                    throw encodeResult.Exception ?? new("Not sure - something went wrong with encoding. Check the logs");
+                }
 
                 var origSize = new FileInfo(tempFile).Length;
 
@@ -827,7 +836,8 @@ namespace Compressarr.Presets
                 wi.ArgCalcResults = new List<AutoPresetTest>();
                 var testSuite = wi.ArgCalcResults;
 
-                wi.Update();
+                wi.Output("Calculating Best Encoder Options");
+                if (token.IsCancellationRequested) return string.Empty;
 
                 foreach (var option in preset.VideoCodecOptions.Where(o => o.AutoCalculate).Select(x => x.EncoderOption))
                 {
@@ -860,6 +870,7 @@ namespace Compressarr.Presets
                 }
 
                 wi.Update();
+                if (token.IsCancellationRequested) return string.Empty;
 
                 foreach (var test in wi.ArgCalcResults)
                 {
@@ -876,21 +887,23 @@ namespace Compressarr.Presets
                         var arg = $"{hardwareDecoder} -y -i \"{tempFile}\" -map 0:V -c:V {preset.VideoEncoder.Name}{autoTuneStr} {frameRate}  \"{tempEncFile}\" ";
                         logger.LogInformation($"Trying: {arg}");
 
-                        await processManager.EncodeAVideo(null, null, (sender, args) =>
+                        await processManager.EncodeAVideo( null, (sender, args) =>
                         {
                             test.AutoPresetResultSet[i.Key].EncodingProgress = args.Percent;
                             wi.Update();
-                        }, arg, new());
+                        }, arg, token);
+
+                        if (token.IsCancellationRequested) return string.Empty;
 
                         var size = new FileInfo(tempEncFile).Length;
                         test.AutoPresetResultSet[i.Key].AddSize(size, origSize);
                         wi.Update();
 
-                        var ssimResult = await processManager.CalculateSSIM(null, null, (sender, args) =>
+                        var ssimResult = await processManager.CalculateSSIM(null, (sender, args) =>
                         {
                             test.AutoPresetResultSet[i.Key].SSIMProgress = args.Percent;
                             wi.Update();
-                        }, tempFile, tempEncFile, new());
+                        }, tempFile, tempEncFile, token);
 
                         if (ssimResult.Success)
                         {
@@ -900,6 +913,7 @@ namespace Compressarr.Presets
 
                         test.AutoPresetResultSet[i.Key].Processing = false;
                         wi.Update();
+                        if (token.IsCancellationRequested) return string.Empty;
                     }
 
                     logger.LogDebug($"SSIM results: {string.Join("\r\n", test.AutoPresetResultSet.Select(d => $"{d.Key} | {d.Value.SSIM} | {d.Value.Size.ToFileSize()}"))}");
@@ -919,13 +933,13 @@ namespace Compressarr.Presets
 
                     logger.LogInformation($"Best Argument: {result}");
 
-                    wi.Update();
+                    wi.Output($"Best Argument: {result}");
                 }
                 wi.Update();
                 return result;
             }
         }
-        private async Task<string> GetVideoCodecParams(FFmpegPreset preset, WorkItem wi)
+        private async Task<string> GetVideoCodecParams(FFmpegPreset preset, WorkItem wi, CancellationToken token)
         {
             using (logger.BeginScope("Get Video Codec Parameters"))
             {
@@ -959,7 +973,7 @@ namespace Compressarr.Presets
                     if (preset.VideoCodecOptions.Any(x => x.AutoCalculate))
                     {
                         logger.LogInformation($"Now Calculating Best values");
-                        var calVals = await CalculateBestOptions(preset, wi);
+                        var calVals = await CalculateBestOptions(preset, wi, token);
                         logger.LogDebug($"Calculated: {calVals}");
 
                         sb.Append(calVals);

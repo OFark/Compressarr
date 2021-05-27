@@ -29,15 +29,15 @@
 		<PackageReference Include="Microsoft.EntityFrameworkCore.DynamicLinq" Version="5.2.9" />
 		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.10.9" />
 		<PackageReference Include="Microsoft.VisualStudio.Web.BrowserLink" Version="2.2.0" />
-		<PackageReference Include="MudBlazor" Version="5.0.9" />
+		<PackageReference Include="MudBlazor" Version="5.0.10" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
 		<PackageReference Include="Nito.AsyncEx" Version="5.1.0" />
 		<PackageReference Include="Serilog.Extensions.Logging.File" Version="2.0.0" />
 		<PackageReference Include="System.Configuration.ConfigurationManager" Version="5.0.0" />
 		<PackageReference Include="System.IO.FileSystem.AccessControl" Version="5.0.0" />
 		<PackageReference Include="System.Runtime" Version="4.3.1" />
-		<PackageReference Include="Xabe.FFmpeg" Version="5.0.0" />
-		<PackageReference Include="Xabe.FFmpeg.Downloader" Version="5.0.0" />
+		<PackageReference Include="Xabe.FFmpeg" Version="5.0.1" />
+		<PackageReference Include="Xabe.FFmpeg.Downloader" Version="5.0.1" />
 	</ItemGroup>
 
 	<ItemGroup>

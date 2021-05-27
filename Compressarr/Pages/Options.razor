@@ -22,39 +22,44 @@
             </CardHeaderContent>
         </MudCardHeader>
         <MudCardContent>
-            @if (applicationService.RadarrSettings != null && applicationService.RadarrSettings.Ok)
-            {
-                @if (string.IsNullOrWhiteSpace(radarrTestResponse))
+            <MudList Dense="true">
+                @if (applicationService.RadarrSettings != null && applicationService.RadarrSettings.Ok)
                 {
-                    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-7" />
+                    <MudListItem>
+                        @if (string.IsNullOrWhiteSpace(radarrTestResponse))
+                        {
+                            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-7" />
+                        }
+                        else
+                        {
+                            <MudText>
+                                Radarr: @applicationService.RadarrSettings.APIURL
+                                <MudIconButton Color="@(radarrConnected ? Color.Success : Color.Error)" OnClick="toggleRadarrStatus" Icon="@(radarrConnected ? Icons.Material.Outlined.Check : Icons.Material.Outlined.Error )" />
+                            </MudText>
+                        }
+                    </MudListItem>
                 }
                 else
                 {
-                    <MudText>
-                        Radarr: @applicationService.RadarrSettings.APIURL
-                        <MudIconButton Color="@(radarrConnected ? Color.Success : Color.Error)" OnClick="toggleRadarrStatus" Icon="@(radarrConnected ? Icons.Material.Outlined.Check : Icons.Material.Outlined.Error )" />
-                    </MudText>
-                }
-
-            }
-            else
-            {
-                <MudList Dense="true">
                     <MudListItem>
                         <MudTextField @bind-Value="radarrURL" Label="Radarr URL" Immediate="true" />
                     </MudListItem>
                     <MudListItem>
                         <MudTextField @bind-Value="radarrAPIKey" Label="Radarr API key" Immediate="true" />
                     </MudListItem>
-                </MudList>
-            }
+                }
 
-            @if (showRadarrStatus)
-            {
-                <pre>@radarrTestResponse</pre>
-            }
+                @if (showRadarrStatus)
+                {
+                    <MudListItem>
+                        <pre>@radarrTestResponse</pre>
+                    </MudListItem>
+                }
 
-            <DirectoryLookup @bind-Folder="radarrBasePath" Label="Base Folder" Required="false" />
+                <MudListItem>
+                    <DirectoryLookup @bind-Folder="radarrBasePath" Label="Base Folder" Required="false" />
+                </MudListItem>
+            </MudList>
 
         </MudCardContent>
         <MudCardActions>
@@ -73,39 +78,43 @@
             </CardHeaderContent>
         </MudCardHeader>
         <MudCardContent>
-            @if (applicationService.SonarrSettings != null && applicationService.SonarrSettings.Ok)
-            {
-                @if (string.IsNullOrWhiteSpace(sonarrTestResponse))
-                {
-                    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-7" />
+            <MudList Dense="true">
+                @if (applicationService.SonarrSettings != null && applicationService.SonarrSettings.Ok)
+                {<MudListItem>
+                        @if (string.IsNullOrWhiteSpace(sonarrTestResponse))
+                        {
+                            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-7" />
+                        }
+                        else
+                        {
+                            <MudText>
+                                Sonarr: @applicationService.SonarrSettings.APIURL
+                                <MudIconButton Color="@(sonarrConnected ? Color.Success : Color.Error)" OnClick="toggleSonarrStatus" Icon="@(sonarrConnected ? Icons.Material.Outlined.Check : Icons.Material.Outlined.Error )" />
+                            </MudText>
+                        }
+                    </MudListItem>
+
                 }
                 else
                 {
-                    <MudText>
-                        Sonarr: @applicationService.SonarrSettings.APIURL
-                        <MudIconButton Color="@(sonarrConnected ? Color.Success : Color.Error)" OnClick="toggleSonarrStatus" Icon="@(sonarrConnected ? Icons.Material.Outlined.Check : Icons.Material.Outlined.Error )" />
-                    </MudText>
-                }
-
-            }
-            else
-            {
-                <MudList Dense="true">
                     <MudListItem>
                         <MudTextField @bind-Value="sonarrURL" Label="Sonarr URL" Immediate="true" />
                     </MudListItem>
                     <MudListItem>
                         <MudTextField @bind-Value="sonarrAPIKey" Label="Sonarr API key" Immediate="true" />
                     </MudListItem>
-                </MudList>
-            }
+                }
 
-            @if (showSonarrStatus)
-            {
-                <pre>@sonarrTestResponse</pre>
-            }
-
-            <DirectoryLookup @bind-Folder="sonarrBasePath" Label="Base Folder" />
+                @if (showSonarrStatus)
+                {
+                    <MudListItem>
+                        <pre>@sonarrTestResponse</pre>
+                    </MudListItem>
+                }
+                <MudListItem>
+                    <DirectoryLookup @bind-Folder="sonarrBasePath" Label="Base Folder" />
+                </MudListItem>
+            </MudList>
         </MudCardContent>
         <MudCardActions>
             @if (applicationService.SonarrSettings?.APIURL != null)
@@ -123,22 +132,31 @@
             </CardHeaderContent>
         </MudCardHeader>
         <MudCardContent>
-            <MudPaper Elevation="0">
-                <MudSwitch Color="Color.Secondary" @bind-Checked="@applicationService.AlwaysCalculateSSIM" Label="Always calculate SSIM after encoding" />
-            </MudPaper>
-            <MudPaper Elevation="0">
-                <MudSwitch Color="Color.Secondary" @bind-Checked="@applicationService.CacheMediaInfo" Label="Cache Media Information for faster job initialisation (~10kb per media file)" />
-            </MudPaper>
-            <MudPaper Elevation="0">
-                <MudSwitch Color="Color.Secondary" @bind-Checked="@applicationService.InsertNamesIntoFFmpegPreviews" Label="Insert file names into FFmpeg previews" />
-            </MudPaper>
+            <MudList>
 
-            <MudSelect T="LogLevel" @bind-Value="logLevel" Label="Log Level">
-                @foreach (LogLevel ll in Enum.GetValues(typeof(LogLevel)))
-                {
-                    <MudSelectItem Value="ll" />
-                }
-            </MudSelect>
+                <MudListItem>
+                    <MudSwitch Color="Color.Secondary" @bind-Checked="@applicationService.AlwaysCalculateSSIM" Label="Always calculate SSIM after encoding" />
+                </MudListItem>
+                <MudListItem>
+                    <MudSwitch Color="Color.Secondary" @bind-Checked="@applicationService.CacheMediaInfo" Label="Cache Media Information for faster job initialisation (~10kb per media file)" />
+                </MudListItem>
+                <MudListItem>
+                    <MudSwitch Color="Color.Secondary" @bind-Checked="@applicationService.InsertNamesIntoFFmpegPreviews" Label="Insert file names into FFmpeg previews" />
+                </MudListItem>
+                <MudListItem>
+                    <MudItem md="4">
+                        <MudTimePicker PickerVariant="PickerVariant.Dialog" Color="Color.Secondary" @bind-Time="@applicationService.ArgCalcSampleLength" Label="Sample length for calculating best profile values" OpenTo="OpenTo.Minutes" />
+                    </MudItem>
+                </MudListItem>
+                <MudListItem>
+                    <MudSelect T="LogLevel" @bind-Value="logLevel" Label="Log Level">
+                        @foreach (LogLevel ll in Enum.GetValues(typeof(LogLevel)))
+                        {
+                            <MudSelectItem Value="ll" />
+                        }
+                    </MudSelect>
+                </MudListItem>
+            </MudList>
         </MudCardContent>
         <MudCardActions>
             <MudButton Color="Color.Primary" OnClick="saveSettings" StartIcon="@Icons.Outlined.Save">Save</MudButton>
@@ -262,7 +280,7 @@
                 radarrTestResponse = ss.ErrorMessage;
                 showRadarrStatus = true;
             }
-            _=  InvokeAsync(StateHasChanged);
+            _ = InvokeAsync(StateHasChanged);
         }
     }
 

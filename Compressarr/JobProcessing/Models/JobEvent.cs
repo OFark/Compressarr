@@ -12,6 +12,7 @@ namespace Compressarr.JobProcessing.Models
         public DateTime Date { get; set; }
         public LogLevel Level { get; set; }
         public string Message { get; set; }
+        public bool IsFFmpegProgress { get; set; }
 
         public Color Color=> Level switch
                 {
@@ -21,19 +22,15 @@ namespace Compressarr.JobProcessing.Models
                     _ => Color.Default,
                 };
 
-        public JobEvent(LogLevel level, string message)
+        public JobEvent(Update update, bool isFFmpegProgress)
         {
             Date = DateTime.Now;
-            Level = level;
-            Message = message;
+            Level = update.Level;
+            Message = update.Message;
+            IsFFmpegProgress = isFFmpegProgress;
         }
 
-        public JobEvent(string message)
-        {
-            Date = DateTime.Now;
-            Level = LogLevel.Information;
-            Message = message;
-        }
+        public JobEvent(Update update) : this(update, false) { }
 
         public int CompareTo(JobEvent other)
         {

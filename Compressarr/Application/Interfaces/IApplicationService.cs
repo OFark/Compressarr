@@ -38,6 +38,7 @@ namespace Compressarr.Application
         Queue<string> StateHistory { get; set; }
         bool CacheMediaInfo { get; set; }
         CancellationToken AppStoppingCancellationToken { get; set; }
+        TimeSpan? ArgCalcSampleLength { get; set; }
 
         void Broadcast(string message);
         LogLevel GetLogLevel();

@@ -24,6 +24,5 @@ namespace Compressarr.JobProcessing
         bool PresetInUse(FFmpegPreset preset);
         Job ReloadJob(Job job);
         void RunJob(Job job);
-        void Stop(Job job);
     }
 }

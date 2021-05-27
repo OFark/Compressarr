@@ -7,7 +7,7 @@
 @inject IDialogService DialogService
 @inject IApplicationService applicationService
 
-<MudPaper id="divRadarr">
+<MudPaper id="divRadarr" Elevation="0">
     <MudGrid>
         <MudItem xs="9"></MudItem>
         <MudItem xs="3">
@@ -28,118 +28,113 @@
         <MudAlert Severity="Severity.Error">@AlertMessage</MudAlert>
     }
 
-    <MudGrid Spacing="1">
-        <MudItem sm="11">
-            <div class="my-2 filterList">
-                <table class="filterTableWrapper">
-                    <thead valign="baseline">
-                        <tr>
-                            <th class="hide">
-                            </th>
-                            <th>
-                                <div class="mud-input-control mud-input-input-control">
-                                    <div class="mud-input-control-input-container">
-                                        <div class="mud-input mud-input-text mud-input-underline mud-shrink">
-                                            <select @bind="filterPropertyStr" required>
-                                                @foreach (var fp in filterManager.RadarrFilterProperties.OrderBy(f => f.Key))
-                                                {
-                                                    <option value="@fp.Value">@fp.Key</option>
-                                                }
-                                            </select>
-                                        </div>
-                                    </div>
+
+    <MudPaper Class="my-2 filterList">
+        <table class="filterTableWrapper">
+            <thead valign="baseline">
+                <tr>
+                    <th class="hide">
+                    </th>
+                    <th>
+                        <div class="mud-input-control mud-input-input-control">
+                            <div class="mud-input-control-input-container">
+                                <div class="mud-input mud-input-text mud-input-underline mud-shrink">
+                                    <select @bind="filterPropertyStr" required>
+                                        @foreach (var fp in filterManager.RadarrFilterProperties.OrderBy(f => f.Key))
+                                        {
+                                            <option value="@fp.Value">@fp.Key</option>
+                                        }
+                                    </select>
                                 </div>
-                            </th>
-                            <th>
-                                <div class="mud-input-control mud-input-input-control">
-                                    <div class="mud-input-control-input-container">
-                                        <div class="mud-input mud-input-text mud-input-underline mud-shrink">
-                                            <select @bind="filterComparitorStr" required>
-                                                <option value="" disabled selected hidden>is...</option>
-                                                @if (FilterProperty != null)
-                                                {
-                                                    foreach (var fc in filterManager.GetComparitors(FilterProperty))
-                                                    {
-                                                        <option value="@fc.Value">@fc.Key</option>
-                                                    }
-                                                }
-                                            </select>
-                                        </div>
-                                    </div>
+                            </div>
+                        </div>
+                    </th>
+                    <th>
+                        <div class="mud-input-control mud-input-input-control">
+                            <div class="mud-input-control-input-container">
+                                <div class="mud-input mud-input-text mud-input-underline mud-shrink">
+                                    <select @bind="filterComparitorStr" required>
+                                        <option value="" disabled selected hidden>is...</option>
+                                        @if (FilterProperty != null)
+                                        {
+                                            foreach (var fc in filterManager.GetComparitors(FilterProperty))
+                                            {
+                                                <option value="@fc.Value">@fc.Key</option>
+                                            }
+                                        }
+                                    </select>
                                 </div>
-                            </th>
-                            <th colspan="2">
-                                @switch (FilterProperty.PropertyType)
-                                {
-                                    case FilterPropertyType.Boolean:
-                                        {
-                                            <MudSelect Value="filterValue" OffsetY="true">
-                                                <MudSelectItem Value="@("True")" />
-                                                <MudSelectItem Value="@("False")" />
-                                            </MudSelect>
-                                        }
-                                        break;
-                                    case FilterPropertyType.DateTime:
-                                        {
-                                            <MudDatePicker @bind-Text="filterValue" placeholder="something" />
-                                        }
-                                        break;
-                                    case FilterPropertyType.String:
-                                        {
-                                            <MudTextField T="string" @bind-Text="filterValue" Placeholder="something" />
-
-                                        }
-                                        break;
-                                    case FilterPropertyType.Number:
-                                        {
-                                            <MudNumericField T="decimal" @bind-Value="filterIntValue" Placeholder="something" />
-                                        }
-                                        break;
-                                    case FilterPropertyType.Enum:
-                                        {
-                                            var filterValueResults = radarrService.GetValuesForProperty(filterPropertyStr).Result;
-
-                                            if (filterValueResults.Success)
-                                            {
-                                                <MudSelect @bind-Value="filterValue" MultiSelection="true" Required="true" @bind-SelectedValues="filterValues">
-                                                    @foreach (var key in filterValueResults.Results)
-                                                                    {
-                                                        <MudSelectItem Value="@key" />
-                                                                    }
-                                                </MudSelect>
-                                            }
-                                            else
-                                            {
-                                                <MudText Color="Color.Error">@filterValueResults.ErrorString</MudText>
-                                            }
-
-                                            break;
-                                        }
-                                }
-                            </th>
-                            <th class="hide">
-                                <MudButton OnClick="addFilter" Color="Color.Primary" StartIcon="@Icons.Outlined.Add">@newFilterTextButton</MudButton>
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var dlf in dlFilters)
+                            </div>
+                        </div>
+                    </th>
+                    <th colspan="2">
+                        @switch (FilterProperty.PropertyType)
                         {
-                            <tr>
-                                <DLFilter filter="dlf" OnDeleteFilter="deleteFilter" OnFilterUpdate="filterUpdate" />
-                                <td>
-                                    <MudButton OnClick="(() => groupFilter(dlf))" Color="Color.Primary" StartIcon="@Icons.Outlined.Add">or</MudButton>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        </MudItem>
-        <MudItem sm="1">
+                            case FilterPropertyType.Boolean:
+                                {
+                                    <MudSelect Value="filterValue" OffsetY="true">
+                                        <MudSelectItem Value="@("True")" />
+                                        <MudSelectItem Value="@("False")" />
+                                    </MudSelect>
+                                }
+                                break;
+                            case FilterPropertyType.DateTime:
+                                {
+                                    <MudDatePicker @bind-Text="filterValue" placeholder="something" />
+                                }
+                                break;
+                            case FilterPropertyType.String:
+                                {
+                                    <MudTextField T="string" @bind-Text="filterValue" Placeholder="something" />
 
-        </MudItem>
-    </MudGrid>
+                                }
+                                break;
+                            case FilterPropertyType.Number:
+                                {
+                                    <MudNumericField T="decimal" @bind-Value="filterIntValue" Placeholder="something" />
+                                }
+                                break;
+                            case FilterPropertyType.Enum:
+                                {
+                                    var filterValueResults = radarrService.GetValuesForProperty(filterPropertyStr).Result;
+
+                                    if (filterValueResults.Success)
+                                    {
+                                        <MudSelect @bind-Value="filterValue" MultiSelection="true" Required="true" @bind-SelectedValues="filterValues">
+                                            @foreach (var key in filterValueResults.Results)
+                                                            {
+                                                <MudSelectItem Value="@key" />
+                                                            }
+                                        </MudSelect>
+                                    }
+                                    else
+                                    {
+                                        <MudText Color="Color.Error">@filterValueResults.ErrorString</MudText>
+                                    }
+
+                                    break;
+                                }
+                        }
+                    </th>
+                    <th class="hide">
+                        <MudButton OnClick="addFilter" Color="Color.Primary" StartIcon="@Icons.Outlined.Add">@newFilterTextButton</MudButton>
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var dlf in dlFilters)
+                {
+                    <tr>
+                        <DLFilter filter="dlf" OnDeleteFilter="deleteFilter" OnFilterUpdate="filterUpdate" />
+                        <td>
+                            <MudButton OnClick="(() => groupFilter(dlf))" Color="Color.Primary" StartIcon="@Icons.Outlined.Add">or</MudButton>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </MudPaper>
+
     @if (dlFilters.Any())
     {
         <MudToolBar>
@@ -271,7 +266,7 @@
     private IEnumerable<Compressarr.Services.Models.Movie> Movies { get; set; }
 
     private bool showSaveDialog = false;
-    
+
     private string AlertMessage = null;
 
     private string filter = "";

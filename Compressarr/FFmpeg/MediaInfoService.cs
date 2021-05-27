@@ -42,7 +42,7 @@ namespace Compressarr.FFmpeg
                         return movie.MediaInfo;
                     }
 
-                    var cacheHash = movie.GetHashCode();
+                    var cacheHash = movie.GetStableHash();
 
                     using (logger.BeginScope($"Getting Cached MediaInfo: {filePath}", filePath))
                     {
@@ -81,7 +81,7 @@ namespace Compressarr.FFmpeg
                                 movie.MediaInfo = ffProbeInfo;
                                 if (applicationService.CacheMediaInfo)
                                 {
-                                    await fileService.WriteJsonFileAsync(AppDir.Cache, $"{movie.GetHashCode()}.json", ffProbeInfo);
+                                    await fileService.WriteJsonFileAsync(AppDir.Cache, $"{movie.GetStableHash()}.json", ffProbeInfo);
                                 }
                             }
                             return ffProbeInfo;
