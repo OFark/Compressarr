@@ -21,6 +21,7 @@ namespace Compressarr.JobProcessing.Models
             MediaHash = movie.GetStableHash();
             SourceFile = $"{basePath}{Path.Combine(movie.path, movie.movieFile.relativePath)}";
             Movie = movie;
+            Processing = new();
         }
 
         public event EventHandler<Update> OnUpdate;
@@ -39,15 +40,11 @@ namespace Compressarr.JobProcessing.Models
         public long? Frame { get; internal set; }
         public Job Job { get; set; }
         public int MediaHash { get; set; }
-
         public Movie Movie { get; set; }
-
         public string MovieName { get; set; }
-
         public string Name => MovieName ?? SourceFileName;
-
         public int? Percent { get; internal set; }
-
+        public ConditionSwitch Processing { get; set; }
         public decimal? Q { get; internal set; }
 
         public bool ShowArgs { get; set; }
@@ -102,6 +99,8 @@ namespace Compressarr.JobProcessing.Models
             OnUpdate?.Invoke(this, update);
             Output(update);
         }
+
+        public void Update(object sender, Update update) => Update(update);
         public void Update(Update update)
         {
             OnUpdate?.Invoke(this, update);

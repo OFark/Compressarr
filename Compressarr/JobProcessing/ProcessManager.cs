@@ -35,7 +35,7 @@ namespace Compressarr.JobProcessing
 
         public async Task<SSIMResult> CalculateSSIM(DataReceivedEventHandler dataRecieved, ConversionProgressEventHandler dataProgress, string sourceFile, string destinationFile, CancellationToken token)
         {
-            var arguments = $" -i \"{sourceFile}\" -i \"{destinationFile}\" -lavfi  \"[0:v]settb = AVTB,setpts = PTS - STARTPTS[main];[1:v]settb = AVTB,setpts = PTS - STARTPTS[ref];[main][ref]ssim\" -f null -";
+            var arguments = $" -i \"{sourceFile}\" -i \"{destinationFile}\" -lavfi  \"[0:v]settb=AVTB,setpts=PTS-STARTPTS[main];[1:v]settb=AVTB,setpts=PTS-STARTPTS[ref];[main][ref]ssim\" -max_muxing_queue_size 2048 -f null -";
             logger.LogDebug($"SSIM arguments: {arguments}");
 
             decimal ssim = default;

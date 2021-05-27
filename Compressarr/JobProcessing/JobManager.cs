@@ -390,83 +390,86 @@ namespace Compressarr.JobProcessing
 
                                 foreach (var wi in job.WorkLoad)
                                 {
-
-                                    if (!job.Cancelled)
+                                    using (var workItemWorker = new JobWorker(wi.Processing, wi.Update))
                                     {
-                                        using (logger.BeginScope("Work Item {SourceFileName}", wi.SourceFileName))
+                                        if (!job.Cancelled)
                                         {
-                                            Log(job, LogLevel.Debug, $"Now Processing: {wi.SourceFileName}");
-
-                                            //job.Process.WorkItem = wi;
-
-                                            wi.Success = false;
-
-                                            using (var jobPreparer = new JobWorker(job.Condition.Prepare, job.UpdateStatus))
+                                            using (logger.BeginScope("Work Item {SourceFileName}", wi.SourceFileName))
                                             {
-                                                if (wi.Arguments == null)
+                                                Log(job, LogLevel.Debug, $"Now Processing: {wi.SourceFileName}");
+
+                                                //job.Process.WorkItem = wi;
+
+                                                wi.Success = false;
+
+                                                using (var jobPreparer = new JobWorker(job.Condition.Prepare, job.UpdateStatus))
                                                 {
-                                                    var results = await presetManager.GetArguments(job.Preset, wi, lnkCTS.Token);
-                                                    if (results.Success)
+                                                    if (wi.Arguments == null)
                                                     {
-                                                        wi.Arguments = results.Arguments;
+                                                        var results = await presetManager.GetArguments(job.Preset, wi, lnkCTS.Token);
+                                                        if (results.Success)
+                                                        {
+                                                            wi.Arguments = results.Arguments;
+                                                        }
+                                                    }
+
+                                                    if (wi.Arguments != null && wi.Arguments.Any())
+                                                    {
+                                                        jobPreparer.Succeed();
                                                     }
                                                 }
 
-                                                if (wi.Arguments != null && wi.Arguments.Any())
+                                                if (job.Cancelled) break;
+
+                                                await processManager.Process(wi, lnkCTS.Token);
+
+                                                if (!job.Cancelled)
                                                 {
-                                                    jobPreparer.Succeed();
-                                                }
-                                            }
-
-                                            if (job.Cancelled) break;
-
-                                            await processManager.Process(wi, lnkCTS.Token);
-
-                                            if (!job.Cancelled)
-                                            {
-                                                var checkResult = await CheckResult(wi);
-                                                if (checkResult != null)
-                                                {
-                                                    if (checkResult.AllGood)
+                                                    var checkResult = await CheckResult(wi);
+                                                    if (checkResult != null)
                                                     {
-                                                        job.Log(new(checkResult.Result, LogLevel.Debug));
+                                                        if (checkResult.AllGood)
+                                                        {
+                                                            job.Log(new(checkResult.Result, LogLevel.Debug));
+                                                        }
+                                                        else
+                                                        {
+                                                            job.Log(new(checkResult.Result, LogLevel.Warning));
+                                                        }
                                                     }
                                                     else
                                                     {
-                                                        job.Log(new(checkResult.Result, LogLevel.Warning));
+                                                        job.Log(new("Cannot complete checks, Workitem or Process missing", LogLevel.Error));
                                                     }
-                                                }
-                                                else
-                                                {
-                                                    job.Log(new("Cannot complete checks, Workitem or Process missing", LogLevel.Error));
-                                                }
 
-                                                wi.Success = wi.Success && checkResult.AllGood;
+                                                    wi.Success = wi.Success && checkResult.AllGood;
 
-                                                if (wi.Success && job.AutoImport)
-                                                {
-                                                    switch (job.Filter.MediaSource)
+
+                                                    if (wi.Success && job.AutoImport)
                                                     {
-                                                        case MediaSource.Radarr:
-                                                            {
-                                                                job.Log(new("Auto Import - Importing into Radarr"));
-                                                                var response = await radarrService.ImportMovie(wi);
-                                                                if (response.Success)
+                                                        switch (job.Filter.MediaSource)
+                                                        {
+                                                            case MediaSource.Radarr:
                                                                 {
-                                                                    job.Log(new("Movie Imported"));
+                                                                    job.Log(new("Auto Import - Importing into Radarr"));
+                                                                    var response = await radarrService.ImportMovie(wi);
+                                                                    if (response.Success)
+                                                                    {
+                                                                        job.Log(new("Movie Imported"));
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        job.Log(new($"Import Failed [{response.ErrorCode}]: {response.ErrorMessage}", LogLevel.Warning));
+                                                                    }
                                                                 }
-                                                                else
-                                                                {
-                                                                    job.Log(new($"Import Failed [{response.ErrorCode}]: {response.ErrorMessage}", LogLevel.Warning));
-                                                                }
-                                                            }
-                                                            break;
+                                                                break;
+                                                        }
                                                     }
-                                                }
 
+                                                    workItemWorker.Succeed(wi.Success);
+                                                }
                                             }
                                         }
-
                                     }
                                 }
 

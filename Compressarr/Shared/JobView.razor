@@ -101,11 +101,13 @@
                                     </HeaderContent>
                                     <RowTemplate>
                                         <MudTd>
-                                            <MudIconButton Size="Size.Small" Icon="@(context.ShowArgs ? Icons.Outlined.Cancel : Icons.Outlined.Info)" OnClick="@(() => toggleArgs(context))"></MudIconButton>
-                                            @if ((context.ShowArgs && context.Arguments == null) || job.Condition.Process.Processing)
-                                                    {
-                                                <MudProgressCircular Class="ml-2" Style="vertical-align: middle;" Size="Size.Small" Indeterminate="true" Color="Color.Secondary" />
-                                                    }
+                                            <MudText>
+                                                <MudIconButton Size="Size.Small" Icon="@(context.ShowArgs ? Icons.Outlined.Cancel : Icons.Outlined.Info)" OnClick="@(() => toggleArgs(context))"></MudIconButton>
+                                                @if ((context.ShowArgs && context.Arguments == null) || context.Processing.Processing)
+                                                        {
+                                                    <MudProgressCircular Class="ml-2" Style="vertical-align: middle;" Size="Size.Small" Indeterminate="true" Color="Color.Secondary" />
+                                                        }
+                                            </MudText>
                                         </MudTd>
                                         <MudTd DataLabel="Name">@context.SourceFileName</MudTd>
                                         <MudTd DataLabel="Percent"><MudText Align="Align.Center">@context.Percent.Adorn("%")</MudText></MudTd>
@@ -136,7 +138,7 @@
                                         <MudTd DataLabel="Compression"><MudText Align="Align.Center">@context.Compression.ToPercent(2).Adorn("%")</MudText></MudTd>
                                     </RowTemplate>
                                     <ChildRowContent>
-                                        @if (context.ShowArgs || (job.Condition.Process.Processing && context.Arguments == null))
+                                        @if (context.ShowArgs || (context.Processing.Processing && context.Arguments == null))
                                                 {
                                             <MudTr>
                                                 <MudTd colspan="14">
