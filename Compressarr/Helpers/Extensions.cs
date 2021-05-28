@@ -129,6 +129,16 @@ namespace Compressarr.Helpers
             return Math.Round(percent * 100, decimals).ToString();
         }
 
+        public static string Capitalise(this string text)
+        {
+            return text switch
+            {
+                null => null,
+                "" => string.Empty,
+                _ => text.First().ToString().ToUpper() + text.Substring(1)
+            };
+        }
+
         public static string ToPercent(this decimal? percent, int decimals = 0)
         {
             return percent.HasValue ? ToPercent(percent.Value, decimals).ToString() : null;

@@ -27,7 +27,7 @@
                 }
                 else
                 {
-                    <MudAvatar Image="@FilterImageSrc" Style="vertical-align: middle;" Class="mr-3" />
+                    <MudAvatar Color="Color.Transparent" Rounded="true" Image="@FilterImageSrc" Style="vertical-align: middle;" Class="mr-3" />
                 }
                 @:@job.FilterName | @job.Preset => @job.DestinationFolder
                 <MudChip Color="@buttonColour">@buttonText</MudChip>
@@ -313,8 +313,7 @@
 
     private bool saveEnabled => (editing || NewJob) && job?.FilterName != null && job?.PresetName != null && job?.DestinationFolder != null;
 
-    private string FilterImageSrc => $"https://raw.githubusercontent.com/{FilterType}/{FilterType}.github.io/master/logo/{FilterType}.svg";
-
+    private string FilterImageSrc => $"https://raw.githubusercontent.com/{FilterType.Capitalise()}/{FilterType.Capitalise()}/develop/Logo/{FilterType.Capitalise()}.svg";
     private string FilterType => job?.Filter?.MediaSource.ToString().ToLower();
 
     private double initialisationProgress;

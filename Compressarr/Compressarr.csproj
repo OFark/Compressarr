@@ -23,6 +23,8 @@
 		  <CopyToOutputDirectory>Never</CopyToOutputDirectory>
 		</None>
 		<None Include="compilerconfig.json" />
+		<None Include="wwwroot\Logo\Compressarr.psd" />
+		<None Include="wwwroot\Logo\Compressarr.svg" />
 	</ItemGroup>
 
 	<ItemGroup>
