@@ -31,7 +31,7 @@ jobs:
     - name: Publish
       run: |
         tag=${{ steps.tag_version.outputs.new_tag }}
-        release_name: "Compressarr-${{ steps.tag_version.outputs.new_tag }}"
+        release_name= "Compressarr-${{ steps.tag_version.outputs.new_tag }}"
         dotnet publish -c Release -o "$release_name"
         7z a -tzip "${release_name}.zip" "./${release_name}/*"
         rm -r "$release_name"
