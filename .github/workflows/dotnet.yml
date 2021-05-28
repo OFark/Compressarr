@@ -44,6 +44,6 @@ jobs:
       uses: ncipollo/release-action@v1
       with:
        token: ${{ secrets.GITHUB_TOKEN }}
-       artifacts: "Compressarr*"
+       artifacts: "Compressarr-*"
        tag: ${{ steps.tag_version.outputs.new_tag }}
        draft: false
