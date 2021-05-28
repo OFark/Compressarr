@@ -23,8 +23,27 @@ jobs:
       run: dotnet build --no-restore
     - name: Test
       run: dotnet test --no-build --verbosity normal
+    - name: Build
+      shell: bash
+      run: |
+        tag=${{ steps.tag_version.outputs.new_tag }}
+        release_name="Compressarr-$tag"
+        # Build everything
+        dotnet publish -c Release -o "$release_name"
+        # Pack files
+        7z a -tzip "${release_name}.zip" "./${release_name}/*"
+        
+        # Delete output directory
+        rm -r "$release_name"
     - name: Bump version and push tag
       id: tag_version
       uses: mathieudutour/github-tag-action@v5.5
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Create release
+      uses: ncipollo/release-action@v1
+      with:
+       token: ${{ secrets.GITHUB_TOKEN }}
+       artifacts: "Compressarr*"
+       tag: ${{ steps.tag_version.outputs.new_tag }}
+       draft: false
