@@ -46,6 +46,12 @@ Also there's a folder called CodecOptions. In here are some templates for config
 
  - Currently Sonarr will connect, but there's no interface to build a filter.
 
-### And Finally:
+### Remember:
 
  This process rebuilds your videos, if you choose to auto import it will over write your existing files, if that what Radarr/Sonarr are set to do. Please check that the output is what you want before enabling the Auto Import option.
+
+## Support:
+
+* [GitHub](https://github.com/OFark/Compressarr) - For the project support, wiki and source
+* [Docker](https://hub.docker.com/r/ofark/compressarr) - For the Docker version of the app
+* [Unraid](https://forums.unraid.net/topic/109411-support-compressarr/) - For discussions about the integration with Unraid.
