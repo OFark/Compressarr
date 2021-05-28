@@ -26,7 +26,7 @@ jobs:
           release_name="Compressarr-$tag"
 
           # Build everything
-          dotnet publish Compressarr/Compressarr.csproj --framework netcoreapp3.1 --runtime "${{ matrix.target }}" -c Release -o "$release_name"
+          dotnet publish -c Release -o "$release_name"
 
           # Pack files
           7z a -tzip "${release_name}.zip" "./${release_name}/*"
