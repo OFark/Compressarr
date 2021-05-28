@@ -25,13 +25,16 @@ jobs:
       run: dotnet test --no-build --verbosity normal
     - name: Publish
       run: |
-        dotnet publish -c Release -o release
-        7z a -tzip "compressarr.zip" "./release/*"
+        tag=$(git describe --tags --abbrev=0)
+        release_name="Compressarr-$tag"
+        dotnet publish -c Release -o "$release_name"
+        7z a -tzip "${release_name}.zip" "./${release_name}/*"
+        rm -r "$release_name"
     - name: Create Release
       id: create_release
       uses: softprops/action-gh-release@v1
       with:
-        files: "compressarr.zip"
+        files: "compressarr-*"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
