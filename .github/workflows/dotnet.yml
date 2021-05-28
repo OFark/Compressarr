@@ -13,6 +13,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: Bump version and push tag
+      id: tag_version
+      uses: mathieudutour/github-tag-action@v5.5
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
     - name: Setup .NET
       uses: actions/setup-dotnet@v1
       with:
@@ -25,8 +30,8 @@ jobs:
       run: dotnet test --no-build --verbosity normal
     - name: Publish
       run: |
-        tag=$(git describe --tags --abbrev=0)
-        release_name="Compressarr-$tag"
+        tag=${{ steps.tag_version.outputs.new_tag }}
+        release_name: "Compressarr-${{ steps.tag_version.outputs.new_tag }}"
         dotnet publish -c Release -o "$release_name"
         7z a -tzip "${release_name}.zip" "./${release_name}/*"
         rm -r "$release_name"
@@ -34,7 +39,7 @@ jobs:
       id: create_release
       uses: softprops/action-gh-release@v1
       with:
-        files: "compressarr-*"
+        files: "Compressarr-*"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
