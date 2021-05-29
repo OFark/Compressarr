@@ -19,7 +19,7 @@ namespace Compressarr.Settings.FFmpegFactory
             Name = preset.Name;
             OptionalArguments = preset.OptionalArguments;
             VideoBitRate = preset.VideoBitRate;
-            VideoCodecOptions = preset.VideoCodecOptions.Select(x => new EncoderOptionValueBase(x)).ToHashSet();
+            VideoCodecOptions = preset.VideoCodecOptions?.Select(x => new EncoderOptionValueBase(x)).ToHashSet();
             VideoEncoder = new(preset.VideoEncoder);
         }
 
