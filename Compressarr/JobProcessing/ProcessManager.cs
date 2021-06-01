@@ -232,6 +232,7 @@ namespace Compressarr.JobProcessing
                 }
                 else
                 {
+                    wi.Output(new(e.Data, LogLevel.Debug), false);
                     logger.LogTrace($"Converter data not recognised: {e.Data}");
                 }
             }

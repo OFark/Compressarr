@@ -4,9 +4,10 @@
     {
         Copy,
         Encode,
+        Clone,
         Delete,
         DeleteUnlessOnly
-            //todo: Add Clone option
+            
     }
     public enum AudioStreamRule
     {

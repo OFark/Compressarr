@@ -674,20 +674,7 @@ namespace Compressarr.Presets
                 var mapAllElse = " -map 0:s? -c:s copy -map 0:t? -map 0:d? -movflags use_metadata_tags";
 
                 logger.LogInformation("Calculating Audio Arguments");
-                //If were treating all audio streams the same
-                if (preset.AudioStreamPresets.First().CoversAny)
-                {
-                    var audioPreset = preset.AudioStreamPresets.First();
-                    audioArguments = audioPreset.Action switch
-                    {
-                        AudioStreamAction.Copy => " -map 0:a? -c:a copy",
-                        AudioStreamAction.Delete => "",
-                        AudioStreamAction.DeleteUnlessOnly => " -map 0:a:0? -c:a copy",
-                        AudioStreamAction.Encode => $" -map 0:a? -c:a {audioPreset.Encoder.Name}{(string.IsNullOrWhiteSpace(audioPreset.BitRate) ? "" : " -b:a ")}{audioPreset.BitRate}",
-                        _ => throw new System.NotImplementedException()
-                    };
-                }
-                else
+
                 {
                     var i = 0; //for stream output tracking
 
@@ -716,6 +703,7 @@ namespace Compressarr.Presets
                                         AudioStreamAction.Copy => $"{audioStreamMap} copy",
                                         AudioStreamAction.Delete => "",
                                         AudioStreamAction.DeleteUnlessOnly => preset.AudioStreamPresets.Last() == audioPreset && i == 0 ? $"{audioStreamMap} copy" : "",
+                                        AudioStreamAction.Clone => $"{audioStreamMap} copy  -map 0:{stream.index} -c:a:{i++} {audioPreset.Encoder.Name}{(string.IsNullOrWhiteSpace(audioPreset.BitRate) ? "" : $" -b:a:{i} ")}{audioPreset.BitRate}",
                                         AudioStreamAction.Encode => $"{audioStreamMap} {audioPreset.Encoder.Name}{(string.IsNullOrWhiteSpace(audioPreset.BitRate) ? "" : $" -b:a:{i} ")}{audioPreset.BitRate}",
                                         _ => throw new System.NotImplementedException()
                                     };
@@ -723,6 +711,10 @@ namespace Compressarr.Presets
                                 }
                             }
                         }
+                    }
+                    else
+                    {
+                        throw new EndOfStreamException("No streams found in this media");
                     }
                 }
 
@@ -887,11 +879,11 @@ namespace Compressarr.Presets
                         var arg = $"{hardwareDecoder} -y -i \"{tempFile}\" -map 0:V -c:V {preset.VideoEncoder.Name}{autoTuneStr} {frameRate}  \"{tempEncFile}\" ";
                         logger.LogInformation($"Trying: {arg}");
 
-                        await processManager.EncodeAVideo( null, (sender, args) =>
-                        {
-                            test.AutoPresetResultSet[i.Key].EncodingProgress = args.Percent;
-                            wi.Update();
-                        }, arg, token);
+                        await processManager.EncodeAVideo(null, (sender, args) =>
+                       {
+                           test.AutoPresetResultSet[i.Key].EncodingProgress = args.Percent;
+                           wi.Update();
+                       }, arg, token);
 
                         if (token.IsCancellationRequested) return string.Empty;
 
