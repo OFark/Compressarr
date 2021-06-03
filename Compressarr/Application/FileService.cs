@@ -33,7 +33,8 @@ namespace Compressarr.Application
     public enum AppFile
     {
         ffmpegVersion,
-        appsettings
+        appsettings,
+        mediaInfo
     }
 
     public class FileService : IFileService
@@ -83,7 +84,8 @@ namespace Compressarr.Application
         public string GetAppFilePath(AppFile file) => file switch
         {
             AppFile.ffmpegVersion => Path.Combine(GetAppDirPath(AppDir.FFmpeg), "version.json"),
-            AppFile.appsettings => AppEnvironment.InDocker ? Path.Combine(ConfigDirectory, $"{file.ToString().ToLower()}.json") : AppEnvironment.IsDevelopment ? $"{file.ToString().ToLower()}.Development.json" : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{file.ToString().ToLower()}.json"),
+            AppFile.appsettings => Path.Combine(ConfigDirectory, $"{file.ToString().ToLower()}{(AppEnvironment.IsDevelopment? ".Development" : "")}.json"),
+            AppFile.mediaInfo => Path.Combine(GetAppDirPath(AppDir.Config), "mediaInfo.db"),
             _ => Path.Combine(ConfigDirectory, $"{file.ToString().ToLower()}.json")
         };
 

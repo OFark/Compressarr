@@ -9,6 +9,8 @@ using Xabe.FFmpeg;
 using Compressarr.FFmpeg.Models;
 using System.Threading.Tasks;
 using System.IO;
+using Compressarr.JobProcessing.Models;
+using Compressarr.Shared.Models;
 
 namespace Compressarr.Services.Models
 {
@@ -284,7 +286,12 @@ namespace Compressarr.Services.Models
         public FFProbeResponse MediaInfo { get; set; }
 
         [JsonIgnore]
+        public HashSet<TreeItemData> MediaHistory { get; set; }
+
+        [JsonIgnore]
         public bool ShowInfo { get; set; }
+        [JsonIgnore]
+        public bool ShowHistory { get; set; }
 
         public string GetFullPath(string basePath) => $"{basePath}{Path.Combine(path, movieFile?.relativePath)}";
 

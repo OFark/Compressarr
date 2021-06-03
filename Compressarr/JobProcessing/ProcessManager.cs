@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,13 +19,15 @@ namespace Compressarr.JobProcessing
     public class ProcessManager : IProcessManager
     {
         private readonly IApplicationService applicationService;
+        private readonly IHistoryService historyService;
         private readonly ILogger<ProcessManager> logger;
 
         readonly SemaphoreSlim semaphore = new(1, 1);
         bool tokenCanceled = false;
-        public ProcessManager(IApplicationService applicationService, ILogger<ProcessManager> logger, IFileService fileService)
+        public ProcessManager(IApplicationService applicationService, ILogger<ProcessManager> logger, IFileService fileService, IHistoryService historyService)
         {
             this.applicationService = applicationService;
+            this.historyService = historyService;
             this.logger = logger;
 
             Xabe.FFmpeg.FFmpeg.SetExecutablesPath(fileService.GetAppDirPath(AppDir.FFmpeg));
@@ -120,6 +123,8 @@ namespace Compressarr.JobProcessing
 
                             var succeded = true;
 
+                            var historyID = historyService.StartProcessing(workItem.SourceFile, workItem.Job.FilterName, workItem.Job.PresetName, workItem.Arguments.Select(x => string.Format(x, workItem.SourceFile, workItem.DestinationFile)));
+
                             
                             logger.LogDebug("FFmpeg process work item starting.");
 
@@ -177,6 +182,8 @@ namespace Compressarr.JobProcessing
                                     }
                                 }
                             }
+
+                            historyService.EndProcessing(historyID, succeded, workItem);
 
                             jobRunner.Succeed();
 

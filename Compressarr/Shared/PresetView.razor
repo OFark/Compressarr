@@ -9,7 +9,7 @@
         <MudText>
             @if (NewPreset)
             {
-                <MudAvatar Color="Color.Dark" Class="mr-3" Style="vertical-align: middle;" >
+                <MudAvatar Color="Color.Dark" Class="mr-3" Style="vertical-align: middle;">
                     <MudIcon Icon="@Icons.Outlined.PlaylistAdd" />
                 </MudAvatar>
                 @:New Preset
@@ -74,62 +74,70 @@
                         <MudCardContent>
                             @foreach (var option in preset.VideoCodecOptions)
                             {
+                                @if (option?.EncoderOption == null)
 
-                                @switch (option.EncoderOption.Type)
                                 {
-                                    case Presets.CodecOptionType.Number:
-                                        {
-                                            <MudToolBar DisableGutters="true" Dense="true">
-                                                <MudNumericField @bind-Value="option.Value" Label="@option.Name" Class="mb-5" Disabled="@(option.AutoCalculate)" />
+                                    <MudText Class="pa-2">Invalid option detected, please check settings and save.</MudText>
+                                }
+                                else
+                                {
 
-                                                @if (option.EncoderOption.AutoTune != null)
-                                                {
-                                                    <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.IntValue = null; option.AutoCalculate = toggled; })" />
-                                                }
-                                            </MudToolBar>
-                                        }
-                                        break;
-                                    case Presets.CodecOptionType.Range:
-                                        {
-                                            <MudSlider @bind-Value="@option.IntValue" T="int?" Max="@option.EncoderOption.Max" Min="option.EncoderOption.Min" Immediate="true" Disabled="@(option.AutoCalculate || (option.EncoderOption.DisabledByVideoBitRate && disabledVideoBitrate))">
-                                                @option.Name: @option.Value
-                                                <MudIconButton Size="Size.Small" Icon="@Icons.Outlined.Clear" OnClick="@(() => { option.IntValue = null; })" Disabled="@(option.AutoCalculate)" />
-                                                @if (option.EncoderOption.AutoTune != null)
-                                                {
-                                                    <MudToggleIconButton Size="Size.Small" Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.Value = null; option.AutoCalculate = toggled; })" />
-                                                }
-                                            </MudSlider>
+                                    @switch (option.EncoderOption.Type)
+                                    {
+                                        case Presets.CodecOptionType.Number:
+                                            {
+                                                <MudToolBar DisableGutters="true" Dense="true">
+                                                    <MudNumericField @bind-Value="option.Value" Label="@option.Name" Class="mb-5" Disabled="@(option.AutoCalculate)" />
 
-                                        }
-                                        break;
-                                    case Presets.CodecOptionType.Select:
-                                        {
-                                            <MudToolBar DisableGutters="true" Dense="true">
-                                                <MudSelect @bind-Value="option.Value" Label="@option.Name" Clearable="true" OffsetY="true" Class="mb-5" Disabled="@(option.AutoCalculate)">
-                                                    @foreach (var c in option.EncoderOption.Values)
-                                                                        {
-                                                        <MudSelectItem Value="@c">@c</MudSelectItem>
-                                                                        }
-                                                </MudSelect>
-                                                @if (option.EncoderOption.AutoTune != null)
-                                                {
-                                                    <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.Value = null; option.AutoCalculate = toggled; })" />
-                                                }
-                                            </MudToolBar>
-                                        }
-                                        break;
-                                    case Presets.CodecOptionType.String:
-                                        {
-                                            <MudToolBar DisableGutters="true" Dense="true">
-                                                <MudTextField @bind-Value="option.Value" Label="@option.Name" Class="mb-5" Disabled="@(option.AutoCalculate)" />
+                                                    @if (option.EncoderOption.AutoTune != null)
+                                                    {
+                                                        <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.IntValue = null; option.AutoCalculate = toggled; })" />
+                                                    }
+                                                </MudToolBar>
+                                            }
+                                            break;
+                                        case Presets.CodecOptionType.Range:
+                                            {
+                                                <MudSlider @bind-Value="@option.IntValue" T="int?" Max="@option.EncoderOption.Max" Min="option.EncoderOption.Min" Immediate="true" Disabled="@(option.AutoCalculate || (option.EncoderOption.DisabledByVideoBitRate && disabledVideoBitrate))">
+                                                    @option.Name: @option.Value
+                                                    <MudIconButton Size="Size.Small" Icon="@Icons.Outlined.Clear" OnClick="@(() => { option.IntValue = null; })" Disabled="@(option.AutoCalculate)" />
+                                                    @if (option.EncoderOption.AutoTune != null)
+                                                    {
+                                                        <MudToggleIconButton Size="Size.Small" Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.Value = null; option.AutoCalculate = toggled; })" />
+                                                    }
+                                                </MudSlider>
 
-                                                @if (option.EncoderOption.AutoTune != null)
-                                                {
-                                                    <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.Value = null; option.AutoCalculate = toggled; })" />
-                                                }
-                                            </MudToolBar>
-                                        }
-                                        break;
+                                            }
+                                            break;
+                                        case Presets.CodecOptionType.Select:
+                                            {
+                                                <MudToolBar DisableGutters="true" Dense="true">
+                                                    <MudSelect @bind-Value="option.Value" Label="@option.Name" Clearable="true" OffsetY="true" Class="mb-5" Disabled="@(option.AutoCalculate)">
+                                                        @foreach (var c in option.EncoderOption.Values)
+                                                                                {
+                                                            <MudSelectItem Value="@c">@c</MudSelectItem>
+                                                                                }
+                                                    </MudSelect>
+                                                    @if (option.EncoderOption.AutoTune != null)
+                                                    {
+                                                        <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.Value = null; option.AutoCalculate = toggled; })" />
+                                                    }
+                                                </MudToolBar>
+                                            }
+                                            break;
+                                        case Presets.CodecOptionType.String:
+                                            {
+                                                <MudToolBar DisableGutters="true" Dense="true">
+                                                    <MudTextField @bind-Value="option.Value" Label="@option.Name" Class="mb-5" Disabled="@(option.AutoCalculate)" />
+
+                                                    @if (option.EncoderOption.AutoTune != null)
+                                                    {
+                                                        <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.Value = null; option.AutoCalculate = toggled; })" />
+                                                    }
+                                                </MudToolBar>
+                                            }
+                                            break;
+                                    }
                                 }
                             }
                         </MudCardContent>

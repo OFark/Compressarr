@@ -254,6 +254,24 @@
                     </td>
                 </MudTr>
             }
+            @if (context.ShowHistory)
+            {
+                <MudTr>
+                    <td colspan="99">
+                        @if (context.MediaHistory != null && context.MediaHistory.Any())
+                        {
+                        <MudTreeView ExpandOnClick="true" Items="@context.MediaHistory" Context="history">
+                            <ItemTemplate>
+                                <MudTreeViewItem @bind-Expanded="@history.IsExpanded" Items="@history.TreeItems" Text="@($"{history.Title}{history.Value.Wrap(": {0}")}")" />
+                            </ItemTemplate>
+                        </MudTreeView>
+                        }
+                        else{
+                            <MudText Class="pa-2">No history for this video</MudText>
+                        }
+                    </td>
+                </MudTr>
+            }
         </ChildRowContent>
         <PagerContent>
             <MudTablePager PageSizeOptions="new int[]{5, 10, 25, 50, 100}" />

@@ -833,6 +833,8 @@ namespace Compressarr.Presets
 
                 foreach (var option in preset.VideoCodecOptions.Where(o => o.AutoCalculate).Select(x => x.EncoderOption))
                 {
+                    if (option == null) throw new InvalidDataException("Options no longer available, please rebuild the FFmpeg Preset");
+
                     var range = new List<string>();
                     switch (option.Type)
                     {

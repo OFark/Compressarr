@@ -272,7 +272,7 @@ namespace Compressarr.JobProcessing
                                                     }
                                                 }
                                                 jobWorkLoad.Succeed();
-                                                Log(job, LogLevel.Debug, "Workload complied", "Checking Destination Folder", "Writing Test.txt file");
+                                                Log(job, LogLevel.Debug, "Workload compiled", "Checking Destination Folder", "Writing Test.txt file");
                                             }
 
                                             var testFilePath = Path.Combine(job.DestinationFolder, "Test.txt");

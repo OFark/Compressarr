@@ -52,6 +52,7 @@ namespace Compressarr
 
             services.AddTransient<IFFmpegProcessor, FFmpegProcessor>();
             services.AddTransient<IFilterManager, FilterManager>();
+            services.AddTransient<IHistoryService, HistoryService>();
             services.AddTransient<IJobManager, JobManager>();
             services.AddTransient<IMediaInfoService, MediaInfoService>();
             services.AddTransient<IPresetManager, PresetManager>();

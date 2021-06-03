@@ -174,9 +174,9 @@ namespace Compressarr.Helpers
             return eovs;
         }
 
-        public static string Wrap(this string text, string format)
+        public static string Wrap(this object text, string format)
         {
-            if (string.IsNullOrWhiteSpace(text)) return null;
+            if (text == null || string.IsNullOrWhiteSpace(text.ToString())) return null;
             return string.Format(format, text);
         }
     }

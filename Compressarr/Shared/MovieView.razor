@@ -3,10 +3,12 @@
 
 @inject IApplicationService applicationService
 @inject IMediaInfoService mediaInfoService
+@inject IHistoryService historyService 
 
 
 <MudTd>
     <MudIconButton Size="Size.Small" Icon="@(movie.ShowInfo ? Icons.Outlined.ArrowCircleUp : Icons.Outlined.Info)" OnClick="toggleInfo" UserAttributes="@(new() { { "title", movie.GetStableHash()}})"></MudIconButton>
+    <MudIconButton Size="Size.Small" Icon="@(movie.ShowHistory ? Icons.Outlined.ArrowCircleUp : Icons.Outlined.History)" OnClick="toggleHistory"></MudIconButton>
 </MudTd>
 
 
@@ -49,6 +51,18 @@
         if (movie.MediaInfo == null)
         {
             movie.MediaInfo = await mediaInfoService.GetMediaInfo(MediaSource.Radarr, movie.GetFullPath(applicationService.RadarrSettings.BasePath));
+        }
+
+        await OnUpdate.InvokeAsync();
+    }
+
+    private async void toggleHistory()
+    {
+        movie.ShowHistory = !movie.ShowHistory;
+
+        if (movie.ShowHistory)
+        {
+            movie.MediaHistory = historyService.GetHistory(movie.GetFullPath(applicationService.RadarrSettings.BasePath)).Select(x => x.ToTreeView()).ToHashSet();
         }
 
         await OnUpdate.InvokeAsync();
