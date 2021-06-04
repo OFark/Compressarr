@@ -39,6 +39,8 @@ namespace Compressarr.Application
         bool CacheMediaInfo { get; set; }
         CancellationToken AppStoppingCancellationToken { get; set; }
         TimeSpan? ArgCalcSampleLength { get; set; }
+        decimal? AutoCalculationPost { get; set; }
+        AutoCalcType AutoCalculationType { get; set; }
 
         void Broadcast(string message);
         LogLevel GetLogLevel();

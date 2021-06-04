@@ -7,8 +7,6 @@ namespace Compressarr.Presets.Models
 {
     public class AutoPresetResult
     {
-        public bool Best { get; set; }
-
         public double EncodingProgress { get; set; }
 
         public decimal Percent { get; set; }

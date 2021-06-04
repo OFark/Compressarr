@@ -286,6 +286,8 @@ namespace Compressarr.FFmpeg
                     response.StdErr = p.StandardError.ReadToEnd();
                     await p.WaitForExitAsync();
 
+                    p.WaitForExit(); //This waits for any hanbdles to finish as well. 
+
                     response.ExitCode = p.ExitCode;
 
                     if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(response.StdErr))

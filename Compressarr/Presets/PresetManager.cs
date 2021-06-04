@@ -7,6 +7,7 @@ using Compressarr.JobProcessing;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Presets.Models;
 using Compressarr.Services.Base;
+using Compressarr.Settings;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -805,18 +806,39 @@ namespace Compressarr.Presets
         {
             using (logger.BeginScope("Calculating Best Encoder Options"))
             {
-                var tempFile = Path.Combine(Path.GetTempPath(), $"directCopy.{preset.ContainerExtension}");
-                var tempEncFile = Path.Combine(Path.GetTempPath(), $"encFile.{preset.ContainerExtension}");
+                
+                var tempFile = Path.Combine(fileService.TempDir, $"directCopy.{preset.ContainerExtension}");
+                var tempEncFile = Path.Combine(fileService.TempDir, $"encFile.{preset.ContainerExtension}");
+                var sampleListFile = Path.Combine(fileService.TempDir, $"sampleList.txt");
+
+                if (File.Exists(sampleListFile)) File.Delete(sampleListFile);
 
                 var sampleTime = applicationService.ArgCalcSampleLength.Value.TotalSeconds;
+                var videoLength = wi.Duration?.TotalSeconds ?? 3600;
 
-                var temparg = $"-y -i \"{wi.SourceFile}\" -codec copy -t {sampleTime} -ss {sampleTime}  \"{tempFile}\" ";
+                var samplePitch = videoLength / 4;
 
-                var encodeResult = await processManager.EncodeAVideo(null, null, temparg, token);
+                for (int i = 1; i < 4; i++)
+                {
+                    var sampleFileName = Path.Combine(fileService.TempDir, $"sample{i}.{preset.ContainerExtension}");
+                    var temparg = $"-y -ss {samplePitch * i} -t {sampleTime} -i \"{wi.SourceFile}\" -codec copy -an \"{sampleFileName}\"";
+
+                    var sampleEncodeResult = await processManager.EncodeAVideo(null, null, temparg, token);
+                    if (!sampleEncodeResult.Success)
+                    {
+                        throw sampleEncodeResult.Exception ?? new("Not sure - something went wrong with encoding. Check the logs");
+                    }
+                    File.AppendAllLines(sampleListFile, new List<string>() { $"file '{sampleFileName}'" });
+                }
+
+                var concatArg = $"-y -f concat -safe 0 -i {sampleListFile} -c copy {tempFile}";
+
+                var encodeResult = await processManager.EncodeAVideo(null, null, concatArg, token);
                 if (!encodeResult.Success)
                 {
                     throw encodeResult.Exception ?? new("Not sure - something went wrong with encoding. Check the logs");
                 }
+
 
                 var origSize = new FileInfo(tempFile).Length;
 
@@ -878,14 +900,14 @@ namespace Compressarr.Presets
                         wi.Update();
 
                         var autoTuneStr = $" {test.Argument.Replace("<val>", i.Key)}";
-                        var arg = $"{hardwareDecoder} -y -i \"{tempFile}\" -map 0:V -c:V {preset.VideoEncoder.Name}{autoTuneStr} {frameRate}  \"{tempEncFile}\" ";
+                        var arg = $"{hardwareDecoder}-y -i \"{tempFile}\" -map 0:V -c:V {preset.VideoEncoder.Name}{autoTuneStr} {frameRate}  \"{tempEncFile}\" ";
                         logger.LogInformation($"Trying: {arg}");
 
                         await processManager.EncodeAVideo(null, (sender, args) =>
-                       {
-                           test.AutoPresetResultSet[i.Key].EncodingProgress = args.Percent;
-                           wi.Update();
-                       }, arg, token);
+                        {
+                            test.AutoPresetResultSet[i.Key].EncodingProgress = args.Percent;
+                            wi.Update();
+                        }, arg, token);
 
                         if (token.IsCancellationRequested) return string.Empty;
 
@@ -897,7 +919,7 @@ namespace Compressarr.Presets
                         {
                             test.AutoPresetResultSet[i.Key].SSIMProgress = args.Percent;
                             wi.Update();
-                        }, tempFile, tempEncFile, token);
+                        }, tempFile, tempEncFile, hardwareDecoder, token);
 
                         if (ssimResult.Success)
                         {
@@ -912,14 +934,22 @@ namespace Compressarr.Presets
 
                     logger.LogDebug($"SSIM results: {string.Join("\r\n", test.AutoPresetResultSet.Select(d => $"{d.Key} | {d.Value.SSIM} | {d.Value.Size.ToFileSize()}"))}");
 
-                    var bestVal = test.AutoPresetResultSet.Where(x => x.Value != null && x.Value.Size < origSize).OrderByDescending(x => x.Value.SSIM).ThenBy(x => x.Value.Size).FirstOrDefault();
+                    KeyValuePair<string, AutoPresetResult> bestVal = default;
+
+                    if (applicationService.AutoCalculationType == AutoCalcType.FirstPastThePost)
+                    {
+                        bestVal = test.AutoPresetResultSet.Where(x => x.Value != null && x.Value.SSIM >= (applicationService.AutoCalculationPost ?? 99)).OrderBy(x => x.Value.Size).ThenByDescending(x => x.Value.SSIM).FirstOrDefault();
+                    }
+
+                    if (bestVal.Equals(default(KeyValuePair<string, AutoPresetResult>)))
+                    {
+                        bestVal = test.AutoPresetResultSet.Where(x => x.Value != null && x.Value.Size < origSize).OrderByDescending(x => x.Value.SSIM).ThenBy(x => x.Value.Size).FirstOrDefault();
+                    };
 
                     if (bestVal.Equals(default(KeyValuePair<string, AutoPresetResult>)))
                     {
                         bestVal = test.AutoPresetResultSet.OrderBy(x => x.Value.Size).FirstOrDefault();
                     }
-
-                    bestVal.Value.Best = true;
 
                     logger.LogInformation($"Best Val: {bestVal.Value.SSIM}, Size: {bestVal.Value.Size.ToFileSize()} {Math.Round((decimal)bestVal.Value.Size / origSize * 100M, 2).Adorn("%")}");
 

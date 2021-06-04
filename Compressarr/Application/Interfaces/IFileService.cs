@@ -7,6 +7,7 @@ namespace Compressarr.Application
         string ConfigDirectory { get; }
         string FFMPEGPath { get; }
         string FFPROBEPath { get; }
+        string TempDir { get; }
 
         void DeleteFile(string filePath);
         Task DumpDebugFile(string fileName, string content);

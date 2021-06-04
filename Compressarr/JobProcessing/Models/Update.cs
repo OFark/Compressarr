@@ -17,7 +17,7 @@ namespace Compressarr.JobProcessing.Models
 
         public Update(Exception ex, LogLevel level)
         {
-            Message = ex.ToString();
+            Message = ex?.ToString();
             Level = level;
         }
 

@@ -48,6 +48,7 @@ namespace Compressarr.Application
             this.logger = logger;
 
             cancellationToken = lifetime?.ApplicationStopping ?? new();
+            if (!Directory.Exists(TempDir)) Directory.CreateDirectory(TempDir);
         }
 
         public string ConfigDirectory => GetAppDirPath(AppDir.Config);
@@ -59,6 +60,8 @@ namespace Compressarr.Application
         public string FFPROBEPath => RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? GetFilePath(AppDir.FFmpeg, "ffprobe.exe")
                                    : RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? GetFilePath(AppDir.FFmpeg, "ffprobe")
                                    : throw new NotSupportedException("Cannot Identify OS");
+
+        public string TempDir => Path.Combine(Path.GetTempPath(), "Compressarr");
 
         public void DeleteFile(string filePath)
         {
@@ -84,7 +87,7 @@ namespace Compressarr.Application
         public string GetAppFilePath(AppFile file) => file switch
         {
             AppFile.ffmpegVersion => Path.Combine(GetAppDirPath(AppDir.FFmpeg), "version.json"),
-            AppFile.appsettings => Path.Combine(ConfigDirectory, $"{file.ToString().ToLower()}{(AppEnvironment.IsDevelopment? ".Development" : "")}.json"),
+            AppFile.appsettings => AppEnvironment.InDocker ? Path.Combine(ConfigDirectory, $"{file.ToString().ToLower()}.json") : AppEnvironment.IsDevelopment ? $"{file.ToString().ToLower()}.Development.json" : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{file.ToString().ToLower()}.json"),
             AppFile.mediaInfo => Path.Combine(GetAppDirPath(AppDir.Config), "mediaInfo.db"),
             _ => Path.Combine(ConfigDirectory, $"{file.ToString().ToLower()}.json")
         };

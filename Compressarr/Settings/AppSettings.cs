@@ -8,9 +8,10 @@ namespace Compressarr.Settings
     public class AppSettings
     {
         public bool AlwaysCalculateSSIM { get; set; }
+        public TimeSpan? ArgCalcSampleLength { get; set; }
+        public decimal? AutoCalculationPost { get; set; }
+        public AutoCalcType AutoCalculationType { get; set; }
         public bool CacheMediaInfo { get; set; }
         public bool InsertNamesIntoFFmpegPreviews { get; set; }
-        public TimeSpan? ArgCalcSampleLength { get; set; }
-
     }
 }

@@ -13,4 +13,11 @@ namespace Compressarr.Settings
         SonarrURL,
         SonarrAPIKey
     }
+
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum AutoCalcType
+    {
+        BestGuess,
+        FirstPastThePost
+    }
 }

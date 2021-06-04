@@ -35,6 +35,8 @@ namespace Compressarr.Application
 
             AlwaysCalculateSSIM = appSettings?.Value?.AlwaysCalculateSSIM ?? false;
             ArgCalcSampleLength = appSettings?.Value?.ArgCalcSampleLength ?? new TimeSpan(0, 2, 0);
+            AutoCalculationPost = appSettings?.Value?.AutoCalculationPost;
+            AutoCalculationType = appSettings?.Value?.AutoCalculationType ?? AutoCalcType.BestGuess;
             CacheMediaInfo = appSettings?.Value?.CacheMediaInfo ?? false;
             InsertNamesIntoFFmpegPreviews = appSettings?.Value?.InsertNamesIntoFFmpegPreviews ?? false;
 
@@ -58,6 +60,9 @@ namespace Compressarr.Application
         //App Settings
         public bool AlwaysCalculateSSIM { get; set; }
         public TimeSpan? ArgCalcSampleLength { get; set; }
+        public decimal? AutoCalculationPost { get; set; }
+        public AutoCalcType AutoCalculationType { get; set; }
+
 
         public bool CacheMediaInfo { get; set; }
         public CancellationToken AppStoppingCancellationToken { get; set; }
@@ -102,6 +107,8 @@ namespace Compressarr.Application
                 {
                     AlwaysCalculateSSIM = AlwaysCalculateSSIM,
                     ArgCalcSampleLength = ArgCalcSampleLength ?? new TimeSpan(0, 2, 0),
+                    AutoCalculationPost = AutoCalculationPost,
+                    AutoCalculationType = AutoCalculationType,
                     CacheMediaInfo = CacheMediaInfo,
                     InsertNamesIntoFFmpegPreviews = InsertNamesIntoFFmpegPreviews
                 });

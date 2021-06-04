@@ -34,8 +34,8 @@ namespace Compressarr.JobProcessing.Models
                 new("Success", Success?.ToString() ?? "Unknown")
             });
 
-            if (SSIM.HasValue) root.TreeItems.Add(new("SSIM", SSIM));
-            if (Compression.HasValue) root.TreeItems.Add(new("Compression", Compression));
+            if (SSIM.HasValue) root.TreeItems.Add(new("SSIM", SSIM.ToPercent(2).Adorn("%")));
+            if (Compression.HasValue) root.TreeItems.Add(new("Compression", Compression.ToPercent(2).Adorn("%")));
             if (Percentage.HasValue) root.TreeItems.Add(new("Percentage", Percentage.Adorn("%")));
             if (!string.IsNullOrWhiteSpace(Speed)) root.TreeItems.Add(new("Speed", Speed));
             if (FPS.HasValue) root.TreeItems.Add(new("FPS", FPS));

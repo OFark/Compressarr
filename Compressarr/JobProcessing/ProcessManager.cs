@@ -36,9 +36,9 @@ namespace Compressarr.JobProcessing
         public static Regex ProgressReg { get => new(@"frame= *(\d*) fps= *([\d\.]*) q=*(-?[\d\.]*)(?: q=*-?[\d\.]*)* size= *([^ ]*) time= *([\d:\.]*) bitrate= *([^ ]*) speed= *([\d.]*x) *"); }
         public static Regex SSIMReg { get => new(@"\[Parsed_ssim_4\s@\s\w*\]\sSSIM\sY\:\d\.\d*\s\([inf\d\.]*\)\sU\:\d\.\d*\s\([inf\d\.]*\)\sV\:\d\.\d*\s\([inf\d\.]*\)\sAll\:(\d\.\d*)\s\([inf\d\.]*\)"); }
 
-        public async Task<SSIMResult> CalculateSSIM(DataReceivedEventHandler dataRecieved, ConversionProgressEventHandler dataProgress, string sourceFile, string destinationFile, CancellationToken token)
+        public async Task<SSIMResult> CalculateSSIM(DataReceivedEventHandler dataRecieved, ConversionProgressEventHandler dataProgress, string sourceFile, string destinationFile, string hardwareDecoder, CancellationToken token)
         {
-            var arguments = $" -i \"{sourceFile}\" -i \"{destinationFile}\" -lavfi  \"[0:v]settb=AVTB,setpts=PTS-STARTPTS[main];[1:v]settb=AVTB,setpts=PTS-STARTPTS[ref];[main][ref]ssim\" -max_muxing_queue_size 2048 -f null -";
+            var arguments = $"{hardwareDecoder} -i \"{sourceFile}\" -i \"{destinationFile}\" -lavfi  \"[0:v]settb=AVTB,setpts=PTS-STARTPTS[main];[1:v]settb=AVTB,setpts=PTS-STARTPTS[ref];[main][ref]ssim\" -max_muxing_queue_size 2048 -f null -";
             logger.LogDebug($"SSIM arguments: {arguments}");
 
             decimal ssim = default;
@@ -168,8 +168,9 @@ namespace Compressarr.JobProcessing
                                 if (workItem.Job.SSIMCheck || applicationService.AlwaysCalculateSSIM)
                                 {
                                     workItem.Update("Calculating SSIM");
+                                    var hardwareDecoder = workItem.Job.Preset.HardwareDecoder.Wrap("-hwaccel {0} ");
 
-                                    var result = await CalculateSSIM((sender, args) => Converter_OnDataReceived(args, workItem), (sender, args) => Converter_OnProgress(args, workItem), workItem.SourceFile, workItem.DestinationFile, token);
+                                    var result = await CalculateSSIM((sender, args) => Converter_OnDataReceived(args, workItem), (sender, args) => Converter_OnProgress(args, workItem), workItem.SourceFile, workItem.DestinationFile, hardwareDecoder, token);
 
                                     succeded = result.Success;
                                     if(succeded)
