@@ -24,62 +24,32 @@ namespace Compressarr.FFmpeg
             this.logger = logger;
         }
 
-        public async Task<FFResult<EncoderResponse>> GetAvailableEncodersAsync()
+        public async Task<FFResult<string>> ConvertContainerToExtension(string container)
         {
-            using (logger.BeginScope("Get Available Encoders"))
-            {
+            await applicationService.InitialiseFFmpeg;
 
-                var result = await RunProcess(FFProcess.FFmpeg, "-encoders -v 1");
+            using (logger.BeginScope("Converting container to extension"))
+            {
+                logger.LogInformation($"Container name: {container}");
+
+                if (container == "copy")
+                {
+                    return new(false, (string)null);
+                }
+
+                var result = await RunProcess(FFProcess.FFmpeg, $"-v 1 -h muxer={container}");
 
                 if (result.Success)
                 {
-                    var regPattern = @"^\s([VAS])[F\.][S\.][X\.][B\.][D\.]\s(?!=)([^\s]*)\s*(.*)$";
-                    var reg = new Regex(regPattern, RegexOptions.IgnoreCase | RegexOptions.Multiline);
-                    logger.LogDebug($"Regex matching pattern: \"{regPattern}\"");
-
-                    var results = new HashSet<EncoderResponse>();
-                    foreach (Match m in reg.Matches(result.StdOut))
+                    var reg = new Regex(@"^ *Common extensions: (\w*)(?:,\w*)*\.", RegexOptions.IgnoreCase | RegexOptions.Multiline);
+                    var match = reg.Match(result.StdOut);
+                    if (match != null)
                     {
-                        results.Add(new()
-                        {
-                            Type = m.Groups[1].Value switch { "A" => CodecType.Audio, "S" => CodecType.Subtitle, "V" => CodecType.Video, _ => throw new NotImplementedException() },
-                            Name = m.Groups[2].Value,
-                            Description = m.Groups[3].Value
-                        });
+                        return new(true, match.Groups[1].Value);
                     }
-
-                    return new(true, results);
                 }
 
-                return new(result);
-            }
-        }
-
-        public async Task<FFResult<string>> GetAvailableHardwareDecodersAsync()
-        {
-            using (logger.BeginScope("Get available hardware decoders"))
-            {
-                var hwdecoders = new SortedSet<string>();
-
-                var result = await RunProcess(FFProcess.FFmpeg, "-hwaccels -v 1");
-
-                if (result.Success)
-                {
-                    var regPattern = @"^(?!Hardware).*";
-                    var reg = new Regex(regPattern, RegexOptions.IgnoreCase | RegexOptions.Multiline);
-                    logger.LogDebug($"Regex matching pattern: \"{regPattern}\"");
-
-                    foreach (Match m in reg.Matches(result.StdOut))
-                    {
-                        if (!string.IsNullOrWhiteSpace(m.Value))
-                        {
-                            hwdecoders.Add(m.Value.Trim());
-                        }
-                    }
-                    return new(true, hwdecoders);
-                }
-
-                return new(result);
+                return new(false, container);
             }
         }
 
@@ -151,6 +121,64 @@ namespace Compressarr.FFmpeg
             }
         }
 
+        public async Task<FFResult<EncoderResponse>> GetAvailableEncodersAsync()
+        {
+            using (logger.BeginScope("Get Available Encoders"))
+            {
+
+                var result = await RunProcess(FFProcess.FFmpeg, "-encoders -v 1");
+
+                if (result.Success)
+                {
+                    var regPattern = @"^\s([VAS])[F\.][S\.][X\.][B\.][D\.]\s(?!=)([^\s]*)\s*(.*)$";
+                    var reg = new Regex(regPattern, RegexOptions.IgnoreCase | RegexOptions.Multiline);
+                    logger.LogDebug($"Regex matching pattern: \"{regPattern}\"");
+
+                    var results = new HashSet<EncoderResponse>();
+                    foreach (Match m in reg.Matches(result.StdOut))
+                    {
+                        results.Add(new()
+                        {
+                            Type = m.Groups[1].Value switch { "A" => CodecType.Audio, "S" => CodecType.Subtitle, "V" => CodecType.Video, _ => throw new NotImplementedException() },
+                            Name = m.Groups[2].Value,
+                            Description = m.Groups[3].Value
+                        });
+                    }
+
+                    return new(true, results);
+                }
+
+                return new(result);
+            }
+        }
+
+        public async Task<FFResult<string>> GetAvailableHardwareDecodersAsync()
+        {
+            using (logger.BeginScope("Get available hardware decoders"))
+            {
+                var hwdecoders = new SortedSet<string>();
+
+                var result = await RunProcess(FFProcess.FFmpeg, "-hwaccels -v 1");
+
+                if (result.Success)
+                {
+                    var regPattern = @"^(?!Hardware).*";
+                    var reg = new Regex(regPattern, RegexOptions.IgnoreCase | RegexOptions.Multiline);
+                    logger.LogDebug($"Regex matching pattern: \"{regPattern}\"");
+
+                    foreach (Match m in reg.Matches(result.StdOut))
+                    {
+                        if (!string.IsNullOrWhiteSpace(m.Value))
+                        {
+                            hwdecoders.Add(m.Value.Trim());
+                        }
+                    }
+                    return new(true, hwdecoders);
+                }
+
+                return new(result);
+            }
+        }
         public async Task<FFResult<string>> GetFFmpegVersionAsync()
         {
             using (logger.BeginScope("Get FFmpeg Version."))
@@ -195,36 +223,6 @@ namespace Compressarr.FFmpeg
                 }
             }
         }
-
-        public async Task<FFResult<string>> ConvertContainerToExtension(string container)
-        {
-            await applicationService.InitialiseFFmpeg;
-
-            using (logger.BeginScope("Converting container to extension"))
-            {
-                logger.LogInformation($"Container name: {container}");
-
-                if (container == "copy")
-                {
-                    return new(false, (string)null);
-                }
-
-                var result = await RunProcess(FFProcess.FFmpeg, $"-v 1 -h muxer={container}");
-
-                if (result.Success)
-                {
-                    var reg = new Regex(@"^ *Common extensions: (\w*)(?:,\w*)*\.", RegexOptions.IgnoreCase | RegexOptions.Multiline);
-                    var match = reg.Match(result.StdOut);
-                    if (match != null)
-                    {
-                        return new(true, match.Groups[1].Value);
-                    }
-                }
-
-                return new(false, container);
-            }
-        }
-
         public async Task<FFResult<FFProbeResponse>> GetFFProbeInfo(string filePath)
         {
             using (logger.BeginScope("GetFFProbeInfo: {filePath}", filePath))
@@ -237,6 +235,30 @@ namespace Compressarr.FFmpeg
                     {
                         var ffProbeInfo = JsonConvert.DeserializeObject<FFProbeResponse>(result.StdOut);
                         return new(true, ffProbeInfo);
+                    }
+
+                    return new(result);
+                }
+                catch (ArgumentException aex)
+                {
+                    logger.LogError(aex, "An error occurred");
+                    return new(aex);
+                }
+            }
+        }
+
+        public async Task<FFResult<string>> GetFFProbeJSON(string filePath)
+        {
+            using (logger.BeginScope("GetFFProbeInfo: {filePath}", filePath))
+            {
+                try
+                {
+                    var result = await RunProcess(FFProcess.FFprobe, $"-v 1 -print_format json -show_format -show_streams -find_stream_info \"{filePath}\"");
+
+                    if (result.Success)
+                    {
+
+                        return new(true, result.StdOut);
                     }
 
                     return new(result);
@@ -267,40 +289,38 @@ namespace Compressarr.FFmpeg
             {
                 var response = new ProcessResponse();
 
-                using (var p = new Process())
+                using var p = new Process();
+                p.StartInfo = new ProcessStartInfo()
                 {
-                    p.StartInfo = new ProcessStartInfo()
-                    {
-                        Arguments = arguments,
-                        CreateNoWindow = true,
-                        FileName = filePath,
-                        RedirectStandardError = true,
-                        RedirectStandardOutput = true,
-                        UseShellExecute = false,
-                        WindowStyle = ProcessWindowStyle.Hidden,
-                    };
+                    Arguments = arguments,
+                    CreateNoWindow = true,
+                    FileName = filePath,
+                    RedirectStandardError = true,
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                };
 
-                    logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
-                    p.Start();
-                    response.StdOut = p.StandardOutput.ReadToEnd();
-                    response.StdErr = p.StandardError.ReadToEnd();
-                    await p.WaitForExitAsync();
+                logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
+                p.Start();
+                response.StdOut = p.StandardOutput.ReadToEnd();
+                response.StdErr = p.StandardError.ReadToEnd();
+                await p.WaitForExitAsync();
 
-                    p.WaitForExit(); //This waits for any hanbdles to finish as well. 
+                p.WaitForExit(); //This waits for any handles to finish as well. 
 
-                    response.ExitCode = p.ExitCode;
+                response.ExitCode = p.ExitCode;
 
-                    if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(response.StdErr))
-                    {
-                        logger.LogError($"Process Error: ({p.ExitCode}) {response.StdErr} <End Of Error>");
-                    }
-                    else
-                    {
-                        response.Success = true;
-                    }
-
-                    return response;
+                if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(response.StdErr))
+                {
+                    logger.LogError($"Process Error: ({p.ExitCode}) {response.StdErr} <End Of Error>");
                 }
+                else
+                {
+                    response.Success = true;
+                }
+
+                return response;
             }
         }
     }

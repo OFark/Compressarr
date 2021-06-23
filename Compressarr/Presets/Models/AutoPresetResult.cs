@@ -7,22 +7,32 @@ namespace Compressarr.Presets.Models
 {
     public class AutoPresetResult
     {
+        public string ArgumentValue { get; set; }
+        public bool Best { get; set; }
         public double EncodingProgress { get; set; }
 
-        public decimal Percent { get; set; }
+        public long OriginalSize { get; set; }
+        public decimal Percent => Math.Round((decimal)Size / OriginalSize * 100M, 2);
 
         public bool Processing { get; set; }
 
         public long Size { get; private set; }
 
         public decimal SSIM { get; set; }
-
         public double SSIMProgress { get; set; }
-
         public void AddSize(long size, long origSize)
         {
             Size = size;
-            Percent = Math.Round((decimal)size / origSize * 100M, 2);
+            OriginalSize = origSize;
+        }
+
+        public void Reset()
+        {
+            Best = default;
+            EncodingProgress = default;
+            Size = default;
+            SSIM = default;
+            SSIMProgress = default;
         }
     }
 }

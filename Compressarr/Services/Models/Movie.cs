@@ -11,6 +11,8 @@ using System.Threading.Tasks;
 using System.IO;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Shared.Models;
+using Compressarr.Services.Interfaces;
+using Nito.AsyncEx;
 
 namespace Compressarr.Services.Models
 {
@@ -177,7 +179,7 @@ namespace Compressarr.Services.Models
         public int width { get; set; }
     }
 
-    public class Movie
+    public class Movie : Media, IMedia
     {
         [Filter("Added", FilterPropertyType.DateTime)]
         public DateTime added { get; set; }
@@ -197,9 +199,6 @@ namespace Compressarr.Services.Models
 
         [Filter("Has File", FilterPropertyType.Boolean)]
         public bool hasFile { get; set; }
-
-        [Filter("ID", FilterPropertyType.Number)]
-        public int id { get; set; }
 
         public HashSet<Image> images { get; set; }
 
@@ -283,17 +282,12 @@ namespace Compressarr.Services.Models
         public string youTubeTrailerId { get; set; }
 
         [JsonIgnore]
-        public FFProbeResponse MediaInfo { get; set; }
-
-        [JsonIgnore]
-        public HashSet<TreeItemData> MediaHistory { get; set; }
-
-        [JsonIgnore]
         public bool ShowInfo { get; set; }
         [JsonIgnore]
         public bool ShowHistory { get; set; }
 
-        public string GetFullPath(string basePath) => $"{basePath}{Path.Combine(path, movieFile?.relativePath)}";
+        [JsonIgnore]
+        public string FilePath => $"{BasePath}{Path.Combine(path, movieFile?.relativePath)}";
 
         public int GetStableHash()
         {

@@ -1,5 +1,6 @@
 ﻿using Compressarr.FFmpeg.Models;
 using Compressarr.JobProcessing.Models;
+using Compressarr.Presets.Models;
 using Compressarr.Services.Models;
 using System;
 using System.Diagnostics;
@@ -15,6 +16,7 @@ namespace Compressarr.JobProcessing
     {
         Task<SSIMResult> CalculateSSIM(DataReceivedEventHandler dataRecieved, ConversionProgressEventHandler dataProgress, string sourceFile, string destinationFile, string hardwareDecoder, CancellationToken token);
         Task<EncodingResult> EncodeAVideo(DataReceivedEventHandler dataRecieved, ConversionProgressEventHandler dataProgress, string arguments, CancellationToken token);
+        Task GenerateSample(string sampleFile, WorkItem wi, FFmpegPreset preset, CancellationToken token);
         Task Process(WorkItem workItem, CancellationToken token);
     }
 }

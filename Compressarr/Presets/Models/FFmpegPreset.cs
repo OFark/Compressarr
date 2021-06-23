@@ -19,13 +19,14 @@ namespace Compressarr.Presets.Models
         public FFmpegPreset(FFmpegPresetBase presetBase)
         {
             AudioStreamPresets = presetBase?.AudioStreamPresets?.Select(x => new FFmpegAudioStreamPreset(x)).ToList();
+            B_Frames = presetBase.B_Frames;
             Container = presetBase?.Container;
             FrameRate = presetBase?.FrameRate;
             HardwareDecoder = presetBase?.HardwareDecoder;
             Name = presetBase?.Name;
             OptionalArguments = presetBase?.OptionalArguments;
             VideoBitRate = presetBase?.VideoBitRate;
-            VideoCodecOptions = presetBase?.VideoCodecOptions?.Select(x => new EncoderOptionValue(x)).ToHashSet();
+            VideoEncoderOptions = presetBase?.VideoEncoderOptions?.Select(x => new EncoderOptionValue(x)).ToHashSet();
             _videoEncoder = presetBase.VideoEncoder != null ? new Encoder(presetBase.VideoEncoder) : null;
         }
 
@@ -35,7 +36,7 @@ namespace Compressarr.Presets.Models
 
         public bool Initialised { get; set; }
 
-        public new HashSet<EncoderOptionValue> VideoCodecOptions { get; set; }
+        public new HashSet<EncoderOptionValue> VideoEncoderOptions { get; set; }
 
         public new Encoder VideoEncoder
         {
@@ -47,11 +48,11 @@ namespace Compressarr.Presets.Models
             {
                 if (_videoEncoder != null && _videoEncoder.Name != value.Name)
                 {
-                    VideoCodecOptions = value?.Options?.WithValues();
+                    VideoEncoderOptions = value?.Options?.WithValues();
                 }
                 else
                 {
-                    VideoCodecOptions = value?.Options?.WithValues(VideoCodecOptions);
+                    VideoEncoderOptions = value?.Options?.WithValues(VideoEncoderOptions);
                 }
 
                 _videoEncoder = value;

@@ -41,7 +41,7 @@ namespace Compressarr.Application
     {
         private readonly CancellationToken cancellationToken;
         private readonly ILogger<FileService> logger;
-        private Dictionary<string, SemaphoreSlim> locks = new();
+        private readonly Dictionary<string, SemaphoreSlim> locks = new();
 
         public FileService(ILogger<FileService> logger, IHostApplicationLifetime lifetime)
         {

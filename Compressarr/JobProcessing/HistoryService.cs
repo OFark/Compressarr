@@ -5,14 +5,13 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 
 namespace Compressarr.JobProcessing
 {
     public class HistoryService : IHistoryService
     {
         private readonly IFileService fileService;
-        private ILogger<HistoryService> logger;
+        private readonly ILogger<HistoryService> logger;
 
         private const string HISTORYTABLE = "History";
 
@@ -23,53 +22,55 @@ namespace Compressarr.JobProcessing
             this.logger = logger;
         }
 
-        public Guid StartProcessing(string filePath, string filter, string preset, IEnumerable<string> arguments)
+        public Guid StartProcessing(int mediaID, string filePath, string filter, string preset, IEnumerable<string> arguments)
         {
-            using (var db = new LiteDatabase(fileService.GetAppFilePath(AppFile.mediaInfo)))
+            using var db = new LiteDatabase(fileService.GetAppFilePath(AppFile.mediaInfo));
+
+            var histories = db.GetCollection<History>();
+            var history = histories.Query().Include(x => x.Entries).Where(x => x.MediaID == mediaID).FirstOrDefault();
+
+            if (history == default)
             {
-                var histories = db.GetCollection<History>(HISTORYTABLE);
-                var history = histories.Query().Include(x => x.Entries).Where(x => x.FilePath == filePath).FirstOrDefault();
-                
-                if(history == default)
+                history = new History()
                 {
-                    history = new History()
-                    {
-                        FilePath = filePath
-                    };
-                    histories.Insert(history);
-                }
-
-                history.Entries ??= new();
-
-                var historyProcessing = new HistoryProcessing()
-                {
-                    Type = "Processed",
-                    Arguments = arguments.ToList(),
-                    Filter = filter,
-                    Preset = preset,
-                    Started = DateTime.Now,
-                    HistoryID = Guid.NewGuid()
+                    MediaID = mediaID
                 };
-
-                history.Entries.Add(historyProcessing);
-
-                histories.EnsureIndex(x => x.FilePath);
-                histories.EnsureIndex(x => x.Entries);
-
-                histories.Update(history);
-
-                return historyProcessing.HistoryID;
+                histories.Insert(history);
             }
+
+            history.Entries ??= new();
+
+            var historyProcessing = new HistoryProcessing()
+            {
+                Arguments = arguments.ToList(),
+                FilePath = filePath,
+                Filter = filter,
+                HistoryID = Guid.NewGuid(),
+                Preset = preset,
+                Started = DateTime.Now,
+                Type = "Processed"
+            };
+
+            history.Entries.Add(historyProcessing);
+
+            histories.EnsureIndex(x => x.Id);
+            histories.EnsureIndex(x => x.Entries);
+
+            histories.Update(history);
+
+            return historyProcessing.HistoryID;
         }
 
-        public void EndProcessing(Guid historyID, bool succeeded, WorkItem workItem)
+        public void EndProcessing(Guid historyEntryID, bool succeeded, WorkItem workItem)
         {
-            using (var db = new LiteDatabase(fileService.GetAppFilePath(AppFile.mediaInfo)))
-            {
-                var histories = db.GetCollection<History>(HISTORYTABLE);
-                var history = histories.Query().Include(x => x.Entries).Where(x => x.FilePath == workItem.SourceFile).FirstOrDefault();
+            using var db = new LiteDatabase(fileService.GetAppFilePath(AppFile.mediaInfo));
 
-                var historyProcessing = (HistoryProcessing)history.Entries.FirstOrDefault(x => x.HistoryID == historyID);
+            var histories = db.GetCollection<History>(HISTORYTABLE);
+            var history = histories.Query().Include(x => x.Entries).Where(x => x.MediaID == workItem.Media.UniqueID).FirstOrDefault();
+
+            if (history != null)
+            {
+                var historyProcessing = history.Entries.FirstOrDefault(x => x.HistoryID == historyEntryID);
 
                 historyProcessing.Finished = DateTime.Now;
                 historyProcessing.Success = succeeded;
@@ -83,16 +84,14 @@ namespace Compressarr.JobProcessing
             }
         }
 
-        public SortedSet<IHistoryEntry> GetHistory(string filePath)
+        public SortedSet<HistoryProcessing> GetProcessHistory(int mediaID)
         {
-            using (var db = new LiteDatabase(fileService.GetAppFilePath(AppFile.mediaInfo)))
-            {
-                var histories = db.GetCollection<History>(HISTORYTABLE);
-                var history = histories.Query().Where(x => x.FilePath == filePath).FirstOrDefault();
+            using var db = new LiteDatabase(fileService.GetAppFilePath(AppFile.mediaInfo));
 
-                return  new SortedSet<IHistoryEntry>(history?.Entries ?? new());
+            var histories = db.GetCollection<History>(HISTORYTABLE);
+            var history = histories.Query().Where(x => x.MediaID == mediaID).FirstOrDefault();
 
-            }
+            return new SortedSet<HistoryProcessing>(history?.Entries ?? new());
 
         }
         

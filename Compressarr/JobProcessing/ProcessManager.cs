@@ -4,6 +4,7 @@ using Compressarr.JobProcessing.Models;
 using Compressarr.Presets.Models;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -19,6 +20,7 @@ namespace Compressarr.JobProcessing
     public class ProcessManager : IProcessManager
     {
         private readonly IApplicationService applicationService;
+        private readonly IFileService fileService;
         private readonly IHistoryService historyService;
         private readonly ILogger<ProcessManager> logger;
 
@@ -27,6 +29,7 @@ namespace Compressarr.JobProcessing
         public ProcessManager(IApplicationService applicationService, ILogger<ProcessManager> logger, IFileService fileService, IHistoryService historyService)
         {
             this.applicationService = applicationService;
+            this.fileService = fileService;
             this.historyService = historyService;
             this.logger = logger;
 
@@ -106,6 +109,56 @@ namespace Compressarr.JobProcessing
             }
         }
 
+        public async Task GenerateSample(string sampleFile, WorkItem wi, FFmpegPreset preset, CancellationToken token)
+        {
+
+            using (logger.BeginScope("Generating Sample"))
+            {
+                var sampleListFile = Path.Combine(fileService.TempDir, $"sampleList.txt");
+
+                if (File.Exists(sampleListFile)) File.Delete(sampleListFile);
+
+                var sampleTime = applicationService.ArgCalcSampleSeconds;
+                var videoLength = wi.Media?.MediaInfo?.format?.Duration.TotalSeconds ?? 3600;
+
+                var samplePitch = videoLength / 4;
+
+                var partialSampleFiles = new List<string>();
+
+                for (int i = 1; i < 4; i++)
+                {
+                    var partialSampleFileName = Path.Combine(fileService.TempDir, $"sample{i}.{preset.ContainerExtension}");
+                    partialSampleFiles.Add(partialSampleFileName);
+                    var temparg = $"-y -ss {samplePitch * i} -t {sampleTime} -i \"{wi.SourceFile}\" -map 0 -codec copy -avoid_negative_ts 1 \"{partialSampleFileName}\"";
+
+                    logger.LogInformation($"Generating Sample {i}  with: {temparg}");
+
+                    var sampleEncodeResult = await EncodeAVideo(null, null, temparg, token);
+                    if (!sampleEncodeResult.Success)
+                    {
+                        throw sampleEncodeResult.Exception ?? new("Not sure - something went wrong with encoding. Check the logs");
+                    }
+                    File.AppendAllLines(sampleListFile, new List<string>() { $"file '{partialSampleFileName}'" });
+                }
+
+                var concatArg = $"-y -f concat -safe 0 -i {sampleListFile} -map 0 -c copy {sampleFile}";
+
+                logger.LogInformation($"Concatenating samples  with: {concatArg}");
+
+                var encodeResult = await EncodeAVideo(null, null, concatArg, token);
+                if (!encodeResult.Success)
+                {
+                    throw encodeResult.Exception ?? new("Not sure - something went wrong with encoding. Check the logs");
+                }
+
+                if (File.Exists(sampleListFile)) File.Delete(sampleListFile);
+                foreach (var f in partialSampleFiles)
+                {
+                    if (File.Exists(f)) File.Delete(f);
+                }
+            }
+        }
+
         public async Task Process(WorkItem workItem, CancellationToken token)
         {
             try
@@ -123,19 +176,18 @@ namespace Compressarr.JobProcessing
 
                             var succeded = true;
 
-                            var historyID = historyService.StartProcessing(workItem.SourceFile, workItem.Job.FilterName, workItem.Job.PresetName, workItem.Arguments.Select(x => string.Format(x, workItem.SourceFile, workItem.DestinationFile)));
-
                             
+                            var historyID = historyService.StartProcessing(workItem.Media.UniqueID, workItem.SourceFile, workItem.Job.FilterName, workItem.Job.PresetName, workItem.Arguments);
+                                                        
                             logger.LogDebug("FFmpeg process work item starting.");
 
                             foreach (var arg in workItem.Arguments)
                             {
                                 if (succeded)
                                 {
-                                    var arguments = string.Format(arg, workItem.SourceFile, workItem.DestinationFile);
-                                    logger.LogDebug($"FFmpeg Process arguments: \"{arguments}\"");
+                                    logger.LogDebug($"FFmpeg Process arguments: \"{arg}\"");
 
-                                    var result = await EncodeAVideo((sender, args) => Converter_OnDataReceived(args, workItem), (sender, args) => Converter_OnProgress(args, workItem), arguments, token);
+                                    var result = await EncodeAVideo((sender, args) => Converter_OnDataReceived(args, workItem), (sender, args) => Converter_OnProgress(args, workItem), arg, token);
 
                                     if (!result.Success)
                                     {
@@ -160,9 +212,9 @@ namespace Compressarr.JobProcessing
                                 }
                                 catch (Exception ex) when (ex is FileNotFoundException || ex is IOException)
                                 {
-                                    workItem = null;
                                     workItem.Update(new Update(ex, LogLevel.Warning));
                                     logger.LogWarning(ex, "Error fetching file lengths");
+                                    return;
                                 }
 
                                 if (workItem.Job.SSIMCheck || applicationService.AlwaysCalculateSSIM)
@@ -249,7 +301,7 @@ namespace Compressarr.JobProcessing
         private void Converter_OnProgress(ConversionProgressEventArgs args, WorkItem wi)
         {
             //Here Duration is the current time frame;
-            wi.Duration = args.Duration;
+            wi.EncodingDuration = args.Duration;
             wi.Percent = args.Percent;
 
             // todo: If size looks to be over original option to abandon

@@ -50,6 +50,7 @@ namespace Compressarr
 
             services.AddScoped<ILayoutService, LayoutService>();
 
+            services.AddTransient<IArgumentService, ArgumentService>();
             services.AddTransient<IFFmpegProcessor, FFmpegProcessor>();
             services.AddTransient<IFilterManager, FilterManager>();
             services.AddTransient<IHistoryService, HistoryService>();

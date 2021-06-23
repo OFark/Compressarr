@@ -27,7 +27,6 @@ namespace Compressarr.Application
         SortedSet<string> HardwareDecoders { get; set; }
         Task InitialiseFFmpeg { get; set; }
         Task InitialisePresets { get; set; }
-        bool InsertNamesIntoFFmpegPreviews { get; set; }
         HashSet<Job> Jobs { get; set; }
         IEnumerable<Movie> Movies { get; set; }
         HashSet<FFmpegPreset> Presets { get; }
@@ -36,9 +35,8 @@ namespace Compressarr.Application
         APISettings SonarrSettings { get; set; }
         string State { get; set; }
         Queue<string> StateHistory { get; set; }
-        bool CacheMediaInfo { get; set; }
         CancellationToken AppStoppingCancellationToken { get; set; }
-        TimeSpan? ArgCalcSampleLength { get; set; }
+        int ArgCalcSampleSeconds { get; set; }
         decimal? AutoCalculationPost { get; set; }
         AutoCalcType AutoCalculationType { get; set; }
 

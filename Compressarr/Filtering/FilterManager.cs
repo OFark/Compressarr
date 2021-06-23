@@ -55,7 +55,7 @@ namespace Compressarr.Filtering
 
             RadarrFilterProperties = new List<FilterProperty>();
 
-            buildFilterProperties();
+            BuildFilterProperties();
 
             //This HAS to come after building the filter properties.
             RadarrTableColumns = GetRadarrTableColumns();
@@ -95,7 +95,7 @@ namespace Compressarr.Filtering
         public string ConstructFilterQuery(List<DynamicLinqFilter> dlFilters, out List<string> vals)
         {
             var filtervalues = new List<string>();
-            var filterStr = recursiveFilterQuery(dlFilters, ref filtervalues);
+            var filterStr = RecursiveFilterQuery(dlFilters, ref filtervalues);
 
             vals = filtervalues;
 
@@ -163,12 +163,11 @@ namespace Compressarr.Filtering
             });
         }
 
-        private void buildFilterProperties(Type type = null, string name = null, string prefix = null)
+        private void BuildFilterProperties(Type type = null, string name = null, string prefix = null)
         {
             foreach (var prop in (type ?? typeof(Services.Models.Movie)).GetProperties())
             {
-                var attr = prop.GetCustomAttributes(false).FirstOrDefault(a => a is FilterAttribute) as FilterAttribute;
-                if (attr != null)
+                if (prop.GetCustomAttributes(false).FirstOrDefault(a => a is FilterAttribute) is FilterAttribute attr)
                 {
                     var attrName = string.IsNullOrWhiteSpace(name) ? attr.Name : $"{name} - {attr.Name}";
                     var attrPrefix = string.IsNullOrWhiteSpace(prefix) ? prop.Name : $"{prefix}.{prop.Name}";
@@ -176,7 +175,7 @@ namespace Compressarr.Filtering
 
                     if (attr.Traverse)
                     {
-                        buildFilterProperties(prop.PropertyType, attrName, attrPrefix);
+                        BuildFilterProperties(prop.PropertyType, attrName, attrPrefix);
                     }
                     else
                     {
@@ -210,7 +209,7 @@ namespace Compressarr.Filtering
             return columns.Join(RadarrFilterProperties.Where(f => columns.Contains(f.Value)), c => c, f => f.Value, (c, f) => f).ToList();
         }
 
-        private string recursiveFilterQuery(List<DynamicLinqFilter> dlFilters, ref List<string> vals)
+        private string RecursiveFilterQuery(List<DynamicLinqFilter> dlFilters, ref List<string> vals)
         {
             var sb = new StringBuilder();
 
@@ -218,7 +217,7 @@ namespace Compressarr.Filtering
             {
                 if (dlFilter.IsGroup)
                 {
-                    sb.Append($" {dlFilter.LogicalOperator} ({recursiveFilterQuery(dlFilter.SubFilters, ref vals)})");
+                    sb.Append($" {dlFilter.LogicalOperator} ({RecursiveFilterQuery(dlFilter.SubFilters, ref vals)})");
                 }
                 else
                 {
@@ -243,7 +242,7 @@ namespace Compressarr.Filtering
                     {
                         vals.Add(dlFilter.Value);
                         var reg = new Regex(@"\(@\)");
-                        filterStr = reg.Replace(filterStr, $"(@{vals.Count() - 1})");
+                        filterStr = reg.Replace(filterStr, $"(@{vals.Count - 1})");
                     }
 
                     sb.Append(filterStr);

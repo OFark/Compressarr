@@ -138,17 +138,11 @@
                     <MudSwitch Color="Color.Secondary" @bind-Checked="@applicationService.AlwaysCalculateSSIM" Label="Always calculate SSIM after encoding" />
                 </MudListItem>
                 <MudListItem>
-                    <MudSwitch Color="Color.Secondary" @bind-Checked="@applicationService.CacheMediaInfo" Label="Cache Media Information for faster job initialisation (~10kb per media file)" />
-                </MudListItem>
-                <MudListItem>
-                    <MudSwitch Color="Color.Secondary" @bind-Checked="@applicationService.InsertNamesIntoFFmpegPreviews" Label="Insert file names into FFmpeg previews" />
-                </MudListItem>
-                <MudListItem>
                     <MudText Typo="Typo.h6">Auto Calculation</MudText>
                     <MudList Dense="true">
                         <MudListItem>
                             <MudItem md="4">
-                                <MudTimePicker PickerVariant="PickerVariant.Dialog" Color="Color.Secondary" @bind-Time="@applicationService.ArgCalcSampleLength" Label="Sample length for calculating best profile values" OpenTo="OpenTo.Minutes" />
+                                <MudNumericField @bind-Value="@applicationService.ArgCalcSampleSeconds" Label="Sample length (Seconds)" />
                             </MudItem>
                         </MudListItem>
                         <MudListItem>

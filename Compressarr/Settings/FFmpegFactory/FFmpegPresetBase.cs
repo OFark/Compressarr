@@ -13,13 +13,14 @@ namespace Compressarr.Settings.FFmpegFactory
         public FFmpegPresetBase(FFmpegPreset preset)
         {
             AudioStreamPresets = preset.AudioStreamPresets.Select(x => new FFmpegAudioStreamPresetBase(x)).ToList();
+            B_Frames = preset.B_Frames;
             Container = preset.Container;
             FrameRate = preset.FrameRate;
             HardwareDecoder = preset.HardwareDecoder;
             Name = preset.Name;
             OptionalArguments = preset.OptionalArguments;
             VideoBitRate = preset.VideoBitRate;
-            VideoCodecOptions = preset.VideoCodecOptions?.Select(x => new EncoderOptionValueBase(x)).ToHashSet();
+            VideoEncoderOptions = preset.VideoEncoderOptions?.Select(x => new EncoderOptionValueBase(x)).ToHashSet();
             VideoEncoder = new(preset.VideoEncoder);
         }
 
@@ -33,7 +34,9 @@ namespace Compressarr.Settings.FFmpegFactory
         public string Name { get; set; }
         public string OptionalArguments { get; set; }
         public int? VideoBitRate { get; set; }
-        public HashSet<EncoderOptionValueBase> VideoCodecOptions { get; set; }
+
+        public int B_Frames { get; set; }
+        public HashSet<EncoderOptionValueBase> VideoEncoderOptions { get; set; }
 
         public EncoderBase VideoEncoder { get; set; }
     }

@@ -25,6 +25,7 @@ namespace Compressarr.Presets
         private readonly IApplicationService applicationService;
         private readonly IFFmpegProcessor fFmpegProcessor;
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0052:Remove unread private members", Justification = "This may come in handy")]
         private readonly Task InitialisationTask;
 
         public ApplicationInitialiser(IApplicationService applicationService, IFileService fileService, IJobManager jobManager, ILogger<ApplicationInitialiser> logger, IFFmpegProcessor fFmpegProcessor)
@@ -92,7 +93,7 @@ namespace Compressarr.Presets
                     Progress("Checking for FFmpeg update");
                 }
 
-                await FFmpegDownloader.GetLatestVersion(FFmpegVersion.Official, fileService.GetAppDirPath(AppDir.FFmpeg), new Progress<ProgressInfo>(reportFFmpegProgress));
+                await FFmpegDownloader.GetLatestVersion(FFmpegVersion.Official, fileService.GetAppDirPath(AppDir.FFmpeg), new Progress<ProgressInfo>(ReportFFmpegProgress));
                 logger.LogDebug("FFmpeg latest version check finished.");
 
                 if (!fileService.HasFile(fileService.FFMPEGPath))
@@ -144,13 +145,13 @@ namespace Compressarr.Presets
 
         private void Job_StatusUpdate(object sender, EventArgs e)
         {
-            applicationService.Progress = (double)100 * jobManager.Jobs.Sum(j => j.WorkLoad?.Count(x => x.Arguments != null) ?? 0) / jobManager.Jobs.Sum(j => j.WorkLoad?.Count() ?? 1);
+            applicationService.Progress = (double)100 * jobManager.Jobs.Sum(j => j.WorkLoad?.Count(x => x.Arguments != null) ?? 0) / jobManager.Jobs.Sum(j => j.WorkLoad?.Count ?? 1);
             applicationService.Broadcast("");
         }
 
         private void Progress(string message)
         {
-            applicationService.StateHistory.Append(message);
+            applicationService.StateHistory.Enqueue(message);
             applicationService.State = message;
             logger.LogInformation(message);
             applicationService.Broadcast(message);
@@ -234,11 +235,12 @@ namespace Compressarr.Presets
         {
             logger.LogDebug($"Get available codecs.");
 
-            var codecs = new Dictionary<CodecType, SortedSet<Codec>>();
-
-            codecs.Add(CodecType.Audio, new());
-            codecs.Add(CodecType.Subtitle, new());
-            codecs.Add(CodecType.Video, new());
+            var codecs = new Dictionary<CodecType, SortedSet<Codec>>
+            {
+                { CodecType.Audio, new() },
+                { CodecType.Subtitle, new() },
+                { CodecType.Video, new() }
+            };
 
             var result = await fFmpegProcessor.GetAvailableCodecsAsync();
 
@@ -256,8 +258,6 @@ namespace Compressarr.Presets
         private async Task<SortedSet<ContainerResponse>> GetAvailableContainersAsync()
         {
             logger.LogDebug($"Get Available Containers.");
-
-            var formats = new SortedDictionary<string, string>();
 
             var result = await fFmpegProcessor.GetAvailableContainersAsync();
 
@@ -300,7 +300,7 @@ namespace Compressarr.Presets
             }
         }
 
-        private void reportFFmpegProgress(ProgressInfo info)
+        private void ReportFFmpegProgress(ProgressInfo info)
         {
             applicationService.Progress = 100 * info.DownloadedBytes / info.TotalBytes;
             applicationService.Broadcast("");

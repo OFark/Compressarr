@@ -27,7 +27,6 @@ namespace Compressarr.Presets
 
         Task AddPresetAsync(FFmpegPreset newPreset);
         Task DeletePresetAsync(FFmpegPreset preset);
-        Task<GetArgumentsResult> GetArguments(FFmpegPreset preset, WorkItem wi, CancellationToken token);
         FFmpegPreset GetPreset(string presetName);
     }
 }

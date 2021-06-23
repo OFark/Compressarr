@@ -48,10 +48,9 @@
     {
         movie.ShowInfo = !movie.ShowInfo;
 
-        if (movie.MediaInfo == null)
-        {
-            movie.MediaInfo = await mediaInfoService.GetMediaInfo(MediaSource.Radarr, movie.GetFullPath(applicationService.RadarrSettings.BasePath));
-        }
+        await OnUpdate.InvokeAsync();
+
+        movie.MediaInfo ??= await mediaInfoService.GetMediaInfo(movie);
 
         await OnUpdate.InvokeAsync();
     }
@@ -62,7 +61,7 @@
 
         if (movie.ShowHistory)
         {
-            movie.MediaHistory = historyService.GetHistory(movie.GetFullPath(applicationService.RadarrSettings.BasePath)).Select(x => x.ToTreeView()).ToHashSet();
+            movie.MediaHistory = historyService.GetProcessHistory(movie.UniqueID).Select(x => x.ToTreeView()).ToHashSet();
         }
 
         await OnUpdate.InvokeAsync();

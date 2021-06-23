@@ -1,4 +1,5 @@
 ﻿using Compressarr.Application;
+using Compressarr.FFmpeg;
 using Compressarr.JobProcessing;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Presets;
@@ -25,6 +26,7 @@ namespace Compressarr.Services
 
         private static SemaphoreSlim mediaInfoSemaphore = new(1, 1);
         private readonly IApplicationService applicationService;
+        private readonly IMediaInfoService mediaInfoService;
         private readonly IPresetManager presetManager;
         private readonly IProcessManager processManager;
         private readonly IFileService fileService;
@@ -32,11 +34,12 @@ namespace Compressarr.Services
         private StatusResult _status = null;
 
         private int previousResultsHash;
-        public RadarrService(IApplicationService applicationService, IFileService fileService, ILogger<RadarrService> logger, IPresetManager presetManager, IProcessManager processManager)
+        public RadarrService(IApplicationService applicationService, IFileService fileService, ILogger<RadarrService> logger, IMediaInfoService mediaInfoService, IPresetManager presetManager, IProcessManager processManager)
         {
             this.applicationService = applicationService;
             this.fileService = fileService;
             this.logger = logger;
+            this.mediaInfoService = mediaInfoService;
             this.presetManager = presetManager;
             this.processManager = processManager;
         }
@@ -364,7 +367,20 @@ namespace Compressarr.Services
                 return ss;
             }
         }
-                
+
+        public async Task<ServiceResult<IEnumerable<Movie>>> RequestMoviesFiltered(string filter, IEnumerable<string> filterValues)
+        {
+            var requestMoviesResponse = await RequestMovies();
+
+            if (requestMoviesResponse.Success)
+            {
+                return new(true, requestMoviesResponse.Results.AsQueryable().Where(filter, filterValues.ToArray()));
+            }
+
+            return requestMoviesResponse;
+        }
+
+
         private async Task<ServiceResult<IEnumerable<Movie>>> RequestMovies()
         {
             using (logger.BeginScope("Requesting Movies"))
@@ -425,9 +441,16 @@ namespace Compressarr.Services
 
                         var moviesArr = JsonConvert.DeserializeObject<Movie[]>(movieJSON);
 
+                        var movies = moviesArr.Where(m => m.downloaded && m.movieFile != null && m.movieFile.mediaInfo != null).OrderBy(m => m.title).ToHashSet();
+
+                        foreach (var m in movies)
+                        {
+                            m.BasePath = applicationService.RadarrSettings.BasePath;
+                        }
+
                         logger.LogDebug($"Success.");
 
-                        return new(true, moviesArr.Where(m => m.downloaded && m.movieFile != null && m.movieFile.mediaInfo != null).OrderBy(m => m.title).ToHashSet(), new(0, 1, 0));
+                        return new(true, movies);
                     }
                 }
                 catch (Exception ex)

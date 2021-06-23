@@ -34,11 +34,9 @@ namespace Compressarr.Application
             this.fileService = fileService;
 
             AlwaysCalculateSSIM = appSettings?.Value?.AlwaysCalculateSSIM ?? false;
-            ArgCalcSampleLength = appSettings?.Value?.ArgCalcSampleLength ?? new TimeSpan(0, 2, 0);
+            ArgCalcSampleSeconds = appSettings?.Value?.ArgCalcSampleSeconds ?? 10;
             AutoCalculationPost = appSettings?.Value?.AutoCalculationPost;
             AutoCalculationType = appSettings?.Value?.AutoCalculationType ?? AutoCalcType.BestGuess;
-            CacheMediaInfo = appSettings?.Value?.CacheMediaInfo ?? false;
-            InsertNamesIntoFFmpegPreviews = appSettings?.Value?.InsertNamesIntoFFmpegPreviews ?? false;
 
             Filters = filters?.Value ?? new();
             Jobs = jobs?.Value ?? new();
@@ -59,12 +57,11 @@ namespace Compressarr.Application
 
         //App Settings
         public bool AlwaysCalculateSSIM { get; set; }
-        public TimeSpan? ArgCalcSampleLength { get; set; }
+        public int ArgCalcSampleSeconds { get; set; }
         public decimal? AutoCalculationPost { get; set; }
         public AutoCalcType AutoCalculationType { get; set; }
 
-
-        public bool CacheMediaInfo { get; set; }
+        
         public CancellationToken AppStoppingCancellationToken { get; set; }
         public Dictionary<CodecType, SortedSet<Codec>> Codecs { get; set; }
         public SortedSet<ContainerResponse> Containers { get; set; }
@@ -73,7 +70,6 @@ namespace Compressarr.Application
         public HashSet<Filter> Filters { get; set; }
         public SortedSet<string> HardwareDecoders { get; set; }
 
-        public bool InsertNamesIntoFFmpegPreviews { get; set; }
         public HashSet<Job> Jobs { get; set; }
         public IEnumerable<Movie> Movies { get; set; }
         public HashSet<FFmpegPreset> Presets { get; set; }
@@ -106,11 +102,9 @@ namespace Compressarr.Application
                 jsonObj["Settings"] = JToken.FromObject(new AppSettings()
                 {
                     AlwaysCalculateSSIM = AlwaysCalculateSSIM,
-                    ArgCalcSampleLength = ArgCalcSampleLength ?? new TimeSpan(0, 2, 0),
+                    ArgCalcSampleSeconds = ArgCalcSampleSeconds,
                     AutoCalculationPost = AutoCalculationPost,
-                    AutoCalculationType = AutoCalculationType,
-                    CacheMediaInfo = CacheMediaInfo,
-                    InsertNamesIntoFFmpegPreviews = InsertNamesIntoFFmpegPreviews
+                    AutoCalculationType = AutoCalculationType
                 });
 
                 await WriteAppSettings(jsonObj);

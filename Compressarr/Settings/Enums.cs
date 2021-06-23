@@ -18,6 +18,7 @@ namespace Compressarr.Settings
     public enum AutoCalcType
     {
         BestGuess,
-        FirstPastThePost
+        FirstPastThePost,
+        BangForBuck
     }
 }

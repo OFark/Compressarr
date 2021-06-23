@@ -158,13 +158,15 @@
             }
         </HeaderContent>
         <RowTemplate>
-            <MovieView movie="@context" filterManager="filterManager" OnFilterBy="filterBy" OnUpdate="@(() => InvokeAsync(StateHasChanged))" />
+            <MovieView movie="@context" filterManager="filterManager" OnFilterBy="filterBy" OnUpdate="@(async () => await InvokeAsync(StateHasChanged))" />
         </RowTemplate>
         <ChildRowContent>
-            @if (context.ShowInfo && context.MediaInfo != null)
+            @if (context.ShowInfo)
             {
                 <MudTr>
                     <td colspan="99">
+                        @if (context.MediaInfo != null)
+                        {
                         <MudCard>
                             <MudBlazor.MudCardContent>
                                 <MudTreeView T="string" ExpandOnClick="true">
@@ -251,6 +253,10 @@
                                 </MudTreeView>
                             </MudBlazor.MudCardContent>
                         </MudCard>
+                        }
+                        else{
+                            <MudText Class="pa-2">Probing file&hellip;</MudText>
+                        }
                     </td>
                 </MudTr>
             }
@@ -258,7 +264,7 @@
             {
                 <MudTr>
                     <td colspan="99">
-                        @if (context.MediaHistory != null && context.MediaHistory.Any())
+                        @if (context.MediaHistory != null)
                         {
                         <MudTreeView ExpandOnClick="true" Items="@context.MediaHistory" Context="history">
                             <ItemTemplate>

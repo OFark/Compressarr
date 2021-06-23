@@ -135,7 +135,7 @@ namespace Compressarr.Helpers
             {
                 null => null,
                 "" => string.Empty,
-                _ => text.First().ToString().ToUpper() + text.Substring(1)
+                _ => text.First().ToString().ToUpper() + text[1..]
             };
         }
 

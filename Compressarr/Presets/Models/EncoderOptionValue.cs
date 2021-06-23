@@ -34,6 +34,12 @@ namespace Compressarr.Presets.Models
             }
         }
         public EncoderOption EncoderOption { get; set; }
+
+        public HashSet<AutoPresetResult> AutoPresetTests { get; set; }
+
+        public List<string> ArgumentHistory { get; set; }
+
+        public bool HasSettled { get; set; }
     }
 
 }

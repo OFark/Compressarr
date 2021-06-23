@@ -10,6 +10,7 @@ using Compressarr.Services;
 using Compressarr.Services.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -22,9 +23,11 @@ namespace Compressarr.JobProcessing
     public class JobManager : IJobManager
     {
         private readonly IApplicationService applicationService;
+        private readonly IArgumentService argumentService;
         private readonly IFFmpegProcessor fFmpegProcessor;
         private readonly IFileService fileService;
         private readonly IFilterManager filterManager;
+        private readonly IHistoryService historyService;
         private readonly IOptionsMonitor<HashSet<Job>> jobsMonitor;
         private readonly ILogger<JobManager> logger;
         private readonly IMediaInfoService mediaInfoService;
@@ -34,12 +37,14 @@ namespace Compressarr.JobProcessing
         private readonly ISonarrService sonarrService;
 
 
-        public JobManager(IApplicationService applicationService, IFFmpegProcessor fFmpegProcessor, IFileService fileService, IFilterManager filterManager, ILogger<JobManager> logger, IMediaInfoService mediaInfoService, IOptionsMonitor<HashSet<Job>> jobsMonitor, IPresetManager presetManager, IProcessManager processManager, IRadarrService radarrService, ISonarrService sonarrService)
+        public JobManager(IApplicationService applicationService, IArgumentService argumentService, IFFmpegProcessor fFmpegProcessor, IFileService fileService, IFilterManager filterManager, IHistoryService historyService, ILogger<JobManager> logger, IMediaInfoService mediaInfoService, IOptionsMonitor<HashSet<Job>> jobsMonitor, IPresetManager presetManager, IProcessManager processManager, IRadarrService radarrService, ISonarrService sonarrService)
         {
             this.applicationService = applicationService;
+            this.argumentService = argumentService;
             this.fFmpegProcessor = fFmpegProcessor;
             this.fileService = fileService;
             this.filterManager = filterManager;
+            this.historyService = historyService;
             this.jobsMonitor = jobsMonitor;
             this.logger = logger;
             this.mediaInfoService = mediaInfoService;
@@ -104,6 +109,7 @@ namespace Compressarr.JobProcessing
                 if (ffProbeResponse.Success)
                 {
                     var mediaInfo = ffProbeResponse.Result;
+
                     //Workitem.Duration refers to the processing time frame.
                     logger.LogDebug($"Original Duration: {workItem.TotalLength}");
                     logger.LogDebug($"New Duration: {mediaInfo?.format?.Duration}");
@@ -186,8 +192,6 @@ namespace Compressarr.JobProcessing
                                 {
                                     try
                                     {
-
-
                                         Log(job, LogLevel.Debug, "Begin Testing");
 
                                         if (job.Filter.MediaSource == MediaSource.Radarr)
@@ -205,7 +209,7 @@ namespace Compressarr.JobProcessing
 
                                             Log(job, LogLevel.Debug, "Connected to Radarr", "Fetching List of files from Radarr");
 
-                                            var getFilesResults = await GetFiles(job);
+                                            var getFilesResults = await GetMedia(job.Filter);
 
                                             if (!getFilesResults.Success)
                                             {
@@ -214,94 +218,99 @@ namespace Compressarr.JobProcessing
                                                 return;
                                             }
 
-                                            Log(job, LogLevel.Debug, "Files Returned", "Building Workload");
+                                            job.WorkLoad = getFilesResults.Results.ToHashSet();
+                                        }
 
-                                            using (var jobWorkLoad = new JobWorker(job.Condition.BuildWorkLoad, job.UpdateStatus))
+                                        Log(job, LogLevel.Debug, "Files Returned", "Building Workload");
+
+                                        using (var jobWorkLoad = new JobWorker(job.Condition.BuildWorkLoad, job.UpdateStatus))
+                                        {
+
+                                            double i = 0;
+
+                                            foreach (var wi in job.WorkLoad)
                                             {
-
-                                                double i = 0;
-                                                job.WorkLoad = getFilesResults.Results.ToHashSet();
-                                                foreach (var wi in job.WorkLoad)
+                                                using (logger.BeginScope("Work Item {SourceFileName}", wi.SourceFileName))
                                                 {
-                                                    using (logger.BeginScope("Work Item {SourceFileName}", wi.SourceFileName))
-                                                    {
-                                                        wi.Job = job;
-                                                        wi.OnUpdate += job.UpdateStatus;
+                                                    wi.Job = job;
+                                                    wi.OnUpdate += job.UpdateStatus;
 
-                                                        var file = new FileInfo(wi.SourceFile);
-                                                        if (!file.Exists)
+                                                    var file = new FileInfo(wi.SourceFile);
+                                                    if (!file.Exists)
+                                                    {
+                                                        Log(job, LogLevel.Warning, $"This file was not found: {file.FullName}");
+                                                        Fail(job);
+                                                        return;
+                                                    }
+
+                                                    var destinationpath = job.DestinationFolder;
+
+                                                    if (string.IsNullOrWhiteSpace(destinationpath))
+                                                    {
+                                                        destinationpath = file.Directory.FullName;
+                                                    }
+                                                    else
+                                                    {
+                                                        destinationpath = Path.Combine(destinationpath, file.Directory.Name);
+                                                    }
+
+                                                    if (!Directory.Exists(destinationpath))
+                                                    {
+                                                        try
                                                         {
-                                                            Log(job, LogLevel.Warning, $"This file was not found: {file.FullName}");
+                                                            Directory.CreateDirectory(destinationpath);
+                                                        }
+                                                        catch (Exception ex)
+                                                        {
+                                                            Log(job, LogLevel.Error, ex.Message);
                                                             Fail(job);
                                                             return;
                                                         }
-
-                                                        var destinationpath = job.DestinationFolder;
-
-                                                        if (string.IsNullOrWhiteSpace(destinationpath))
-                                                        {
-                                                            destinationpath = file.Directory.FullName;
-                                                        }
-                                                        else
-                                                        {
-                                                            destinationpath = Path.Combine(destinationpath, file.Directory.Name);
-                                                        }
-
-                                                        if (!Directory.Exists(destinationpath))
-                                                        {
-                                                            try
-                                                            {
-                                                                Directory.CreateDirectory(destinationpath);
-                                                            }
-                                                            catch (Exception ex)
-                                                            {
-                                                                Log(job, LogLevel.Error, ex.Message);
-                                                                Fail(job);
-                                                                return;
-                                                            }
-                                                        }
-
-                                                        wi.DestinationFile = Path.Combine(destinationpath, file.Name);
-                                                        if (!string.IsNullOrWhiteSpace(job.Preset.ContainerExtension))
-                                                        {
-                                                            wi.DestinationFile = Path.ChangeExtension(wi.DestinationFile, job.Preset.ContainerExtension);
-                                                        }
-
-                                                        job.InitialisationProgress?.Report(++i / job.WorkLoad.Count() * 100);
-                                                        job.UpdateStatus(this);
                                                     }
+
+                                                    wi.DestinationFile = Path.Combine(destinationpath, file.Name);
+                                                    if (!string.IsNullOrWhiteSpace(job.Preset.ContainerExtension))
+                                                    {
+                                                        wi.DestinationFile = Path.ChangeExtension(wi.DestinationFile, job.Preset.ContainerExtension);
+                                                    }
+
+                                                    
+
+                                                    job.InitialisationProgress?.Report(++i / job.WorkLoad.Count() * 100);
+                                                    job.UpdateStatus(this);
                                                 }
-                                                jobWorkLoad.Succeed();
-                                                Log(job, LogLevel.Debug, "Workload compiled", "Checking Destination Folder", "Writing Test.txt file");
                                             }
 
-                                            var testFilePath = Path.Combine(job.DestinationFolder, "Test.txt");
+                                            jobWorkLoad.Succeed();
+                                            Log(job, LogLevel.Debug, "Workload compiled", "Checking Destination Folder", "Writing Test.txt file");
+                                        }
 
-                                            try
-                                            {
-                                                await fileService.WriteTextFileAsync(testFilePath, "This is a write test");
+                                        var testFilePath = Path.Combine(job.DestinationFolder, "Test.txt");
 
-                                                fileService.DeleteFile(testFilePath);
-                                            }
-                                            catch (Exception ex)
-                                            {
-                                                Log(job, LogLevel.Error, ex.Message);
-                                                Fail(job);
-                                                return;
-                                            }
+                                        try
+                                        {
+                                            await fileService.WriteTextFileAsync(testFilePath, "This is a write test");
 
-                                            // Success - Job should be good.
-                                            jobTest.Succeed();
-                                            job.Log(new("Test succeeded", LogLevel.Information));
-
-                                            job.ID ??= Guid.NewGuid();
-                                            jobInit.Succeed();
-                                            job.Log(new("Initialisation succeeded", LogLevel.Information));
-
+                                            fileService.DeleteFile(testFilePath);
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            Log(job, LogLevel.Error, ex.Message);
+                                            Fail(job);
                                             return;
                                         }
+
+                                        // Success - Job should be good.
+                                        jobTest.Succeed();
+                                        job.Log(new("Test succeeded", LogLevel.Information));
+
+                                        job.ID ??= Guid.NewGuid();
+                                        jobInit.Succeed();
+                                        job.Log(new("Initialisation succeeded", LogLevel.Information));
+
+                                        return;
                                     }
-                                    catch(OperationCanceledException)
+                                    catch (OperationCanceledException)
                                     {
                                         job.Log(new("Initialisation cancelled", LogLevel.Warning));
                                     }
@@ -388,7 +397,7 @@ namespace Compressarr.JobProcessing
                                 Log(job, LogLevel.Information, $"Started Job at: {DateTime.Now}");
 
 
-                                foreach (var wi in job.WorkLoad)
+                                foreach (var wi in job.WorkLoad.Where(wi => wi.Finished == false))
                                 {
                                     using (var workItemWorker = new JobWorker(wi.Processing, wi.Update))
                                     {
@@ -404,12 +413,27 @@ namespace Compressarr.JobProcessing
 
                                                 using (var jobPreparer = new JobWorker(job.Condition.Prepare, job.UpdateStatus))
                                                 {
+                                                    wi.Media.MediaInfo ??= await mediaInfoService.GetMediaInfo(wi.Media);
+
                                                     if (wi.Arguments == null)
                                                     {
-                                                        var results = await presetManager.GetArguments(job.Preset, wi, lnkCTS.Token);
-                                                        if (results.Success)
+                                                        await argumentService.SetArguments(job.Preset, wi, lnkCTS.Token);
+                                                        if (lnkCTS.Token.IsCancellationRequested) return;
+                                                    }
+
+                                                    var history = historyService.GetProcessHistory(wi.Media.UniqueID);
+
+                                                    if (history != null && history.Any())
+                                                    {
+                                                        var lastEntry = history.Last();
+                                                        if ((lastEntry?.Success ?? false) && (lastEntry?.Arguments?.SequenceEqual(wi.Arguments) ?? wi.Arguments == null) && File.Exists(wi.DestinationFile))
                                                         {
-                                                            wi.Arguments = results.Arguments;
+                                                            wi.SSIM = lastEntry.SSIM;
+                                                            wi.Compression = lastEntry.Compression;
+
+                                                            wi.Success = true;
+                                                            wi.Finished = true;
+                                                            wi.Update("Item skipped, it was already successfully processed");
                                                         }
                                                     }
 
@@ -421,7 +445,10 @@ namespace Compressarr.JobProcessing
 
                                                 if (job.Cancelled) break;
 
-                                                await processManager.Process(wi, lnkCTS.Token);
+                                                if (!wi.Finished) //skipped if done previously
+                                                {
+                                                    await processManager.Process(wi, lnkCTS.Token);
+                                                }
 
                                                 if (!job.Cancelled)
                                                 {
@@ -466,8 +493,10 @@ namespace Compressarr.JobProcessing
                                                         }
                                                     }
 
-                                                    workItemWorker.Succeed(wi.Success);
                                                 }
+
+                                                workItemWorker.Succeed(wi.Success);
+
                                             }
                                         }
                                     }
@@ -498,17 +527,17 @@ namespace Compressarr.JobProcessing
             job.Log(new("Test failed", LogLevel.Warning));
         }
 
-        private async Task<ServiceResult<HashSet<WorkItem>>> GetFiles(Job job)
+        private async Task<ServiceResult<HashSet<WorkItem>>> GetMedia(Filter jobFilter)
         {
             using (logger.BeginScope("Get Files"))
             {
-                if (job.Filter.MediaSource == MediaSource.Radarr)
+                if (jobFilter.MediaSource == MediaSource.Radarr)
                 {
                     logger.LogInformation("From Radarr");
 
-                    var filter = filterManager.ConstructFilterQuery(job.Filter.Filters, out var filterVals);
+                    var filter = filterManager.ConstructFilterQuery(jobFilter.Filters, out var filterVals);
 
-                    var getMoviesResponse = await radarrService.GetMoviesFilteredAsync(filter, filterVals);
+                    var getMoviesResponse = await radarrService.RequestMoviesFiltered(filter, filterVals);
 
                     if (!getMoviesResponse.Success)
                     {
@@ -519,10 +548,11 @@ namespace Compressarr.JobProcessing
                     return new(true, movies.Select(x => new WorkItem(x, applicationService.RadarrSettings.BasePath)).ToHashSet());
                 }
 
-                logger.LogWarning($"Source ({job.Filter.MediaSource}) is not supported");
+                logger.LogWarning($"Source ({jobFilter.MediaSource}) is not supported");
                 return new(false, "404", "Not Implemented");
             }
         }
+
         private void Log(Job job, LogLevel level, params string[] messages)
         {
             foreach (var m in messages.Where(x => !string.IsNullOrWhiteSpace(x)))

@@ -61,9 +61,29 @@
                         </MudSelect>
                         <MudTextField @bind-Value="preset.VideoBitRate" Label="Video Bitrate" Disabled="@disabledNoVideo" Class="mb-2" />
                         <MudNumericField @bind-Value="preset.FrameRate" Label="Framerate" Placeholder="Same as source" Disabled="@disabledNoVideo" Class="mb-2" />
+                        <MudSelect @bind-Value="preset.B_Frames" Label="B Frames" Disabled="@disabledNoVideo" Class="mb-2">
+                            <MudSelectItem Value="-1">Auto</MudSelectItem>
+                            <MudSelectItem Value="0">Disabled</MudSelectItem>
+                            <MudSelectItem Value="1"></MudSelectItem>
+                            <MudSelectItem Value="2" />
+                            <MudSelectItem Value="3" />
+                            <MudSelectItem Value="4" />
+                            <MudSelectItem Value="5" />
+                            <MudSelectItem Value="6" />
+                            <MudSelectItem Value="7" />
+                            <MudSelectItem Value="8" />
+                            <MudSelectItem Value="9" />
+                            <MudSelectItem Value="10" />
+                            <MudSelectItem Value="11" />
+                            <MudSelectItem Value="12" />
+                            <MudSelectItem Value="13" />
+                            <MudSelectItem Value="14" />
+                            <MudSelectItem Value="15" />
+                            <MudSelectItem Value="16" />
+                        </MudSelect>
                     </MudCardContent>
                 </MudCard>
-                @if (preset.VideoEncoder != null && !preset.VideoEncoder.IsCopy && preset.VideoCodecOptions != null)
+                @if (preset.VideoEncoder != null && !preset.VideoEncoder.IsCopy && preset.VideoEncoderOptions != null)
                 {
                     <MudCard Class="my-2">
                         <MudCardHeader>
@@ -72,7 +92,7 @@
                             </CardHeaderContent>
                         </MudCardHeader>
                         <MudCardContent>
-                            @foreach (var option in preset.VideoCodecOptions)
+                            @foreach (var option in preset.VideoEncoderOptions)
                             {
                                 @if (option?.EncoderOption == null)
 

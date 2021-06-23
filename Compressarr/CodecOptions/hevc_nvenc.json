@@ -77,7 +77,14 @@
       "main10",
       "rext"
     ],
-    "Arg": "-profile:v <val>"
+    "Arg": "-profile:v <val>",
+    "AutoTune": {
+      "Values": [
+        "main",
+        "main10",
+        "rext"
+      ]
+    }
   },
   {
     "Name": "Rate Control",
@@ -90,6 +97,16 @@
       "cbr_hq",
       "vbr_hq"
     ],
-    "Arg": "-rc <val>"
+    "Arg": "-rc <val>",
+    "AutoTune": {
+      "Values": [
+        "constqp",
+        "vbr",
+        "cbr",
+        "cbr_ld_hq",
+        "cbr_hq",
+        "vbr_hq"
+      ]
+    }
   }
 ]

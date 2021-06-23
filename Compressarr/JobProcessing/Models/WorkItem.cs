@@ -1,5 +1,6 @@
 ﻿using Compressarr.Filtering;
 using Compressarr.Presets.Models;
+using Compressarr.Services.Interfaces;
 using Compressarr.Services.Models;
 using Microsoft.Extensions.Logging;
 using System;
@@ -17,32 +18,34 @@ namespace Compressarr.JobProcessing.Models
         public WorkItem(Movie movie, string basePath)
         {
             SourceID = movie.id;
-            Source = MediaSource.Radarr;
             MediaHash = movie.GetStableHash();
             SourceFile = $"{basePath}{Path.Combine(movie.path, movie.movieFile.relativePath)}";
-            Movie = movie;
+            Media = movie;
+            Media.Source = MediaSource.Radarr;
             Processing = new();
         }
 
         public event EventHandler<Update> OnUpdate;
 
-        public List<AutoPresetTest> ArgCalcResults { get; set; }
         public IEnumerable<string> Arguments { get; set; }
+        public ArgumentCalculator ArgumentCalculator { get; set; }
         public string Bitrate { get; internal set; }
-        public bool CalcBest { get; set; }
         public decimal? Compression { get; internal set; }
         public ImmutableSortedSet<JobEvent> Console { get; set; }
         public string DestinationFile { get; set; }
         public string DestinationFileName => Path.GetFileName(DestinationFile);
-        public TimeSpan? Duration { get; internal set; }
+        /// <summary>
+        /// This is the Duration of the Encoding Process, not the Duration of the video
+        /// </summary>
+        public TimeSpan? EncodingDuration { get; internal set; }
         public bool Finished { get; internal set; } = false;
         public decimal? FPS { get; internal set; }
         public long? Frame { get; internal set; }
         public Job Job { get; set; }
         public int MediaHash { get; set; }
-        public Movie Movie { get; set; }
-        public string MovieName { get; set; }
-        public string Name => MovieName ?? SourceFileName;
+        public IMedia Media { get; set; }
+        public string MediaName { get; set; }
+        public string Name => MediaName ?? SourceFileName;
         public int? Percent { get; internal set; }
         public ConditionSwitch Processing { get; set; }
         public decimal? Q { get; internal set; }
@@ -50,8 +53,6 @@ namespace Compressarr.JobProcessing.Models
         public bool ShowArgs { get; set; }
 
         public string Size { get; internal set; }
-
-        public MediaSource Source { get; set; }
 
         public string SourceFile { get; set; }
 
@@ -65,7 +66,7 @@ namespace Compressarr.JobProcessing.Models
 
         public bool Success { get; internal set; } = false;
 
-        public TimeSpan? TotalLength => Movie?.MediaInfo?.format?.Duration;
+        public TimeSpan? TotalLength => Media.MediaInfo?.format?.Duration;
 
         public void Output(string message) => Output(new(message), false);
         public void Output(Update update, bool isFFmpegProgress = false)

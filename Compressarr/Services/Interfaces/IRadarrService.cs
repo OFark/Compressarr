@@ -27,7 +27,7 @@ namespace Compressarr.Services
         public Task<ServiceResult<List<string>>> GetValuesForProperty(string property);
 
         Task<ServiceResult<object>> ImportMovie(WorkItem workItem);
-
+        Task<ServiceResult<IEnumerable<Movie>>> RequestMoviesFiltered(string filter, IEnumerable<string> filterValues);
         public Task<SystemStatus> TestConnection(APISettings settings);
     }
 }

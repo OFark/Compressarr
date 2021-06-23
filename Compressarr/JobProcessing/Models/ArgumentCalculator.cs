@@ -1,0 +1,51 @@
+﻿using Compressarr.FFmpeg.Models;
+using Compressarr.Presets.Models;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace Compressarr.JobProcessing.Models
+{
+    public class ArgumentCalculator
+    {
+        public ArgumentCalculator(WorkItem wi, FFmpegPreset preset)
+        {
+            if (wi?.Media?.MediaInfo == null) throw new ArgumentException("MediaInfo is not available");
+
+            AudioStreams = wi.Media.MediaInfo.AudioStreams ?? new HashSet<Stream>();
+            VideoStreams = wi.Media.MediaInfo.VideoStreams ?? new HashSet<Stream> ();
+
+            Preset = preset;
+
+            ColorPrimaries = wi.Media.MediaInfo.VideoStreams?.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.color_primaries))?.color_primaries;
+            ColorTransfer = wi.Media.MediaInfo.VideoStreams?.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.color_transfer))?.color_transfer;
+
+            VideoEncoderOptions = new();
+            foreach(var veo in preset.VideoEncoderOptions)
+            {
+                var eov = new EncoderOptionValue(veo.Name)
+                {
+                    AutoCalculate = veo.AutoCalculate,
+                    EncoderOption = veo.EncoderOption,
+                    Value = veo.Value
+                };
+                VideoEncoderOptions.Add(eov);
+            }
+        }
+
+        public IEnumerable<Stream> AudioStreams { get; set; }
+        public IEnumerable<Stream> VideoStreams { get; set; }
+
+        public FFmpegPreset Preset { get; set; }
+
+        public HashSet<EncoderOptionValue> VideoEncoderOptions { get; set; }
+
+        public IEnumerable<EncoderOptionValue> AutoCalcVideoEncoderOptions => VideoEncoderOptions?.Where(x => x.AutoCalculate);
+
+        public bool TwoPass => Preset?.VideoBitRate.HasValue ?? false;
+
+        public string ColorPrimaries { get; set; }
+        public string ColorTransfer { get; set; }
+    }
+}
