@@ -12,16 +12,16 @@ namespace Compressarr.JobProcessing.Models
         public List<string> Arguments { get; set; }
         public decimal? Compression { get; set; }
         public string FilePath { get; set; }
-        public string Filter { get; set; }
+        public Guid FilterID { get; set; }
         public decimal? FPS { get; set; }
         public int? Percentage { get; set; }
         public string Preset { get; set; }
-        public string Speed { get; set; }
+        public decimal? Speed { get; set; }
         public decimal? SSIM { get; set; }
         public bool? Success { get; set; }
         public override string ToString()
         {
-            return $"{base.ToString()} Filter: {Filter} | Preset: {Preset} | Success: {Success?.ToString() ?? "Unknown"}{SSIM.Wrap(" | SSIM: {0}")}{Compression.Wrap(" | Comp: {0}")}{Speed.Wrap(" | Speed: {0}")}{FPS.Wrap(" | FPS: {0}")}";
+            return $"{base.ToString()} Filter: {FilterID} | Preset: {Preset} | Success: {Success?.ToString() ?? "Unknown"}{SSIM.Wrap(" | SSIM: {0}")}{Compression.Wrap(" | Comp: {0}")}{Speed.Wrap(" | Speed: {0}")}{FPS.Wrap(" | FPS: {0}")}";
         }
 
         public override TreeItemData ToTreeView()
@@ -29,7 +29,7 @@ namespace Compressarr.JobProcessing.Models
             var root = new TreeItemData(Type, Started, new()
             {
                 new("Source File", FilePath),
-                new("Filter", Filter),
+                new("Filter", FilterID),
                 new("Preset", Preset),
                 new("Success", Success?.ToString() ?? "Unknown")
             });
@@ -37,7 +37,7 @@ namespace Compressarr.JobProcessing.Models
             if (SSIM.HasValue) root.TreeItems.Add(new("SSIM", SSIM.ToPercent(2).Adorn("%")));
             if (Compression.HasValue) root.TreeItems.Add(new("Compression", Compression.ToPercent(2).Adorn("%")));
             if (Percentage.HasValue) root.TreeItems.Add(new("Percentage", Percentage.Adorn("%")));
-            if (!string.IsNullOrWhiteSpace(Speed)) root.TreeItems.Add(new("Speed", Speed));
+            if (Speed.HasValue) root.TreeItems.Add(new("Speed", Speed));
             if (FPS.HasValue) root.TreeItems.Add(new("FPS", FPS));
             if (Arguments != null && Arguments.Any())
             {

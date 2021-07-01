@@ -1,7 +1,9 @@
-﻿using Compressarr.Filtering;
+﻿using Compressarr.FFmpeg.Events;
+using Compressarr.Filtering;
 using Compressarr.Presets.Models;
 using Compressarr.Services.Interfaces;
 using Compressarr.Services.Models;
+using Humanizer;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -19,16 +21,26 @@ namespace Compressarr.JobProcessing.Models
         {
             SourceID = movie.id;
             MediaHash = movie.GetStableHash();
-            SourceFile = $"{basePath}{Path.Combine(movie.path, movie.movieFile.relativePath)}";
+            SourceFile = movie.FilePath;
             Media = movie;
             Media.Source = MediaSource.Radarr;
             Processing = new();
         }
 
+        public WorkItem(EpisodeFile episodeFile, string basePath)
+        {
+            SourceID = episodeFile.id;
+            MediaHash = episodeFile.GetStableHash();
+            SourceFile = episodeFile.FilePath;
+            Media = episodeFile;
+            Media.Source = MediaSource.Sonarr;
+            Processing = new();
+        }
+
         public event EventHandler<Update> OnUpdate;
 
-        public IEnumerable<string> Arguments { get; set; }
         public ArgumentCalculator ArgumentCalculator { get; set; }
+        public IEnumerable<string> Arguments { get; set; }
         public string Bitrate { get; internal set; }
         public decimal? Compression { get; internal set; }
         public ImmutableSortedSet<JobEvent> Console { get; set; }
@@ -38,36 +50,48 @@ namespace Compressarr.JobProcessing.Models
         /// This is the Duration of the Encoding Process, not the Duration of the video
         /// </summary>
         public TimeSpan? EncodingDuration { get; internal set; }
+
+        public TimeSpan? ETA
+        {
+            get
+            {
+                if (Percent == 100) return TimeSpan.Zero;
+                if (eta.HasValue) return eta;
+
+                if (EncodingDuration.HasValue && TotalLength.HasValue && FPS > 0)
+                {
+                    var percent = (decimal)EncodingDuration.Value.Ticks / TotalLength.Value.Ticks;
+                    if (percent > 0)
+                    {
+                        return TimeSpan.FromSeconds(Convert.ToDouble(((Frame / percent) - Frame) / FPS));
+                    }
+                }
+                return null;
+            }
+        }
+
         public bool Finished { get; internal set; } = false;
         public decimal? FPS { get; internal set; }
         public long? Frame { get; internal set; }
         public Job Job { get; set; }
-        public int MediaHash { get; set; }
         public IMedia Media { get; set; }
+        public int MediaHash { get; set; }
         public string MediaName { get; set; }
         public string Name => MediaName ?? SourceFileName;
         public int? Percent { get; internal set; }
         public ConditionSwitch Processing { get; set; }
         public decimal? Q { get; internal set; }
-
         public bool ShowArgs { get; set; }
-
         public string Size { get; internal set; }
-
         public string SourceFile { get; set; }
-
+        public string SourceFileExtension => Path.GetExtension(SourceFile);
         public string SourceFileName => Path.GetFileName(SourceFile);
-
         public int SourceID { get; set; }
-
-        public string Speed { get; internal set; }
-
+        public decimal Speed { get; internal set; }
         public decimal? SSIM { get; set; }
-
         public bool Success { get; internal set; } = false;
-
-        public TimeSpan? TotalLength => Media.MediaInfo?.format?.Duration;
-
+        public TimeSpan? TotalLength => Media.FFProbeMediaInfo?.format?.Duration;
+        private TimeSpan? eta { get; set; }
         public void Output(string message) => Output(new(message), false);
         public void Output(Update update, bool isFFmpegProgress = false)
         {
@@ -101,12 +125,51 @@ namespace Compressarr.JobProcessing.Models
             Output(update);
         }
 
-        public void Update(object sender, Update update) => Update(update);
+        public void Update(FFmpegProgress progress)
+        {
+            Frame = progress.Frame;
+            FPS = progress.FPS;
+            Q = progress.Q;
+            Size = progress.Size.Bytes().Humanize("0.00");
+            Bitrate = progress.Bitrate;
+            Speed = progress.Speed;
+            Percent = progress.Percentage;
+            EncodingDuration = progress.Time;
+
+            if (TotalLength.HasValue && progress.FPS > 0)
+            {
+                var percent = (decimal)progress.Time.Ticks / TotalLength.Value.Ticks;
+                if (percent > 0)
+                {
+                    eta = TimeSpan.FromSeconds(Convert.ToDouble(((Frame / percent) - Frame) / progress.FPS));
+                }
+            }
+
+            Update();
+        }
+
+        public void Update(object _, Update update) => Update(update);
+
         public void Update(Update update)
         {
             OnUpdate?.Invoke(this, update);
             Output(update);
         }
-        //WorkItem Duration is the current process time frame, MediaInfo Duration is the movie length.
+
+        public void UpdateSSIM(FFmpegProgress progress)
+        {
+            Frame = progress.Frame;
+            Percent = progress.Percentage;
+
+            if (TotalLength.HasValue && progress.FPS > 0)
+            {
+                var percent = (decimal)progress.Time.Ticks / TotalLength.Value.Ticks;
+                if (percent > 0)
+                {
+                    eta = TimeSpan.FromSeconds(Convert.ToDouble(((Frame / percent) - Frame) / progress.FPS));
+                }
+            }
+            Update();
+        }
     }
 }

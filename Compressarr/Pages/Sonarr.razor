@@ -4,9 +4,188 @@
 @using Compressarr.Filtering.Models;
 @using Compressarr.Helpers;
 
-@inject Compressarr.Services.IRadarrService radarrService
-@inject IFilterManager filterManager
+<MudPaper id="divSonarr" Elevation="0">
+    @if (!string.IsNullOrWhiteSpace(AlertMessage))
+    {
+        <MudAlert Severity="Severity.Error">@AlertMessage</MudAlert>
+    }
 
-<div class="my-2 filterList">
-    <h1>Damn it, I'm working on it OK???</h1>
-</div>
+    <MudGrid>
+        <MudItem sm="4">
+            <MudTreeView ExpandOnClick="true" ServerData="async (pn) => pn.TreeItems" Items="@SeriesTreeItems" Context="series">
+                <ItemTemplate>
+                    <MudTreeViewItem Value="series" Text="@series.Title" EndText="@series.Value" EndTextTypo="Typo.caption" @bind-Expanded="series.IsExpanded">
+                        <Content>
+                            <MudText>
+                                @if (series.TreeItems != null && series.TreeItems.Any())
+                                {
+                                    if (series.IsExpanded)
+                                    {
+                                        <MudIcon Icon="@Icons.Outlined.KeyboardArrowDown" Style="vertical-align:middle" />
+                                    }
+                                    else
+                                    {
+                                        <MudIcon Icon="@Icons.Outlined.KeyboardArrowRight" Style="vertical-align:middle" />
+                                    }
+                                }
+                                @series.Title
+                                @if (!string.IsNullOrWhiteSpace(series.Value))
+                                {
+                                    <MudText Typo="Typo.caption"> - @series.Value</MudText>
+                                }
+
+                                @foreach (var b in series.Badges ?? new())
+                                {
+                                    <MudChip Label="true" Size="Size.Small">@b</MudChip>
+                                }
+                            </MudText>
+                        </Content>
+                    </MudTreeViewItem>
+                </ItemTemplate>
+            </MudTreeView>
+        </MudItem>
+        <MudItem sm="8">
+            <MudGrid>
+                <MudItem xs="6"></MudItem>
+                <MudItem xs="6">
+                    <MudToolBar>
+                        <MudToolBarSpacer />
+                        <MudButton StartIcon="@Icons.Outlined.MovieCreation" Color="Color.Secondary" Class="mt-6 mr-4" OnClick="@(() => SonarrService.GetSeriesAsync(true))">Refresh</MudButton>
+                        <MudSelect Strict="true" @bind-Value="FilterID" Label="Filters" OffsetY="true" Immediate="true">
+                            @foreach (var filter in FilterManager.GetFilters(MediaSource.Sonarr))
+                            {
+                                <MudSelectItem Value="@filter.ID">@filter.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudToolBar>
+                </MudItem>
+            </MudGrid>
+            @if (!string.IsNullOrWhiteSpace(AlertMessage))
+            {
+                <MudAlert Severity="Severity.Error">@AlertMessage</MudAlert>
+            }
+
+
+            <MudPaper Class="my-2 filterList">
+                <table class="filterTableWrapper">
+                    <thead valign="baseline">
+                        <tr>
+                            <th class="hide">
+                            </th>
+                            <th>
+                                <div class="mud-input-control mud-input-input-control">
+                                    <div class="mud-input-control-input-container">
+                                        <div class="mud-input mud-input-text mud-input-underline mud-shrink">
+                                            <select @bind="FilterPropertyStr" required>
+                                                @foreach (var fp in FilterManager.SonarrFilterProperties.OrderBy(f => f.Key))
+                                                {
+                                                    <option value="@fp.Value">@fp.Key</option>
+                                                }
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                            <th>
+                                <div class="mud-input-control mud-input-input-control">
+                                    <div class="mud-input-control-input-container">
+                                        <div class="mud-input mud-input-text mud-input-underline mud-shrink">
+                                            <select @bind="FilterComparitorStr" required>
+                                                <option value="" disabled selected hidden>is...</option>
+                                                @if (FilterProperty != null)
+                                                {
+                                                    foreach (var fc in FilterManager.GetComparitors(FilterProperty))
+                                                    {
+                                                        <option value="@fc.Value">@fc.Key</option>
+                                                    }
+                                                }
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                            <th colspan="2">
+                                @switch (FilterProperty.PropertyType)
+                                {
+                                    case FilterPropertyType.Boolean:
+                                        {
+                                            <MudSelect Value="FilterValue" OffsetY="true">
+                                                <MudSelectItem Value="@("True")" />
+                                                <MudSelectItem Value="@("False")" />
+                                            </MudSelect>
+                                        }
+                                        break;
+                                    case FilterPropertyType.DateTime:
+                                        {
+                                            <MudDatePicker @bind-Text="FilterValue" placeholder="something" />
+                                        }
+                                        break;
+                                    case FilterPropertyType.String:
+                                        {
+                                            <MudTextField T="string" @bind-Text="FilterValue" Placeholder="something" />
+
+                                        }
+                                        break;
+                                    case FilterPropertyType.Number:
+                                        {
+                                            <MudNumericField T="decimal" @bind-Value="FilterIntValue" Placeholder="something" />
+                                        }
+                                        break;
+                                    case FilterPropertyType.Enum:
+                                        {
+                                            var filterValueResults = SonarrService.GetValuesForPropertyAsync(FilterPropertyStr).Result;
+
+                                            if (filterValueResults.Success)
+                                            {
+                                                <MudSelect @bind-Value="FilterValue" MultiSelection="true" Required="true" OffsetY="true" @bind-SelectedValues="FilterValues">
+                                                    @foreach (var key in filterValueResults.Results)
+                                                                    {
+                                                        <MudSelectItem Value="@key" />
+                                                                    }
+                                                </MudSelect>
+                                            }
+                                            else
+                                            {
+                                                <MudText Color="Color.Error">@filterValueResults.ErrorString</MudText>
+                                            }
+
+                                            break;
+                                        }
+                                }
+                            </th>
+                            <th class="hide">
+                                <MudButton OnClick="AddFilter" Color="Color.Primary" StartIcon="@Icons.Outlined.Add">@newFilterTextButton</MudButton>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var dlf in DlFilters)
+                        {
+                            <tr>
+                                <DLFilter filter="dlf" OnDeleteFilter="DeleteFilter" OnFilterUpdate="FilterUpdate" />
+                                <td>
+                                    <MudButton OnClick="(() => GroupFilter(dlf))" Color="Color.Primary" StartIcon="@Icons.Outlined.Add">or</MudButton>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </MudPaper>
+
+            @if (DlFilters.Any())
+            {
+                <MudToolBar>
+                    @if (showSaveDialog)
+                    {
+                        <MudTextField @bind-Value="FilterName" Label="Name" />
+                    }
+                    <MudButton OnClick="SaveFilter" Color="Color.Primary" StartIcon="@Icons.Outlined.Save">Save</MudButton>
+                    <MudButton OnClick="ClearFilters" Color="Color.Warning" StartIcon="@Icons.Outlined.Clear">Clear</MudButton>
+                    <MudButton OnClick="DeleteSavedFilter" Color="Color.Error" StartIcon="@Icons.Outlined.Delete" Disabled="JobManager.FilterInUse(FilterID)">Delete</MudButton>
+                    <MudToolBarSpacer></MudToolBarSpacer>
+                </MudToolBar>
+            }
+        </MudItem>
+    </MudGrid>
+
+</MudPaper>

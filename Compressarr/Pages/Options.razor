@@ -150,7 +150,7 @@
                                 <MudSelect Dense="true" @bind-Value="@applicationService.AutoCalculationType" Label="Calculation Type">
                                     @foreach (AutoCalcType r in Enum.GetValues(typeof(AutoCalcType)))
                                     {
-                                        <MudSelectItem Value="r">@r.ToString().ToCamelCaseSplit()</MudSelectItem>
+                                        <MudSelectItem Value="r">@r.ToString().Humanize()</MudSelectItem>
                                     }
                                 </MudSelect>
                             </MudItem>
@@ -221,7 +221,7 @@
             radarrAPIKey = applicationService.RadarrSettings.APIKey;
             radarrURL = applicationService.RadarrSettings.APIURL;
             radarrBasePath = applicationService.RadarrSettings.BasePath;
-            var ss = await radarrService.TestConnection(applicationService.RadarrSettings);
+            var ss = await radarrService.TestConnectionAsync(applicationService.RadarrSettings);
 
             radarrConnected = ss.Success;
 
@@ -235,7 +235,7 @@
             sonarrURL = applicationService.SonarrSettings.APIURL;
             sonarrBasePath = applicationService.SonarrSettings.BasePath;
 
-            var ss = await sonarrService.TestConnection(applicationService.SonarrSettings);
+            var ss = await sonarrService.TestConnectionAsync(applicationService.SonarrSettings);
 
             sonarrConnected = ss.Success;
 
@@ -291,7 +291,7 @@
             radarrURL = radarrURL.TrimEnd('/');
             radarrTestResponse = null;
             var radarrServiceSettings = new APISettings() { APIURL = radarrURL, APIKey = radarrAPIKey, BasePath = radarrBasePath };
-            var ss = await radarrService.TestConnection(radarrServiceSettings);
+            var ss = await radarrService.TestConnectionAsync(radarrServiceSettings);
 
             if (ss.Success)
             {
@@ -324,8 +324,8 @@
         {
             sonarrURL = sonarrURL.TrimEnd('/');
             sonarrTestResponse = null;
-            var sonarrServiceSettings = new APISettings() { APIURL = radarrURL, APIKey = radarrAPIKey, BasePath = sonarrBasePath };
-            var ss = await sonarrService.TestConnection(sonarrServiceSettings);
+            var sonarrServiceSettings = new APISettings() { APIURL = sonarrURL, APIKey = sonarrAPIKey, BasePath = sonarrBasePath };
+            var ss = await sonarrService.TestConnectionAsync(sonarrServiceSettings);
 
             if (ss.Success)
             {

@@ -1,21 +1,20 @@
 ﻿using Compressarr.Application;
-using Compressarr.FFmpeg;
-using Compressarr.JobProcessing;
+using Compressarr.Helpers;
 using Compressarr.JobProcessing.Models;
-using Compressarr.Presets;
 using Compressarr.Services.Base;
 using Compressarr.Services.Models;
 using Compressarr.Settings;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Net.Http;
 using System.Text;
-using System.Threading;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Web;
 
@@ -23,28 +22,20 @@ namespace Compressarr.Services
 {
     public class RadarrService : IRadarrService
     {
-
-        private static SemaphoreSlim mediaInfoSemaphore = new(1, 1);
         private readonly IApplicationService applicationService;
-        private readonly IMediaInfoService mediaInfoService;
-        private readonly IPresetManager presetManager;
-        private readonly IProcessManager processManager;
         private readonly IFileService fileService;
         private readonly ILogger<RadarrService> logger;
         private StatusResult _status = null;
 
         private int previousResultsHash;
-        public RadarrService(IApplicationService applicationService, IFileService fileService, ILogger<RadarrService> logger, IMediaInfoService mediaInfoService, IPresetManager presetManager, IProcessManager processManager)
+        public RadarrService(IApplicationService applicationService, IFileService fileService, ILogger<RadarrService> logger)
         {
             this.applicationService = applicationService;
             this.fileService = fileService;
             this.logger = logger;
-            this.mediaInfoService = mediaInfoService;
-            this.presetManager = presetManager;
-            this.processManager = processManager;
         }
 
-        public delegate Task AsyncEventHandler(object sender, EventArgs e);
+        //public delegate Task AsyncEventHandler(object sender, EventArgs e);
 
         public long MovieCount => movies?.Count() ?? 0;
         public string MovieFilter { get; set; }
@@ -75,12 +66,7 @@ namespace Compressarr.Services
 
                 if (!string.IsNullOrWhiteSpace(MovieFilter))
                 {
-                    logger.LogDebug("Filtering Movies");
-                    logger.LogDebug($"Filter: {MovieFilter}");
-                    logger.LogDebug($"Filter Values: {string.Join(", ", MovieFilterValues)}");
-
-                    var results = movies.AsQueryable().Where(MovieFilter, MovieFilterValues.ToArray());
-                    return new(true, results);
+                    return new(true, FilterMovies(movies.JsonClone().AsQueryable(), MovieFilter, MovieFilterValues));
                 }
 
                 return new(true, movies);
@@ -108,7 +94,7 @@ namespace Compressarr.Services
 
                 if (!string.IsNullOrWhiteSpace(applicationService.RadarrSettings?.APIURL))
                 {
-                    if ((await TestConnection(applicationService.RadarrSettings)).Success)
+                    if ((await TestConnectionAsync(applicationService.RadarrSettings)).Success)
                     {
                         _status.Status = ServiceStatus.Ready;
                         _status.Message = new("Ready");
@@ -130,7 +116,7 @@ namespace Compressarr.Services
             return _status;
         }
 
-        public async Task<ServiceResult<List<string>>> GetValuesForProperty(string property)
+        public async Task<ServiceResult<List<string>>> GetValuesForPropertyAsync(string property)
         {
             using (logger.BeginScope("Get Values for Property"))
             {
@@ -139,15 +125,24 @@ namespace Compressarr.Services
 
                 if (movies.Any())
                 {
-                    return new ServiceResult<List<string>>(true, movies.AsQueryable().GroupBy(property).OrderBy("Count() desc").ThenBy("Key").Select("Key").ToDynamicArray<string>().Where(x => !string.IsNullOrEmpty(x)).ToList());
+                    var selectManySplit = property.Split("|");
+                    IQueryable movs = movies.AsQueryable();
+
+                    for (int i = 0; i < selectManySplit.Length - 1; i++)
+                    {
+                        movs = movs.SelectMany(selectManySplit[i]);
+                    }
+
+                    return new ServiceResult<List<string>>(true, movs.GroupBy(selectManySplit.Last()).OrderBy("Count() desc").ThenBy("Key").Select("Key").ToDynamicArray<string>().Where(x => !string.IsNullOrEmpty(x)).ToList());
                 }
 
                 var moviesResult = await RequestMovies();
                 return new ServiceResult<List<string>>(moviesResult.Success, moviesResult.ErrorCode, moviesResult.ErrorMessage);
             }
+
         }
 
-        public async Task<ServiceResult<object>> ImportMovie(WorkItem workItem)
+        public async Task<ServiceResult<object>> ImportMovieAsync(WorkItem workItem)
         {
             //Get ManualImport 
             //Request URL: /api/manualimport?folder=C%3A%5CCompressarr%5C&filterExistingFiles=true
@@ -210,10 +205,11 @@ namespace Compressarr.Services
                         {
                             var mirs = JsonConvert.DeserializeObject<HashSet<ManualImportResponse>>(manualImportJSON);
 
-                            mir = mirs.FirstOrDefault(x => x.movie.id == workItem.SourceID && x.relativePath == workItem.DestinationFileName);
+                            mir = mirs.FirstOrDefault(x => x?.movie?.id == workItem.SourceID && x?.relativePath == workItem.DestinationFileName);
 
                             if (mir == null)
                             {
+                                _ = fileService.DumpDebugFile("manualImport.json", manualImportJSON).ConfigureAwait(false);
                                 logger.LogWarning("Failed: Radarr didn't recognise the file to import");
                                 return new(false, "Failed", "Radarr didn't recognise the file to import");
                             }
@@ -262,7 +258,7 @@ namespace Compressarr.Services
                     path = mir.path,
                     movieId = workItem.SourceID,
                     quality = mir.quality,
-                    languages = new() { new Language() { id = 1, name = "English" } }
+                    languages = new() { new Language() { Id = 1, Name = "English" } }
                 };
 
                 payload.files = new() { file };
@@ -310,7 +306,19 @@ namespace Compressarr.Services
             }
         }
 
-        public async Task<SystemStatus> TestConnection(APISettings settings)
+        public async Task<ServiceResult<IEnumerable<Movie>>> RequestMoviesFilteredAsync(string filter, IEnumerable<string> filterValues)
+        {
+            var requestMoviesResponse = await RequestMovies();
+
+            if (requestMoviesResponse.Success)
+            {
+                return new(true, FilterMovies(requestMoviesResponse.Results.AsQueryable(), filter, filterValues));
+            }
+
+            return requestMoviesResponse;
+        }
+
+        public async Task<SystemStatus> TestConnectionAsync(APISettings settings)
         {
             using (logger.BeginScope("Test Connection"))
             {
@@ -368,19 +376,38 @@ namespace Compressarr.Services
             }
         }
 
-        public async Task<ServiceResult<IEnumerable<Movie>>> RequestMoviesFiltered(string filter, IEnumerable<string> filterValues)
+        private IEnumerable<Movie> FilterMovies(IQueryable<Movie> movies, string filter, IEnumerable<string> filterValues)
         {
-            var requestMoviesResponse = await RequestMovies();
+            logger.LogDebug("Filtering Series");
+            logger.LogDebug($"Filter: {filter}");
+            logger.LogDebug($"Filter Values: {string.Join(", ", filterValues)}");
 
-            if (requestMoviesResponse.Success)
-            {
-                return new(true, requestMoviesResponse.Results.AsQueryable().Where(filter, filterValues.ToArray()));
-            }
+            return RecursiveFilter(movies, filter, filterValues.ToArray()).Cast<Movie>();
 
-            return requestMoviesResponse;
         }
 
+        private IEnumerable RecursiveFilter(IEnumerable collection, string filter, string[] filterValues)
+        {
+            var reg = new Regex(@"(\w+\|)");
 
+            if (reg.IsMatch(filter))
+            {
+                var match = reg.Match(filter);
+                var prop = match.Value;
+
+                filter = filter.Replace(prop, "");
+                prop = prop.Replace("|", "");
+
+                foreach (var ent in collection)
+                {
+                    ent.GetType().GetProperty(prop).SetValue(ent, RecursiveFilter(ent.GetType().GetProperty(prop).GetValue(ent) as IEnumerable, filter, filterValues));
+                }
+
+                return collection.AsQueryable().Where($"{prop}.Any()");
+            }
+
+            return collection.AsQueryable().Where(filter, filterValues);
+        }
         private async Task<ServiceResult<IEnumerable<Movie>>> RequestMovies()
         {
             using (logger.BeginScope("Requesting Movies"))

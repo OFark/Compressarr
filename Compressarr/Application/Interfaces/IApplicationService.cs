@@ -39,6 +39,7 @@ namespace Compressarr.Application
         int ArgCalcSampleSeconds { get; set; }
         decimal? AutoCalculationPost { get; set; }
         AutoCalcType AutoCalculationType { get; set; }
+        IEnumerable<Series> Series { get; set; }
 
         void Broadcast(string message);
         LogLevel GetLogLevel();

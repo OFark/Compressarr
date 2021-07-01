@@ -30,21 +30,43 @@ namespace Compressarr.Application
         private readonly ILogger<ApplicationService> logger;
         public ApplicationService(IConfiguration configuration, IFileService fileService, ILogger<ApplicationService> logger, IOptions<AppSettings> appSettings, IOptions<APIServiceSettings> apiServiceSettings, IOptions<HashSet<FFmpegPresetBase>> presets, IOptions<HashSet<Filter>> filters, IOptions<HashSet<Job>> jobs, IHostApplicationLifetime lifetime)
         {
+            this.logger = logger;
             this.configuration = configuration;
             this.fileService = fileService;
 
             AlwaysCalculateSSIM = appSettings?.Value?.AlwaysCalculateSSIM ?? false;
             ArgCalcSampleSeconds = appSettings?.Value?.ArgCalcSampleSeconds ?? 10;
             AutoCalculationPost = appSettings?.Value?.AutoCalculationPost;
-            AutoCalculationType = appSettings?.Value?.AutoCalculationType ?? AutoCalcType.BestGuess;
+            AutoCalculationType = appSettings?.Value?.AutoCalculationType ?? AutoCalcType.BestSSIM;
 
             Filters = filters?.Value ?? new();
             Jobs = jobs?.Value ?? new();
+
+            var doSave = false;
+            foreach (var filter in Filters.Where(f => f.ID == default))
+            {
+                filter.ID = Guid.NewGuid();
+                doSave = true;
+            }
+
+            foreach (var job in Jobs.Where(j => j.FilterID == default))
+            {
+#pragma warning disable CS0618 // Type or member is obsolete this is to upgrade old databases
+                var filter = Filters.FirstOrDefault(x => x.Name == job.FilterName);
+#pragma warning restore CS0618 // Type or member is obsolete
+                if (filter != null)
+                {
+                    job.FilterID = filter.ID;
+                }
+                doSave = true;
+            }
+
+            if (doSave) _ = SaveAppSetting();
+
             Presets = presets?.Value.Select(p => new FFmpegPreset(p)).ToHashSet() ?? new();
             RadarrSettings = apiServiceSettings?.Value?.RadarrSettings ?? new();
             SonarrSettings = apiServiceSettings?.Value?.SonarrSettings ?? new();
 
-            this.logger = logger;
 
             AppStoppingCancellationToken = lifetime.ApplicationStopping;
 
@@ -57,12 +79,10 @@ namespace Compressarr.Application
 
         //App Settings
         public bool AlwaysCalculateSSIM { get; set; }
+        public CancellationToken AppStoppingCancellationToken { get; set; }
         public int ArgCalcSampleSeconds { get; set; }
         public decimal? AutoCalculationPost { get; set; }
         public AutoCalcType AutoCalculationType { get; set; }
-
-        
-        public CancellationToken AppStoppingCancellationToken { get; set; }
         public Dictionary<CodecType, SortedSet<Codec>> Codecs { get; set; }
         public SortedSet<ContainerResponse> Containers { get; set; }
         public Dictionary<CodecType, SortedSet<Encoder>> Encoders { get; set; }
@@ -70,17 +90,17 @@ namespace Compressarr.Application
         public HashSet<Filter> Filters { get; set; }
         public SortedSet<string> HardwareDecoders { get; set; }
 
+        public Task InitialiseFFmpeg { get; set; }
+        public Task InitialisePresets { get; set; }
         public HashSet<Job> Jobs { get; set; }
         public IEnumerable<Movie> Movies { get; set; }
         public HashSet<FFmpegPreset> Presets { get; set; }
         public double Progress { get; set; }
         public APISettings RadarrSettings { get; set; }
+        public IEnumerable<Series> Series { get; set; }
         public APISettings SonarrSettings { get; set; }
         public string State { get; set; }
         public Queue<string> StateHistory { get; set; } = new();
-        public Task InitialiseFFmpeg { get; set; }
-        public Task InitialisePresets { get; set; }
-
         public void Broadcast(string message) => OnBroadcast?.Invoke(this, message);
         public LogLevel GetLogLevel()
         {

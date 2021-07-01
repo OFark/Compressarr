@@ -12,7 +12,7 @@ namespace Compressarr.Presets.Models
         public double EncodingProgress { get; set; }
 
         public long OriginalSize { get; set; }
-        public decimal Percent => Math.Round((decimal)Size / OriginalSize * 100M, 2);
+        public decimal Compression => Math.Round((decimal)Size / OriginalSize * 100M, 2);
 
         public bool Processing { get; set; }
 
@@ -20,6 +20,7 @@ namespace Compressarr.Presets.Models
 
         public decimal SSIM { get; set; }
         public double SSIMProgress { get; set; }
+        public decimal Speed { get; set; }
         public void AddSize(long size, long origSize)
         {
             Size = size;

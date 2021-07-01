@@ -40,7 +40,7 @@ namespace Compressarr.FFmpeg
 
                     if (ffProbeResponse.Success)
                     {
-                        return media.MediaInfo = ffProbeResponse.Result;
+                        return media.FFProbeMediaInfo = ffProbeResponse.Result;
                     }
                 }
             }

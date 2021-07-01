@@ -17,8 +17,13 @@ namespace Compressarr.Settings
     [JsonConverter(typeof(StringEnumConverter))]
     public enum AutoCalcType
     {
-        BestGuess,
+        BestSSIM,
         FirstPastThePost,
-        BangForBuck
+        BangForBuck,
+        BySpeed,
+        Balanced,
+        WeightedForCompression,
+        WeightedForSpeed,
+        WeightedForSSIM
     }
 }

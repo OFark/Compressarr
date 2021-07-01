@@ -12,8 +12,10 @@ namespace Compressarr.Filtering.Models
         {
             Name = name ?? throw new ArgumentNullException(nameof(name));
             MediaSource = filterType;
+            ID = Guid.NewGuid();
         }
 
+        public Guid ID { get; set; }
         public string Name { get; set; }
         public MediaSource MediaSource { get; set; }
         public List<DynamicLinqFilter> Filters { get; set; }

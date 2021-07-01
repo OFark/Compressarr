@@ -45,7 +45,9 @@ namespace Compressarr.JobProcessing.Models
         [JsonIgnore]
         public Filter Filter { get; internal set; }
 
+        [Obsolete("Depreciated in favour of FilterID")]
         public string FilterName { get; set; }
+        public Guid FilterID { get; set; }
 
         public Guid? ID { get; set; }
 
@@ -62,7 +64,7 @@ namespace Compressarr.JobProcessing.Models
         public decimal? MinSSIM { get; set; }
 
         [JsonIgnore]
-        public string Name => $"{FilterName}|{PresetName}";
+        public string Name => $"{Filter?.Name}|{PresetName}";
 
         [JsonIgnore]
         public FFmpegPreset Preset { get; internal set; }

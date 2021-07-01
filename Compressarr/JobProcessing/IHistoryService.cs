@@ -8,6 +8,6 @@ namespace Compressarr.JobProcessing
     {
         void EndProcessing(Guid historyID, bool succeeded, WorkItem workItem);
         SortedSet<HistoryProcessing> GetProcessHistory(int mediaID);
-        Guid StartProcessing(int id, string filePath, string filter, string preset, IEnumerable<string> arguments);
+        Guid StartProcessing(int id, string filePath, Guid filterID, string preset, IEnumerable<string> arguments);
     }
 }

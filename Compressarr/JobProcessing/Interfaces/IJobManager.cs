@@ -16,7 +16,7 @@ namespace Compressarr.JobProcessing
         Task<bool> AddJobAsync(Job newJob);
         void CancelJob(Job job);
         Task DeleteJob(Job job);
-        bool FilterInUse(string filterName);
+        bool FilterInUse(Guid id);
         Task InitialiseJob(Job job);
         void InitialiseJobs(Filter filter);
         void InitialiseJobs(MediaSource source);

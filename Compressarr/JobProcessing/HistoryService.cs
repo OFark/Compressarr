@@ -22,12 +22,24 @@ namespace Compressarr.JobProcessing
             this.logger = logger;
         }
 
-        public Guid StartProcessing(int mediaID, string filePath, string filter, string preset, IEnumerable<string> arguments)
+        public Guid StartProcessing(int mediaID, string filePath, Guid filterID, string preset, IEnumerable<string> arguments)
         {
             using var db = new LiteDatabase(fileService.GetAppFilePath(AppFile.mediaInfo));
 
-            var histories = db.GetCollection<History>();
-            var history = histories.Query().Include(x => x.Entries).Where(x => x.MediaID == mediaID).FirstOrDefault();
+            var history = new History();
+            ILiteCollection<History> histories = default;
+
+            try
+            {
+                histories = db.GetCollection<History>();
+                history = histories.Query().Include(x => x.Entries).Where(x => x.MediaID == mediaID).FirstOrDefault();
+            }
+            catch (InvalidCastException)
+            {
+                db.DropCollection(HISTORYTABLE);
+                histories = db.GetCollection<History>();
+                //todo: report on screen
+            }
 
             if (history == default)
             {
@@ -44,7 +56,7 @@ namespace Compressarr.JobProcessing
             {
                 Arguments = arguments.ToList(),
                 FilePath = filePath,
-                Filter = filter,
+                FilterID = filterID,
                 HistoryID = Guid.NewGuid(),
                 Preset = preset,
                 Started = DateTime.Now,
@@ -65,22 +77,29 @@ namespace Compressarr.JobProcessing
         {
             using var db = new LiteDatabase(fileService.GetAppFilePath(AppFile.mediaInfo));
 
-            var histories = db.GetCollection<History>(HISTORYTABLE);
-            var history = histories.Query().Include(x => x.Entries).Where(x => x.MediaID == workItem.Media.UniqueID).FirstOrDefault();
-
-            if (history != null)
+            try
             {
-                var historyProcessing = history.Entries.FirstOrDefault(x => x.HistoryID == historyEntryID);
+                var histories = db.GetCollection<History>();
+                var history = histories.Query().Include(x => x.Entries).Where(x => x.MediaID == workItem.Media.UniqueID).FirstOrDefault();
 
-                historyProcessing.Finished = DateTime.Now;
-                historyProcessing.Success = succeeded;
-                historyProcessing.Compression = workItem.Compression;
-                historyProcessing.FPS = workItem.FPS;
-                historyProcessing.Percentage = workItem.Percent;
-                historyProcessing.Speed = workItem.Speed;
-                historyProcessing.SSIM = workItem.SSIM;
+                if (history != null)
+                {
+                    var historyProcessing = history.Entries.FirstOrDefault(x => x.HistoryID == historyEntryID);
 
-                histories.Update(history);
+                    historyProcessing.Finished = DateTime.Now;
+                    historyProcessing.Success = succeeded;
+                    historyProcessing.Compression = workItem.Compression;
+                    historyProcessing.FPS = workItem.FPS;
+                    historyProcessing.Percentage = workItem.Percent;
+                    historyProcessing.Speed = workItem.Speed;
+                    historyProcessing.SSIM = workItem.SSIM;
+
+                    histories.Update(history);
+                }
+            }
+            catch (InvalidCastException)
+            {
+                db.DropCollection(HISTORYTABLE);
             }
         }
 
@@ -88,12 +107,18 @@ namespace Compressarr.JobProcessing
         {
             using var db = new LiteDatabase(fileService.GetAppFilePath(AppFile.mediaInfo));
 
-            var histories = db.GetCollection<History>(HISTORYTABLE);
-            var history = histories.Query().Where(x => x.MediaID == mediaID).FirstOrDefault();
-
-            return new SortedSet<HistoryProcessing>(history?.Entries ?? new());
-
+            try
+            {
+                var histories = db.GetCollection<History>();
+                var history = histories.Query().Where(x => x.MediaID == mediaID).FirstOrDefault();
+                return new SortedSet<HistoryProcessing>(history?.Entries ?? new());
+            }
+            catch (InvalidCastException)
+            {
+                db.DropCollection(HISTORYTABLE);
+                return new();
+            }
         }
-        
+
     }
 }

@@ -1,18 +1,20 @@
 ﻿using Compressarr.Application;
+using Compressarr.FFmpeg;
+using Compressarr.FFmpeg.Events;
 using Compressarr.Helpers;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Presets.Models;
+using Humanizer;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Xabe.FFmpeg;
 using Xabe.FFmpeg.Events;
+using static Compressarr.FFmpeg.FFmpegProcessor;
 
 namespace Compressarr.JobProcessing
 {
@@ -20,15 +22,17 @@ namespace Compressarr.JobProcessing
     public class ProcessManager : IProcessManager
     {
         private readonly IApplicationService applicationService;
+        private readonly IFFmpegProcessor fFmpegProcessor;
         private readonly IFileService fileService;
         private readonly IHistoryService historyService;
         private readonly ILogger<ProcessManager> logger;
 
         readonly SemaphoreSlim semaphore = new(1, 1);
         bool tokenCanceled = false;
-        public ProcessManager(IApplicationService applicationService, ILogger<ProcessManager> logger, IFileService fileService, IHistoryService historyService)
+        public ProcessManager(IApplicationService applicationService, ILogger<ProcessManager> logger, IFFmpegProcessor fFmpegProcessor, IFileService fileService, IHistoryService historyService)
         {
             this.applicationService = applicationService;
+            this.fFmpegProcessor = fFmpegProcessor;
             this.fileService = fileService;
             this.historyService = historyService;
             this.logger = logger;
@@ -39,36 +43,18 @@ namespace Compressarr.JobProcessing
         public static Regex ProgressReg { get => new(@"frame= *(\d*) fps= *([\d\.]*) q=*(-?[\d\.]*)(?: q=*-?[\d\.]*)* size= *([^ ]*) time= *([\d:\.]*) bitrate= *([^ ]*) speed= *([\d.]*x) *"); }
         public static Regex SSIMReg { get => new(@"\[Parsed_ssim_4\s@\s\w*\]\sSSIM\sY\:\d\.\d*\s\([inf\d\.]*\)\sU\:\d\.\d*\s\([inf\d\.]*\)\sV\:\d\.\d*\s\([inf\d\.]*\)\sAll\:(\d\.\d*)\s\([inf\d\.]*\)"); }
 
-        public async Task<SSIMResult> CalculateSSIM(DataReceivedEventHandler dataRecieved, ConversionProgressEventHandler dataProgress, string sourceFile, string destinationFile, string hardwareDecoder, CancellationToken token)
+        public async Task<SSIMResult> CalculateSSIM(FFmpegProgressEvent ffmpegProgress, string sourceFile, string destinationFile, string hardwareDecoder, CancellationToken token)
         {
             var arguments = $"{hardwareDecoder} -i \"{sourceFile}\" -i \"{destinationFile}\" -lavfi  \"[0:v]settb=AVTB,setpts=PTS-STARTPTS[main];[1:v]settb=AVTB,setpts=PTS-STARTPTS[ref];[main][ref]ssim\" -max_muxing_queue_size 2048 -f null -";
             logger.LogDebug($"SSIM arguments: {arguments}");
 
             decimal ssim = default;
-            var converter = Xabe.FFmpeg.FFmpeg.Conversions.New();
-            converter.OnDataReceived += (sender, e) =>
-            {
-                if (SSIMReg.TryMatch(e.Data, out var ssimMatch))
-                {
-                    logger.LogTrace(e.Data);
-                    _ = decimal.TryParse(ssimMatch.Groups[1].Value.Trim(), out ssim);
-
-                    logger.LogInformation($"SSIM: {ssim}");
-                }
-                dataRecieved?.Invoke(sender, e);
-            };
-            converter.OnProgress += dataProgress;
 
             try
             {
                 logger.LogDebug("FFmpeg starting SSIM.");
-                await converter.Start(arguments, token);
-                logger.LogDebug("FFmpeg finished SSIM.");
-
-                if (ssim == default)
-                {
-                    await Task.Delay(5000, token);
-                }
+                var result = await fFmpegProcessor.RunProcess(FFProcess.FFmpeg, arguments, ffmpegProgress, (ssimresult) => ssim = ssimresult.SSIM);
+                logger.LogDebug($"FFmpeg finished SSIM. ({ssim})");
 
                 if (ssim != default)
                     return new(ssim);
@@ -119,7 +105,7 @@ namespace Compressarr.JobProcessing
                 if (File.Exists(sampleListFile)) File.Delete(sampleListFile);
 
                 var sampleTime = applicationService.ArgCalcSampleSeconds;
-                var videoLength = wi.Media?.MediaInfo?.format?.Duration.TotalSeconds ?? 3600;
+                var videoLength = wi.Media?.FFProbeMediaInfo?.format?.Duration.TotalSeconds ?? 3600;
 
                 var samplePitch = videoLength / 4;
 
@@ -127,9 +113,9 @@ namespace Compressarr.JobProcessing
 
                 for (int i = 1; i < 4; i++)
                 {
-                    var partialSampleFileName = Path.Combine(fileService.TempDir, $"sample{i}.{preset.ContainerExtension}");
+                    var partialSampleFileName = Path.Combine(fileService.TempDir, $"sample{i}{wi.SourceFileExtension}");
                     partialSampleFiles.Add(partialSampleFileName);
-                    var temparg = $"-y -ss {samplePitch * i} -t {sampleTime} -i \"{wi.SourceFile}\" -map 0 -codec copy -avoid_negative_ts 1 \"{partialSampleFileName}\"";
+                    var temparg = $"-y -ss {samplePitch * i} -t {sampleTime} -i \"{wi.SourceFile}\" -map 0 -codec copy \"{partialSampleFileName}\"";
 
                     logger.LogInformation($"Generating Sample {i}  with: {temparg}");
 
@@ -177,7 +163,7 @@ namespace Compressarr.JobProcessing
                             var succeded = true;
 
                             
-                            var historyID = historyService.StartProcessing(workItem.Media.UniqueID, workItem.SourceFile, workItem.Job.FilterName, workItem.Job.PresetName, workItem.Arguments);
+                            var historyID = historyService.StartProcessing(workItem.Media.UniqueID, workItem.SourceFile, workItem.Job.FilterID, workItem.Job.PresetName, workItem.Arguments);
                                                         
                             logger.LogDebug("FFmpeg process work item starting.");
 
@@ -222,7 +208,7 @@ namespace Compressarr.JobProcessing
                                     workItem.Update("Calculating SSIM");
                                     var hardwareDecoder = workItem.Job.Preset.HardwareDecoder.Wrap("-hwaccel {0} ");
 
-                                    var result = await CalculateSSIM((sender, args) => Converter_OnDataReceived(args, workItem), (sender, args) => Converter_OnProgress(args, workItem), workItem.SourceFile, workItem.DestinationFile, hardwareDecoder, token);
+                                    var result = await CalculateSSIM((args) => workItem.UpdateSSIM(args), workItem.SourceFile, workItem.DestinationFile, hardwareDecoder, token);
 
                                     succeded = result.Success;
                                     if(succeded)
@@ -258,6 +244,9 @@ namespace Compressarr.JobProcessing
                     semaphore.Release();
             }
         }
+
+        
+
         private void Converter_OnDataReceived(DataReceivedEventArgs e, WorkItem wi)
         {
             //Conversion:
@@ -273,16 +262,16 @@ namespace Compressarr.JobProcessing
             using (logger.BeginScope("Converter Data Received"))
             {
 
-                if (ProgressReg.TryMatch(e.Data, out var match))
+                if(FFmpegProgress.TryParse(e.Data, out var progress))
                 {
                     wi.Output(new(e.Data, LogLevel.Debug), true);
                     logger.LogTrace(e.Data);
-                    if (long.TryParse(match.Groups[1].Value.Trim(), out var frame)) wi.Frame = frame;
-                    if (decimal.TryParse(match.Groups[2].Value.Trim(), out var fps)) wi.FPS = fps;
-                    if (decimal.TryParse(match.Groups[3].Value.Trim(), out var q)) wi.Q = q;
-                    wi.Size = match.Groups[4].Value.Trim();
-                    wi.Bitrate = match.Groups[6].Value.Trim();
-                    wi.Speed = match.Groups[7].Value.Trim();
+                    wi.Frame = progress.Frame;
+                    wi.FPS = progress.FPS;
+                    wi.Q = progress.Q;
+                    wi.Size = progress.Size.Bytes().Humanize("0.00");
+                    wi.Bitrate = progress.Bitrate;
+                    wi.Speed = progress.Speed;
                     wi.Update();
                 }
                 else if (SSIMReg.TryMatch(e.Data, out var ssimMatch))

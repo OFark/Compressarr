@@ -14,10 +14,10 @@
             <MudToolBar>
                 <MudToolBarSpacer />
                 <MudButton StartIcon="@Icons.Outlined.MovieCreation" Color="Color.Secondary" Class="mt-6 mr-4" OnClick="@(() => radarrService.GetMoviesAsync(true))">Refresh</MudButton>
-                <MudSelect @bind-Value="filterSelected" Label="Filters" OffsetY="true" Immediate="true">
+                <MudSelect Strict="true" @bind-Value="filterID" Label="Filters" OffsetY="true" Immediate="true">
                     @foreach (var filter in filterManager.GetFilters(MediaSource.Radarr))
                     {
-                        <MudSelectItem Value="@filter.Name" />
+                        <MudSelectItem Value="@filter.ID">@filter.Name</MudSelectItem>
                     }
                 </MudSelect>
             </MudToolBar>
@@ -96,7 +96,7 @@
                                 break;
                             case FilterPropertyType.Enum:
                                 {
-                                    var filterValueResults = radarrService.GetValuesForProperty(filterPropertyStr).Result;
+                                    var filterValueResults = radarrService.GetValuesForPropertyAsync(filterPropertyStr).Result;
 
                                     if (filterValueResults.Success)
                                     {
@@ -144,7 +144,7 @@
             }
             <MudButton OnClick="saveFilter" Color="Color.Primary" StartIcon="@Icons.Outlined.Save">Save</MudButton>
             <MudButton OnClick="clearFilters" Color="Color.Warning" StartIcon="@Icons.Outlined.Clear">Clear</MudButton>
-            <MudButton OnClick="deleteSavedFilter" Color="Color.Error" StartIcon="@Icons.Outlined.Delete" Disabled="JobManager.FilterInUse(filterName)">Delete</MudButton>
+            <MudButton OnClick="deleteSavedFilter" Color="Color.Error" StartIcon="@Icons.Outlined.Delete" Disabled="JobManager.FilterInUse(filterID)">Delete</MudButton>
             <MudToolBarSpacer></MudToolBarSpacer>
         </MudToolBar>
     }
@@ -165,18 +165,18 @@
             {
                 <MudTr>
                     <td colspan="99">
-                        @if (context.MediaInfo != null)
+                        @if (context.FFProbeMediaInfo != null)
                         {
                         <MudCard>
                             <MudBlazor.MudCardContent>
                                 <MudTreeView T="string" ExpandOnClick="true">
-                                    <MudTreeViewItem Value='@($"Duration: {@context.MediaInfo?.format?.Duration.ToStringTimeSeconds()}")' />
+                                    <MudTreeViewItem Value='@($"Duration: {@context.FFProbeMediaInfo?.format?.Duration.ToStringTimeSeconds()}")' />
                                     <MudTreeViewItem Value='@($"Path: {@context.path}")' />
-                                    <MudTreeViewItem Value='@($"Size: {@context.MediaInfo?.format?.size}")' />
-                                    @if (context.MediaInfo?.AttachmentStreams != null)
+                                    <MudTreeViewItem Value='@($"Size: {@context.FFProbeMediaInfo?.format?.size}")' />
+                                    @if (context.FFProbeMediaInfo?.AttachmentStreams != null)
                                     {
-                                        <MudTreeViewItem Value="@($"Attachment Streams: {context.MediaInfo?.AttachmentStreams?.Count()}")">
-                                            @foreach (var s in context.MediaInfo?.AttachmentStreams)
+                                        <MudTreeViewItem Value="@($"Attachment Streams: {context.FFProbeMediaInfo?.AttachmentStreams?.Count()}")">
+                                            @foreach (var s in context.FFProbeMediaInfo?.AttachmentStreams)
                                             {
                                                 <MudTreeViewItem Value='@($"Stream: {s.index}")'>
                                                     <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
@@ -186,10 +186,10 @@
                                             }
                                         </MudTreeViewItem>
                                     }
-                                    @if (context.MediaInfo?.AudioStreams != null)
+                                    @if (context.FFProbeMediaInfo?.AudioStreams != null)
                                     {
-                                        <MudTreeViewItem Value="@($"Audio Streams: {context.MediaInfo?.AudioStreams.Count()}")">
-                                            @foreach (var s in context.MediaInfo?.AudioStreams)
+                                        <MudTreeViewItem Value="@($"Audio Streams: {context.FFProbeMediaInfo?.AudioStreams.Count()}")">
+                                            @foreach (var s in context.FFProbeMediaInfo?.AudioStreams)
                                             {
                                                 <MudTreeViewItem Value='@($"Stream: {s.index}")'>
                                                     <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
@@ -203,10 +203,10 @@
                                             }
                                         </MudTreeViewItem>
                                     }
-                                    @if (context.MediaInfo?.DataStreams != null)
+                                    @if (context.FFProbeMediaInfo?.DataStreams != null)
                                     {
-                                        <MudTreeViewItem Value="@($"Data Streams: {context.MediaInfo?.DataStreams.Count()}")">
-                                            @foreach (var s in context.MediaInfo?.DataStreams)
+                                        <MudTreeViewItem Value="@($"Data Streams: {context.FFProbeMediaInfo?.DataStreams.Count()}")">
+                                            @foreach (var s in context.FFProbeMediaInfo?.DataStreams)
                                             {
                                                 <MudTreeViewItem Value='@($"Stream: {s.index}")'>
                                                     <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
@@ -217,10 +217,10 @@
                                             }
                                         </MudTreeViewItem>
                                     }
-                                    @if (context.MediaInfo?.VideoStreams != null)
+                                    @if (context.FFProbeMediaInfo?.VideoStreams != null)
                                     {
-                                        <MudTreeViewItem Value="@($"Video Streams: {context.MediaInfo?.VideoStreams.Count()}")">
-                                            @foreach (var s in context.MediaInfo?.VideoStreams)
+                                        <MudTreeViewItem Value="@($"Video Streams: {context.FFProbeMediaInfo?.VideoStreams.Count()}")">
+                                            @foreach (var s in context.FFProbeMediaInfo?.VideoStreams)
                                             {
                                                 <MudTreeViewItem Value='@($"Stream: {s.index}")'>
                                                     <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
@@ -235,10 +235,10 @@
                                             }
                                         </MudTreeViewItem>
                                     }
-                                    @if (context.MediaInfo?.SubtitleStreams != null)
+                                    @if (context.FFProbeMediaInfo?.SubtitleStreams != null)
                                     {
-                                        <MudTreeViewItem Value="@($"Subtitle Streams: {context.MediaInfo?.SubtitleStreams.Count()}")">
-                                            @foreach (var s in context.MediaInfo?.SubtitleStreams)
+                                        <MudTreeViewItem Value="@($"Subtitle Streams: {context.FFProbeMediaInfo?.SubtitleStreams.Count()}")">
+                                            @foreach (var s in context.FFProbeMediaInfo?.SubtitleStreams)
                                             {
                                                 <MudTreeViewItem Value='@($"Stream: {s.index}")'>
                                                     <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
@@ -287,8 +287,6 @@
 
 @code {
 
-    private IEnumerable<Compressarr.Services.Models.Movie> Movies { get; set; }
-
     private bool showSaveDialog = false;
 
     private string AlertMessage = null;
@@ -315,25 +313,31 @@
     }
 
     private string filterName = "";
-    private string filterSelected
+
+    private Guid _filterID;
+    private Guid filterID
     {
         get
         {
-            return filterName;
+            return _filterID;
         }
         set
         {
-            filterName = value;
-            var filter = filterManager.GetFilter(filterName);
-            if (filter != null)
+            _filterID = value;
+            if (_filterID != default)
             {
-                dlFilters = filter.Filters.ToList().JsonClone();
-                showSaveDialog = true;
-                _ = filterUpdate();
-            }
-            else
-            {
-                clearFilters();
+                var filter = filterManager.GetFilter(_filterID);
+                if (filter != null)
+                {
+                    filterName = filter.Name;
+                    dlFilters = filter.Filters.ToList().JsonClone();
+                    showSaveDialog = true;
+                    _ = filterUpdate();
+                }
+                else
+                {
+                    clearFilters();
+                }
             }
         }
     }
@@ -393,6 +397,7 @@
     {
         dlFilters = new List<DynamicLinqFilter>();
         filterName = null;
+        filterID = default;
         await filterUpdate();
     }
 
@@ -495,7 +500,7 @@
         }
     }
 
-    private void saveFilter()
+    private async void saveFilter()
     {
         if (string.IsNullOrWhiteSpace(filterName))
         {
@@ -503,8 +508,8 @@
         }
         else
         {
-            filterManager.AddFilter(dlFilters, filterName, MediaSource.Radarr);
-            JobManager.InitialiseJobs(filterManager.GetFilter(filterName));
+            var id = await filterManager.AddFilter(dlFilters, filterName, MediaSource.Radarr);
+            JobManager.InitialiseJobs(filterManager.GetFilter(id));
         }
     }
 

@@ -36,9 +36,7 @@
         "faster",
         "fast",
         "medium",
-        "slow",
-        "slower",
-        "veryslow"
+        "slow"
       ]
     }
   },

@@ -7,6 +7,7 @@ using Compressarr.JobProcessing.Models;
 using Compressarr.Presets;
 using Compressarr.Presets.Models;
 using Compressarr.Services;
+using Compressarr.Services.Base;
 using Compressarr.Services.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -117,7 +118,7 @@ namespace Compressarr.JobProcessing
                     workItem.Output(new($"New Duration: {mediaInfo?.format?.Duration}"));
 
                     result.LengthOK = mediaInfo?.format?.Duration != default && workItem.TotalLength.HasValue &&
-                        Math.Abs(mediaInfo.format.Duration.TotalSeconds - workItem.TotalLength.Value.TotalSeconds) < 1; //Check to the nearest second.
+                        Math.Abs(mediaInfo.format.Duration.TotalSeconds - workItem.TotalLength.Value.TotalSeconds) <= 2; //Check to the nearest second.
                 }
 
                 result.SSIMOK = result.LengthOK &&
@@ -150,9 +151,9 @@ namespace Compressarr.JobProcessing
             }
         }
 
-        public bool FilterInUse(string filterName)
+        public bool FilterInUse(Guid id)
         {
-            return Jobs.Any(j => j.FilterName == filterName);
+            return Jobs.Any(j => j.ID == id);
         }
 
         public async Task InitialiseJob(Job job)
@@ -174,9 +175,9 @@ namespace Compressarr.JobProcessing
                     logger.LogDebug($"Job will initialise.");
                     using (var jobInit = new JobWorker(job.Condition.Initialise, job.UpdateStatus))
                     {
-                        job.Filter = filterManager.GetFilter(job.FilterName);
+                        job.Filter = filterManager.GetFilter(job.FilterID);
                         job.Preset = presetManager.GetPreset(job.PresetName);
-                        logger.LogDebug($"Job using filter: {job.FilterName} and preset: {job.PresetName}.");
+                        logger.LogDebug($"Job using filter: {job.FilterID} ({job.Filter.Name}) and preset: {job.PresetName}.");
 
                         if (job.Preset != null)
                         {
@@ -194,32 +195,36 @@ namespace Compressarr.JobProcessing
                                     {
                                         Log(job, LogLevel.Debug, "Begin Testing");
 
-                                        if (job.Filter.MediaSource == MediaSource.Radarr)
+                                        var sourceName = job.Filter.MediaSource.ToString();
+                                        Log(job, LogLevel.Debug, $"Job is for {sourceName}, Connecting...");
+
+                                        var systemStatus = job.Filter.MediaSource switch
                                         {
-                                            Log(job, LogLevel.Debug, "Job is for Movies, Connecting to Radarr");
+                                            MediaSource.Radarr => await radarrService.TestConnectionAsync(applicationService.RadarrSettings),
+                                            MediaSource.Sonarr => await sonarrService.TestConnectionAsync(applicationService.SonarrSettings),
+                                            _ => new()
+                                        };
 
-                                            var systemStatus = await radarrService.TestConnection(applicationService.RadarrSettings);
-
-                                            if (!systemStatus.Success)
-                                            {
-                                                Log(job, LogLevel.Warning, "Failed to connect to Radarr.");
-                                                Fail(job);
-                                                return;
-                                            }
-
-                                            Log(job, LogLevel.Debug, "Connected to Radarr", "Fetching List of files from Radarr");
-
-                                            var getFilesResults = await GetMedia(job.Filter);
-
-                                            if (!getFilesResults.Success)
-                                            {
-                                                Log(job, LogLevel.Warning, "Failed to list files from Radarr.");
-                                                Fail(job);
-                                                return;
-                                            }
-
-                                            job.WorkLoad = getFilesResults.Results.ToHashSet();
+                                        if (!systemStatus.Success)
+                                        {
+                                            Log(job, LogLevel.Warning, $"Failed to connect to {sourceName}.");
+                                            Fail(job);
+                                            return;
                                         }
+
+                                        Log(job, LogLevel.Debug, $"Connected to {sourceName}", "Fetching List of files.");
+
+                                        var getFilesResults = await GetMedia(job.Filter);
+
+                                        if (!getFilesResults.Success)
+                                        {
+                                            Log(job, LogLevel.Warning, "Failed to list files from Sonarr.");
+                                            Fail(job);
+                                            return;
+                                        }
+
+                                        job.WorkLoad = getFilesResults.Results.ToHashSet();
+
 
                                         Log(job, LogLevel.Debug, "Files Returned", "Building Workload");
 
@@ -251,7 +256,11 @@ namespace Compressarr.JobProcessing
                                                     }
                                                     else
                                                     {
-                                                        destinationpath = Path.Combine(destinationpath, file.Directory.Name);
+                                                        destinationpath = job.Filter.MediaSource switch
+                                                        {
+                                                            MediaSource.Sonarr => Path.Combine(destinationpath, file.Directory.Parent.Name, file.Directory.Name),
+                                                            _ => Path.Combine(destinationpath, file.Directory.Name)
+                                                        };
                                                     }
 
                                                     if (!Directory.Exists(destinationpath))
@@ -274,7 +283,7 @@ namespace Compressarr.JobProcessing
                                                         wi.DestinationFile = Path.ChangeExtension(wi.DestinationFile, job.Preset.ContainerExtension);
                                                     }
 
-                                                    
+
 
                                                     job.InitialisationProgress?.Report(++i / job.WorkLoad.Count() * 100);
                                                     job.UpdateStatus(this);
@@ -397,7 +406,7 @@ namespace Compressarr.JobProcessing
                                 Log(job, LogLevel.Information, $"Started Job at: {DateTime.Now}");
 
 
-                                foreach (var wi in job.WorkLoad.Where(wi => wi.Finished == false))
+                                foreach (var wi in job.WorkLoad.Where(wi => !wi.Finished))
                                 {
                                     using (var workItemWorker = new JobWorker(wi.Processing, wi.Update))
                                     {
@@ -407,13 +416,11 @@ namespace Compressarr.JobProcessing
                                             {
                                                 Log(job, LogLevel.Debug, $"Now Processing: {wi.SourceFileName}");
 
-                                                //job.Process.WorkItem = wi;
-
                                                 wi.Success = false;
 
                                                 using (var jobPreparer = new JobWorker(job.Condition.Prepare, job.UpdateStatus))
                                                 {
-                                                    wi.Media.MediaInfo ??= await mediaInfoService.GetMediaInfo(wi.Media);
+                                                    wi.Media.FFProbeMediaInfo ??= await mediaInfoService.GetMediaInfo(wi.Media);
 
                                                     if (wi.Arguments == null)
                                                     {
@@ -479,7 +486,7 @@ namespace Compressarr.JobProcessing
                                                             case MediaSource.Radarr:
                                                                 {
                                                                     job.Log(new("Auto Import - Importing into Radarr"));
-                                                                    var response = await radarrService.ImportMovie(wi);
+                                                                    var response = await radarrService.ImportMovieAsync(wi);
                                                                     if (response.Success)
                                                                     {
                                                                         job.Log(new("Movie Imported"));
@@ -531,13 +538,13 @@ namespace Compressarr.JobProcessing
         {
             using (logger.BeginScope("Get Files"))
             {
+                var filter = filterManager.ConstructFilterQuery(jobFilter.Filters, out var filterVals);
+
                 if (jobFilter.MediaSource == MediaSource.Radarr)
                 {
                     logger.LogInformation("From Radarr");
 
-                    var filter = filterManager.ConstructFilterQuery(jobFilter.Filters, out var filterVals);
-
-                    var getMoviesResponse = await radarrService.RequestMoviesFiltered(filter, filterVals);
+                    var getMoviesResponse = await radarrService.RequestMoviesFilteredAsync(filter, filterVals);
 
                     if (!getMoviesResponse.Success)
                     {
@@ -546,6 +553,21 @@ namespace Compressarr.JobProcessing
 
                     var movies = getMoviesResponse.Results;
                     return new(true, movies.Select(x => new WorkItem(x, applicationService.RadarrSettings.BasePath)).ToHashSet());
+                }
+
+                if (jobFilter.MediaSource == MediaSource.Sonarr)
+                {
+                    logger.LogInformation("From Sonarr");
+
+                    var getSeriesResponse = await sonarrService.RequestSeriesFilteredAsync(filter, filterVals);
+
+                    if (!getSeriesResponse.Success)
+                    {
+                        return new(false, getSeriesResponse.ErrorCode, getSeriesResponse.ErrorMessage);
+                    }
+
+                    var series = getSeriesResponse.Results;
+                    return new(true, series.SelectMany(s => s.Seasons).SelectMany(s => s.EpisodeFiles).Select(x => new WorkItem(x, applicationService.SonarrSettings.BasePath)).ToHashSet());
                 }
 
                 logger.LogWarning($"Source ({jobFilter.MediaSource}) is not supported");

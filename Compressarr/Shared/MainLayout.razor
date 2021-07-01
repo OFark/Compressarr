@@ -68,7 +68,7 @@
             InvokeAsync(() =>
             {
                 Snackbar.Add(message);
-                StateHasChanged();
+                InvokeAsync(StateHasChanged);
             });
         };
 

@@ -14,7 +14,7 @@ namespace Compressarr.Services.Interfaces
 
         public int UniqueID { get; }
 
-        public FFProbeResponse MediaInfo { get; set; }
+        public FFProbeResponse FFProbeMediaInfo { get; set; }
 
         public MediaSource Source { get; set; }
 

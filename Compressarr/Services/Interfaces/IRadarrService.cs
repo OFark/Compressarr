@@ -24,10 +24,11 @@ namespace Compressarr.Services
 
         Task<ServiceResult<IEnumerable<Movie>>> GetMoviesFilteredAsync(string filter, IEnumerable<string> filterValues);
 
-        public Task<ServiceResult<List<string>>> GetValuesForProperty(string property);
+        public Task<ServiceResult<List<string>>> GetValuesForPropertyAsync(string property);
 
-        Task<ServiceResult<object>> ImportMovie(WorkItem workItem);
-        Task<ServiceResult<IEnumerable<Movie>>> RequestMoviesFiltered(string filter, IEnumerable<string> filterValues);
-        public Task<SystemStatus> TestConnection(APISettings settings);
+        Task<ServiceResult<object>> ImportMovieAsync(WorkItem workItem);
+        Task<ServiceResult<IEnumerable<Movie>>> RequestMoviesFilteredAsync(string filter, IEnumerable<string> filterValues);
+
+        public Task<SystemStatus> TestConnectionAsync(APISettings settings);
     }
 }

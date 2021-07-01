@@ -11,6 +11,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Collections;
 
 namespace Compressarr.Filtering
 {
@@ -53,9 +54,8 @@ namespace Compressarr.Filtering
                 new FilterComparitor("!=")
             };
 
-            RadarrFilterProperties = new List<FilterProperty>();
-
-            BuildFilterProperties();
+            RadarrFilterProperties = BuildFilterProperties(typeof(Movie));
+            SonarrFilterProperties = BuildFilterProperties(typeof(Series));
 
             //This HAS to come after building the filter properties.
             RadarrTableColumns = GetRadarrTableColumns();
@@ -69,8 +69,9 @@ namespace Compressarr.Filtering
         public List<FilterProperty> RadarrTableColumns { get; private set; }
         public List<FilterComparitor> StringComparitors { get; }
 
+        public List<FilterProperty> SonarrFilterProperties { get; }
 
-        public Task AddFilter(List<DynamicLinqFilter> dlFilters, string filterName, MediaSource filterType)
+        public async Task<Guid> AddFilter(List<DynamicLinqFilter> dlFilters, string filterName, MediaSource filterType)
         {
             using (logger.BeginScope("Add Filter"))
             {
@@ -88,7 +89,9 @@ namespace Compressarr.Filtering
 
                 filter.Filters = dlFilters.JsonClone();
 
-                return settingsManager.SaveAppSetting();
+                await settingsManager.SaveAppSetting();
+
+                return filter.ID;
             }
         }
 
@@ -146,7 +149,7 @@ namespace Compressarr.Filtering
             return StringComparitors;
         }
 
-        public Filter GetFilter(string filterName) => Filters.FirstOrDefault(x => x.Name == filterName);
+        public Filter GetFilter(Guid id) => Filters.FirstOrDefault(x => x.ID == id);
 
         /// <summary>
         /// Gets all filters matching the selected source
@@ -163,26 +166,37 @@ namespace Compressarr.Filtering
             });
         }
 
-        private void BuildFilterProperties(Type type = null, string name = null, string prefix = null)
+        private List<FilterProperty> BuildFilterProperties(Type type, List<FilterProperty> filterProperties = null, string name = null, string prefix = null)
         {
-            foreach (var prop in (type ?? typeof(Services.Models.Movie)).GetProperties())
+            filterProperties ??= new();
+            var enumerable = false;
+
+            if (type.GetInterfaces().Contains(typeof(IEnumerable)))
+            {
+                type = type.GetGenericArguments()[0];
+                enumerable = true;
+            }
+
+            foreach (var prop in type.GetProperties())
             {
                 if (prop.GetCustomAttributes(false).FirstOrDefault(a => a is FilterAttribute) is FilterAttribute attr)
                 {
                     var attrName = string.IsNullOrWhiteSpace(name) ? attr.Name : $"{name} - {attr.Name}";
-                    var attrPrefix = string.IsNullOrWhiteSpace(prefix) ? prop.Name : $"{prefix}.{prop.Name}";
-                    var attrfilterOn = string.IsNullOrWhiteSpace(attr.FilterOn) ? attrPrefix : string.IsNullOrWhiteSpace(prefix) ? attr.FilterOn : $"{prefix}.{attr.FilterOn}";
+                    var attrPrefix = string.IsNullOrWhiteSpace(prefix) ? prop.Name : $"{prefix}{(enumerable ? "|": ".")}{prop.Name}";
+                    var attrfilterOn = string.IsNullOrWhiteSpace(attr.FilterOn) ? attrPrefix : string.IsNullOrWhiteSpace(prefix) ? attr.FilterOn : $"{prefix}{(enumerable ? "|" : ".")}{attr.FilterOn}";
 
                     if (attr.Traverse)
                     {
-                        BuildFilterProperties(prop.PropertyType, attrName, attrPrefix);
+                        BuildFilterProperties(prop.PropertyType, filterProperties, attrName, attrPrefix);
                     }
                     else
                     {
-                        RadarrFilterProperties.Add(new FilterProperty(attrName, attrPrefix, attr.PropertyType, attr.Suffix, attrfilterOn));
+                        filterProperties.Add(new FilterProperty(attrName, attrPrefix, attr.PropertyType, attr.Suffix, attrfilterOn));
                     }
                 }
             }
+
+            return filterProperties;
         }
         private List<FilterProperty> GetRadarrTableColumns()
         {
@@ -224,7 +238,15 @@ namespace Compressarr.Filtering
                     string filterStr;
                     if (dlFilter.Comparitor.IsParamMethod)
                     {
-                        filterStr = $" {dlFilter.LogicalOperator} {dlFilter.Property.Value}{dlFilter.Comparitor.Operator}";
+                        var nullPropReg = new Regex(@"\|?([\w\.]+)(?!\|)+$");
+
+                        var valStr = nullPropReg.Replace(dlFilter.Property.Value, "|np($1");
+
+                        filterStr = $" {dlFilter.LogicalOperator} {valStr}{dlFilter.Comparitor.Operator},false)";
+
+                        vals.Add(dlFilter.Value);
+                        var reg = new Regex(@"\(@\)");
+                        filterStr = reg.Replace(filterStr, $"(@{vals.Count - 1})");
                     }
                     else
                     {
@@ -236,13 +258,6 @@ namespace Compressarr.Filtering
                             FilterPropertyType.Enum => $" {dlFilter.LogicalOperator} ( {string.Join(dlFilter.Comparitor.Operator == " == " ? " or " : " and ", (dlFilter.Values ?? new HashSet<string> { dlFilter.Value }).Select(x => $"{dlFilter.Property.Value}{dlFilter.Comparitor.Operator}\"{x}\""))} )",
                             _ => filterStr = $" {dlFilter.LogicalOperator} {dlFilter.Property.Value}{dlFilter.Comparitor.Operator}{dlFilter.Value}"
                         };
-                    }
-
-                    if (dlFilter.Comparitor.IsParamMethod)
-                    {
-                        vals.Add(dlFilter.Value);
-                        var reg = new Regex(@"\(@\)");
-                        filterStr = reg.Replace(filterStr, $"(@{vals.Count - 1})");
                     }
 
                     sb.Append(filterStr);

@@ -11,15 +11,15 @@ namespace Compressarr.JobProcessing.Models
     {
         public ArgumentCalculator(WorkItem wi, FFmpegPreset preset)
         {
-            if (wi?.Media?.MediaInfo == null) throw new ArgumentException("MediaInfo is not available");
+            if (wi?.Media?.FFProbeMediaInfo == null) throw new ArgumentException("MediaInfo is not available");
 
-            AudioStreams = wi.Media.MediaInfo.AudioStreams ?? new HashSet<Stream>();
-            VideoStreams = wi.Media.MediaInfo.VideoStreams ?? new HashSet<Stream> ();
+            AudioStreams = wi.Media.FFProbeMediaInfo.AudioStreams ?? new HashSet<Stream>();
+            VideoStreams = wi.Media.FFProbeMediaInfo.VideoStreams ?? new HashSet<Stream> ();
 
             Preset = preset;
 
-            ColorPrimaries = wi.Media.MediaInfo.VideoStreams?.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.color_primaries))?.color_primaries;
-            ColorTransfer = wi.Media.MediaInfo.VideoStreams?.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.color_transfer))?.color_transfer;
+            ColorPrimaries = wi.Media.FFProbeMediaInfo.VideoStreams?.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.color_primaries))?.color_primaries;
+            ColorTransfer = wi.Media.FFProbeMediaInfo.VideoStreams?.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.color_transfer))?.color_transfer;
 
             VideoEncoderOptions = new();
             foreach(var veo in preset.VideoEncoderOptions)

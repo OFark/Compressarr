@@ -12,6 +12,7 @@ namespace Compressarr.Presets.Models
         public int MediaInfoID { get; set; }
         public string Argument { get; set; }
         public decimal SSIM { get; set; }
+        public decimal Speed { get; set; }
         public long Size { get; set; }
         public long OriginalSize { get; set; }
 

@@ -17,7 +17,7 @@ namespace Compressarr.Services.Models
 
         public HashSet<TreeItemData> MediaHistory { get; set; }
 
-        public FFProbeResponse MediaInfo { get; set; }
+        public FFProbeResponse FFProbeMediaInfo { get; set; }
 
         public MediaSource Source { get; set; }
     }

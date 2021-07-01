@@ -1,4 +1,5 @@
 ﻿using Compressarr.Application;
+using Compressarr.FFmpeg.Events;
 using Compressarr.FFmpeg.Models;
 using Compressarr.Presets;
 using Microsoft.Extensions.Logging;
@@ -7,12 +8,13 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace Compressarr.FFmpeg
 {
-    public class FFmpegProcessor : IFFmpegProcessor
+    public partial class FFmpegProcessor : IFFmpegProcessor
     {
         private readonly IApplicationService applicationService;
         private readonly IFileService fileService;
@@ -271,8 +273,8 @@ namespace Compressarr.FFmpeg
             }
         }
 
-        public async Task<ProcessResponse> RunProcess(FFProcess process, string arguments)
-        {   
+        public async Task<ProcessResponse> RunProcess(FFProcess process, string arguments, FFmpegProgressEvent OnProgress = null, FFmpegSSIMReportEvent OnSSIM = null)
+        {
             var filePath = process switch
             {
                 FFProcess.FFmpeg => fileService.FFMPEGPath,
@@ -280,10 +282,10 @@ namespace Compressarr.FFmpeg
                 _ => throw new NotImplementedException()
             };
 
-            return await RunProcess(filePath, arguments);
+            return await RunProcess(filePath, arguments, OnProgress, OnSSIM);
         }
 
-        public async Task<ProcessResponse> RunProcess(string filePath, string arguments)
+        public async Task<ProcessResponse> RunProcess(string filePath, string arguments, FFmpegProgressEvent OnProgress = null, FFmpegSSIMReportEvent OnSSIM = null)
         {
             using (logger.BeginScope("Run Process: {filePath}", filePath))
             {
@@ -301,13 +303,56 @@ namespace Compressarr.FFmpeg
                     WindowStyle = ProcessWindowStyle.Hidden,
                 };
 
+                var stdOut = new StringBuilder();
+                var stdErr = new StringBuilder();
+                TimeSpan duration = default;
+                FFmpegProgress progressReport = null;
+
+                p.OutputDataReceived += new DataReceivedEventHandler((s, e) =>
+                {
+                    if (OnProgress != null && FFmpegProgress.TryParse(e.Data, out var result))
+                    {
+                        progressReport = result.CalculatePercentage(duration);
+                        OnProgress.Invoke(progressReport);
+                    }
+                    else if (OnSSIM != null && FFmpegSSIMReport.TryParse(e.Data, out var ssimreport)) OnSSIM.Invoke(ssimreport);
+                    else if (FFmpegDurationReport.TryParse(e.Data, out var durationreport)) duration = duration != default && duration > durationreport.Duration ? duration : durationreport.Duration;
+                    else { stdOut.AppendLine(e.Data); }
+                });
+                p.ErrorDataReceived += new DataReceivedEventHandler((s, e) =>
+                {
+                    if (OnProgress != null && FFmpegProgress.TryParse(e.Data, out var result))
+                    {
+                        progressReport = result.CalculatePercentage(duration);
+                        OnProgress.Invoke(progressReport);
+                    }
+                    else if (OnSSIM != null && FFmpegSSIMReport.TryParse(e.Data, out var ssimreport)) OnSSIM.Invoke(ssimreport);
+                    else if (FFmpegDurationReport.TryParse(e.Data, out var durationreport)) duration = duration != default && duration > durationreport.Duration ? duration : durationreport.Duration;
+                    else
+                    {
+                        logger.LogError(e.Data);
+                        stdErr.AppendLine(e.Data);
+                    }
+                });
+
                 logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
                 p.Start();
-                response.StdOut = p.StandardOutput.ReadToEnd();
-                response.StdErr = p.StandardError.ReadToEnd();
+
+                p.BeginOutputReadLine();
+                p.BeginErrorReadLine();
+
                 await p.WaitForExitAsync();
 
                 p.WaitForExit(); //This waits for any handles to finish as well. 
+
+                response.StdOut = stdOut.ToString();
+                response.StdErr = stdErr.ToString();
+
+                if(progressReport != null)
+                {
+                    progressReport.Percentage = 100;
+                    OnProgress.Invoke(progressReport);
+                }
 
                 response.ExitCode = p.ExitCode;
 

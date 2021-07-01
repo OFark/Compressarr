@@ -1,4 +1,6 @@
-﻿using Compressarr.FFmpeg.Models;
+﻿using Compressarr.FFmpeg.Events;
+using Compressarr.FFmpeg.Models;
+using System;
 using System.Threading.Tasks;
 
 namespace Compressarr.FFmpeg
@@ -13,7 +15,7 @@ namespace Compressarr.FFmpeg
         Task<FFResult<string>> GetFFmpegVersionAsync();
         Task<FFResult<FFProbeResponse>> GetFFProbeInfo(string filePath);
         Task<FFResult<string>> GetFFProbeJSON(string filePath);
-        Task<ProcessResponse> RunProcess(FFProcess process, string arguments);
-        Task<ProcessResponse> RunProcess(string filePath, string arguments);
+        Task<ProcessResponse> RunProcess(FFProcess process, string arguments, FFmpegProgressEvent OnProgress = null, FFmpegSSIMReportEvent OnSSIM = null);
+        Task<ProcessResponse> RunProcess(string filePath, string arguments, FFmpegProgressEvent OnProgress = null, FFmpegSSIMReportEvent OnSSIM = null);
     }
 }

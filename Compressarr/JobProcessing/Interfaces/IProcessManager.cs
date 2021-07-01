@@ -1,4 +1,5 @@
-﻿using Compressarr.FFmpeg.Models;
+﻿using Compressarr.FFmpeg.Events;
+using Compressarr.FFmpeg.Models;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Presets.Models;
 using Compressarr.Services.Models;
@@ -14,7 +15,7 @@ namespace Compressarr.JobProcessing
 {
     public interface IProcessManager
     {
-        Task<SSIMResult> CalculateSSIM(DataReceivedEventHandler dataRecieved, ConversionProgressEventHandler dataProgress, string sourceFile, string destinationFile, string hardwareDecoder, CancellationToken token);
+        Task<SSIMResult> CalculateSSIM(FFmpegProgressEvent ffmpegProgress, string sourceFile, string destinationFile, string hardwareDecoder, CancellationToken token);
         Task<EncodingResult> EncodeAVideo(DataReceivedEventHandler dataRecieved, ConversionProgressEventHandler dataProgress, string arguments, CancellationToken token);
         Task GenerateSample(string sampleFile, WorkItem wi, FFmpegPreset preset, CancellationToken token);
         Task Process(WorkItem workItem, CancellationToken token);

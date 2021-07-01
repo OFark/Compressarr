@@ -40,25 +40,13 @@ namespace Compressarr.Services.Models
         public string name { get; set; }
 
         [Filter("Resolution", FilterPropertyType.Enum)]
-        public int resolution { get; set; }
+        public string resolution { get; set; }
 
         [Filter("Source", FilterPropertyType.Enum)]
         public string source { get; set; }
     }
 
-    public class Image
-    {
-        public string coverType { get; set; }
-        public string url { get; set; }
-    }
-
-    public class Language
-    {
-        public int id { get; set; }
-        public string name { get; set; }
-    }
-
-    public class MediaInfo
+    public class MovieMediaInfo
     {
         [Filter("Audio - Additional Features")]
         public string audioAdditionalFeatures { get; set; }
@@ -307,7 +295,7 @@ namespace Compressarr.Services.Models
         public int id { get; set; }
 
         [Filter("Media Info", true)]
-        public MediaInfo mediaInfo { get; set; }
+        public MovieMediaInfo mediaInfo { get; set; }
 
         public int movieId { get; set; }
 
@@ -339,26 +327,5 @@ namespace Compressarr.Services.Models
 
         [Filter("Revision", true)]
         public Revision revision { get; set; }
-    }
-
-    public class Ratings
-    {
-        [Filter("Value", FilterPropertyType.Number)]
-        public double value { get; set; }
-
-        [Filter("Votes", FilterPropertyType.Number)]
-        public int votes { get; set; }
-    }
-
-    public class Revision
-    {
-        [Filter("Real", FilterPropertyType.Number)]
-        public int real { get; set; }
-
-        [Filter("Version", FilterPropertyType.Number)]
-        public int version { get; set; }
-
-        [Filter("Is Repack", FilterPropertyType.Boolean)]
-        public bool isRepack { get; set; }
     }
 }

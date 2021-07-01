@@ -47,6 +47,8 @@
       color: var(--mud-palette-primary); }
       body app a:hover {
         text-decoration: underline; }
+    body app pre {
+      white-space: pre-wrap; }
     body app .modal {
       background: rgba(0, 0, 0, 0.5);
       position: fixed;
@@ -78,19 +80,19 @@
         vertical-align: middle; }
     body app #content {
       padding-top: 1.1rem; }
-      body app #content #divRadarr .filterList .filterTableWrapper {
+      body app #content #divRadarr .filterList .filterTableWrapper, body app #content #divSonarr .filterList .filterTableWrapper {
         border-collapse: separate; }
-        body app #content #divRadarr .filterList .filterTableWrapper thead th:not(.hide) select, body app #content #divRadarr .filterList .filterTableWrapper thead th:not(.hide) select:focus-visible {
+        body app #content #divRadarr .filterList .filterTableWrapper thead th:not(.hide) select, body app #content #divRadarr .filterList .filterTableWrapper thead th:not(.hide) select:focus-visible, body app #content #divSonarr .filterList .filterTableWrapper thead th:not(.hide) select, body app #content #divSonarr .filterList .filterTableWrapper thead th:not(.hide) select:focus-visible {
           padding: 4px 0 6px;
           border: none;
           outline: none; }
-        body app #content #divRadarr .filterList .filterTableWrapper thead th:not(.hide) option {
+        body app #content #divRadarr .filterList .filterTableWrapper thead th:not(.hide) option, body app #content #divSonarr .filterList .filterTableWrapper thead th:not(.hide) option {
           /*                    background-color: $overBackground*/ }
-        body app #content #divRadarr .filterList .filterTableWrapper tbody {
+        body app #content #divRadarr .filterList .filterTableWrapper tbody, body app #content #divSonarr .filterList .filterTableWrapper tbody {
           color: var(--mud-palette-secondary); }
-        body app #content #divRadarr .filterList .filterTableWrapper td:not(:first-child) {
+        body app #content #divRadarr .filterList .filterTableWrapper td:not(:first-child), body app #content #divSonarr .filterList .filterTableWrapper td:not(:first-child) {
           padding: 5px 10px; }
-        body app #content #divRadarr .filterList .filterTableWrapper td:first-child {
+        body app #content #divRadarr .filterList .filterTableWrapper td:first-child, body app #content #divSonarr .filterList .filterTableWrapper td:first-child {
           text-align: center; }
       body app #content #divJobList {
         margin-bottom: 1em; }

@@ -1,5 +1,6 @@
 ﻿using Compressarr.Application;
 using Compressarr.FFmpeg;
+using Compressarr.FFmpeg.Events;
 using Compressarr.Helpers;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Presets;
@@ -15,6 +16,7 @@ using System.Linq.Dynamic.Core;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using static Compressarr.FFmpeg.FFmpegProcessor;
 
 namespace Compressarr.JobProcessing
 {
@@ -64,7 +66,7 @@ namespace Compressarr.JobProcessing
             {
                 await applicationService.InitialisePresets;
 
-                wi.Media.MediaInfo ??= await mediaInfoService.GetMediaInfo(wi.Media);
+                wi.Media.FFProbeMediaInfo ??= await mediaInfoService.GetMediaInfo(wi.Media);
 
                 wi.ArgumentCalculator = new ArgumentCalculator(wi, preset);
 
@@ -82,7 +84,7 @@ namespace Compressarr.JobProcessing
             {
                 var preset = wi.ArgumentCalculator.Preset;
 
-                var sampleFile = Path.Combine(fileService.TempDir, $"directCopy.{preset.ContainerExtension}");
+                var sampleFile = Path.Combine(fileService.TempDir, $"directCopy{wi.SourceFileExtension}");
                 var tempEncFile = Path.Combine(fileService.TempDir, $"encFile.{preset.ContainerExtension}");
 
                 Task genSampleTask = null;
@@ -127,7 +129,7 @@ namespace Compressarr.JobProcessing
                     wi.Update();
                 }
 
-                
+
                 do
                 {
                     foreach (var veo in wi.ArgumentCalculator.AutoCalcVideoEncoderOptions)
@@ -141,7 +143,7 @@ namespace Compressarr.JobProcessing
 
                         veo.HasSettled = veo.ArgumentHistory.Contains(currArg);
 
-                        if(!veo.HasSettled) veo.ArgumentHistory.Add(currArg);
+                        if (!veo.HasSettled) veo.ArgumentHistory.Add(currArg);
                         // If it is in the history then the next steps should auto fill from cache
 
                         foreach (var best in veo.AutoPresetTests.Where(x => x.Best)) { best.Best = false; }
@@ -164,12 +166,13 @@ namespace Compressarr.JobProcessing
 
                             logger.LogInformation($"Trying: {arg}");
 
-                            var storedResult = GetAutoCalcResult(wi.Media.MediaInfo.GetStableHash(), arg);
+                            var storedResult = GetAutoCalcResult(wi.Media.FFProbeMediaInfo.GetStableHash(), arg);
 
-                            if (storedResult != null)
+                            if (storedResult != null && (!(applicationService.AutoCalculationType is AutoCalcType.BySpeed or AutoCalcType.Balanced or AutoCalcType.WeightedForCompression or AutoCalcType.WeightedForSpeed or AutoCalcType.WeightedForSSIM) || storedResult.Speed > 0))
                             {
                                 test.AddSize(storedResult.Size, storedResult.OriginalSize);
                                 test.SSIM = storedResult.SSIM;
+                                test.Speed = storedResult.Speed;
                                 logger.LogDebug($"SSIM: {storedResult.SSIM}, Size: {storedResult.Size.ToFileSize()} {Math.Round((decimal)storedResult.Size / storedResult.OriginalSize * 100M, 2).Adorn("%")}");
                             }
                             else
@@ -181,7 +184,12 @@ namespace Compressarr.JobProcessing
 
                                 logger.LogInformation($"Testing sample encode with: {arg}");
 
-                                await processManager.EncodeAVideo(null, (sender, args) =>
+                                await processManager.EncodeAVideo((sender, args) =>
+                                {
+                                    if (FFmpegProgress.TryParse(args.Data, out var progress)) test.Speed = progress.Speed;
+                                }
+
+                                , (sender, args) =>
                                 {
                                     test.EncodingProgress = args.Percent;
                                     wi.Update();
@@ -193,9 +201,9 @@ namespace Compressarr.JobProcessing
                                 test.AddSize(size, origSize);
                                 wi.Update();
 
-                                var ssimResult = await processManager.CalculateSSIM(null, (sender, args) =>
+                                var ssimResult = await processManager.CalculateSSIM((args) =>
                                 {
-                                    test.SSIMProgress = args.Percent;
+                                    test.SSIMProgress = args.Percentage;
                                     wi.Update();
                                 }, sampleFile, tempEncFile, hardwareDecoder, token);
 
@@ -203,7 +211,7 @@ namespace Compressarr.JobProcessing
                                 {
                                     test.SSIM = ssimResult.SSIM;
                                     logger.LogDebug($"SSIM: {ssimResult.SSIM}, Size: {size.ToFileSize()} {Math.Round((decimal)size / origSize * 100M, 2).Adorn("%")}");
-                                    StoreAutoCalcResults(wi.Media.UniqueID, wi.Media.MediaInfo.GetStableHash(), arg, ssimResult.SSIM, size, origSize);
+                                    StoreAutoCalcResults(wi.Media.UniqueID, wi.Media.FFProbeMediaInfo.GetStableHash(), arg, ssimResult.SSIM, size, origSize, test.Speed);
                                 }
                             }
 
@@ -212,6 +220,35 @@ namespace Compressarr.JobProcessing
                         }
 
                         AutoPresetResult bestVal = default;
+
+                        if (applicationService.AutoCalculationType == AutoCalcType.Balanced)
+                        {
+                            var validVals = veo.AutoPresetTests.Where(x => x != null && x.Size < x.OriginalSize);
+                            bestVal = BalanceResults(validVals);
+                        }
+
+                        if (applicationService.AutoCalculationType == AutoCalcType.WeightedForCompression)
+                        {
+                            var validVals = veo.AutoPresetTests.Where(x => x != null && x.Size < x.OriginalSize);
+                            bestVal = BalanceResults(validVals, weightCompression: 2);
+                        }
+
+                        if (applicationService.AutoCalculationType == AutoCalcType.WeightedForSpeed)
+                        {
+                            var validVals = veo.AutoPresetTests.Where(x => x != null && x.Size < x.OriginalSize);
+                            bestVal = BalanceResults(validVals, weightSpeed: 2);
+                        }
+
+                        if (applicationService.AutoCalculationType == AutoCalcType.WeightedForSSIM)
+                        {
+                            var validVals = veo.AutoPresetTests.Where(x => x != null && x.Size < x.OriginalSize);
+                            bestVal = BalanceResults(validVals, weightSSIM: 2);
+                        }
+
+                        if (applicationService.AutoCalculationType == AutoCalcType.BySpeed)
+                        {
+                            bestVal = veo.AutoPresetTests.OrderBy(x => Math.Abs(1 - x.Speed)).ThenByDescending(x => x.Speed > 1).ThenByDescending(x => x.SSIM).FirstOrDefault();
+                        }
 
                         if (applicationService.AutoCalculationType == AutoCalcType.BangForBuck)
                         {
@@ -253,19 +290,19 @@ namespace Compressarr.JobProcessing
                             bestVal = veo.AutoPresetTests.Where(x => x != null && x.SSIM >= (applicationService.AutoCalculationPost ?? 99)).OrderBy(x => x.Size).ThenByDescending(x => x.SSIM).FirstOrDefault();
                         }
 
-                        if (bestVal.Equals(default(KeyValuePair<string, AutoPresetResult>)))
+                        if (bestVal == null || bestVal.Equals(default(KeyValuePair<string, AutoPresetResult>)))
                         {
                             bestVal = veo.AutoPresetTests.Where(x => x != null && x.Size < x.OriginalSize).OrderByDescending(x => x.SSIM).ThenBy(x => x.Size).FirstOrDefault();
                         };
 
-                        if (bestVal.Equals(default(KeyValuePair<string, AutoPresetResult>)))
+                        if (bestVal == null || bestVal.Equals(default(KeyValuePair<string, AutoPresetResult>)))
                         {
                             bestVal = veo.AutoPresetTests.OrderBy(x => x.Size).FirstOrDefault();
                         }
 
                         bestVal.Best = true;
 
-                        var resultLog = veo.AutoPresetTests.Select(d => $"{d.ArgumentValue} | {d.SSIM} | {d.Percent.Adorn("%")} {(d.Best ? "<=" : "")}");
+                        var resultLog = veo.AutoPresetTests.Select(d => $"{d.ArgumentValue} | {d.SSIM} | {d.Compression.Adorn("%")} | {d.Speed.Adorn(" FPS")} {(d.Best ? "<=" : "")}");
                         logger.LogDebug($"SSIM results:\r\n{string.Join("\r\n", resultLog)}");
 
 
@@ -282,6 +319,26 @@ namespace Compressarr.JobProcessing
 
                 return;
             }
+        }
+
+        private static AutoPresetResult BalanceResults(IEnumerable<AutoPresetResult> validVals, decimal weightCompression = 1, decimal weightSpeed = 1, decimal weightSSIM = 1)
+        {
+            AutoPresetResult bestVal;
+            var minCompression = validVals.Min(x => x.Compression);
+            var devCompression = validVals.Max(x => x.Compression) - minCompression;
+
+            var minSpeed = validVals.Min(x => x.Speed);
+            var devSpeed = validVals.Max(x => x.Speed) - minSpeed;
+
+            var minSSIM = validVals.Min(x => x.SSIM);
+            var devSSIM = validVals.Max(x => x.SSIM) - minSSIM;
+
+            bestVal = validVals.OrderByDescending(x =>
+                (devCompression == 0 ? 0 : (1 - ((x.Compression - minCompression) / devCompression)) * weightCompression) +
+                (devSpeed == 0 ? 0 : ((x.Speed - minSpeed) / devSpeed) * weightSpeed) +
+                (devSSIM == 0 ? 0 : ((x.SSIM - minSSIM) / devSSIM) * weightSSIM)
+                ).FirstOrDefault();
+            return bestVal;
         }
 
         private static string GetArgument(ArgumentCalculator argCalc, int pass = 0)
@@ -354,9 +411,9 @@ namespace Compressarr.JobProcessing
 
                         var videoOptionArgs = string.Join(" ",
                             argCalc.VideoEncoderOptions
-                                .Where(x => !string.IsNullOrWhiteSpace(x.Value) && (!argCalc.TwoPass || !x.EncoderOption.DisabledByVideoBitRate))
+                                .Where(x => (!string.IsNullOrWhiteSpace(x.Value) || (x.EncoderOption.IncludePass && argCalc.TwoPass)) && (!argCalc.TwoPass || !x.EncoderOption.DisabledByVideoBitRate))
                                 .Select(x =>
-                                    $"{x.EncoderOption.Arg.Replace("<val>", x.Value.Trim())}{(x.EncoderOption.IncludePass && pass != 0 ? $" pass={pass}" : "")}"
+                                    $"{x.EncoderOption.Arg.Replace("<val>", x.Value?.Trim())}{(x.EncoderOption.IncludePass && pass != 0 ? $" pass={pass}" : "")}"
                                 )
                         );
                         videoArguments += $"{videoStreamMap} {preset.VideoEncoder.Name} {videoOptionArgs}";
@@ -379,11 +436,13 @@ namespace Compressarr.JobProcessing
             var colorPrimaries = argCalc.ColorPrimaries.Wrap(" -color_primaries {0}");
             var colorTransfer = argCalc.ColorTransfer.Wrap(" -color_trc {0}");
 
-            var globalVideoArgs = $"{bitrate}{frameRate}{bframes}{colorPrimaries}{colorTransfer}{passStr}";
+            var globalVideoArgs = firstPass ? "" : $"{bitrate}{frameRate}{bframes}{colorPrimaries}{colorTransfer}{passStr}";
 
             var mapAllElse = firstPass ? "" : " -map 0:s? -c:s copy -map 0:t? -map 0:d? -movflags use_metadata_tags";
 
-            return $"{hardwareDecoder}-y -i \"{{0}}\" {videoArguments}{opArgsStr}{globalVideoArgs}{audioArguments}{mapAllElse} \"{{1}}\"";
+            var outputFile = firstPass ? "" : " \"{1}\"";
+
+            return $"{hardwareDecoder}-y -i \"{{0}}\" {videoArguments}{opArgsStr}{globalVideoArgs}{audioArguments}{mapAllElse}{outputFile}";
         }
         private AutoCalcResult GetAutoCalcResult(int mediaInfoID, string argument)
         {
@@ -399,7 +458,7 @@ namespace Compressarr.JobProcessing
             }
         }
 
-        private void StoreAutoCalcResults(int mediaID, int mediaInfoID, string argument, decimal ssim, long size, long originalSize)
+        private void StoreAutoCalcResults(int mediaID, int mediaInfoID, string argument, decimal ssim, long size, long originalSize, decimal speed)
         {
             using (logger.BeginScope("StoreAutoCalcResults"))
             {
@@ -428,6 +487,7 @@ namespace Compressarr.JobProcessing
                 result.Size = size;
                 result.SSIM = ssim;
                 result.OriginalSize = originalSize;
+                result.Speed = speed;
 
                 results.EnsureIndex(x => x.MediaInfoID);
                 results.EnsureIndex(x => x.Argument);

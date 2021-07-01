@@ -50,7 +50,7 @@
 
         await OnUpdate.InvokeAsync();
 
-        movie.MediaInfo ??= await mediaInfoService.GetMediaInfo(movie);
+        movie.FFProbeMediaInfo ??= await mediaInfoService.GetMediaInfo(movie);
 
         await OnUpdate.InvokeAsync();
     }
