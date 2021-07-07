@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Compressarr.JobProcessing.Models
+namespace Compressarr.FFmpeg.Models
 {
     public class SSIMResult
     {

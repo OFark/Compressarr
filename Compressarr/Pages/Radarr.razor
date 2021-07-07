@@ -509,7 +509,7 @@
         else
         {
             var id = await filterManager.AddFilter(dlFilters, filterName, MediaSource.Radarr);
-            JobManager.InitialiseJobs(filterManager.GetFilter(id));
+            JobManager.InitialiseJobs(filterManager.GetFilter(id), applicationService.AppStoppingCancellationToken);
         }
     }
 

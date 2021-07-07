@@ -1,9 +1,11 @@
 ﻿@using Compressarr.Filtering;
 @using Compressarr.Filtering.Models;
 
+
+@implements IDisposable
 @inject IApplicationService applicationService
 @inject IMediaInfoService mediaInfoService
-@inject IHistoryService historyService 
+@inject IHistoryService historyService
 
 
 <MudTd>
@@ -34,6 +36,14 @@
 
     private List<FilterProperty> tableColumns => filterManager.RadarrTableColumns;
 
+    private CancellationTokenSource cts = new CancellationTokenSource();
+
+    public void Dispose()
+    {
+        cts.Cancel();
+        cts.Dispose();
+    }
+
     private void filterBy(string key, string value)
     {
         if (OnFilterBy.HasDelegate)
@@ -50,7 +60,11 @@
 
         await OnUpdate.InvokeAsync();
 
-        movie.FFProbeMediaInfo ??= await mediaInfoService.GetMediaInfo(movie);
+        var response = await mediaInfoService.GetMediaInfo(movie, cts.Token);
+        if(response.Success)
+        {
+            movie.FFProbeMediaInfo = response.Result;
+        }
 
         await OnUpdate.InvokeAsync();
     }
@@ -61,7 +75,7 @@
 
         if (movie.ShowHistory)
         {
-            movie.MediaHistory = historyService.GetProcessHistory(movie.UniqueID).Select(x => x.ToTreeView()).ToHashSet();
+            movie.MediaHistory = (await historyService.GetProcessHistoryAsync(movie.UniqueID)).Select(x => x.ToTreeView()).ToHashSet();
         }
 
         await OnUpdate.InvokeAsync();

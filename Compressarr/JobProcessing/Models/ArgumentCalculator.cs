@@ -47,5 +47,7 @@ namespace Compressarr.JobProcessing.Models
 
         public string ColorPrimaries { get; set; }
         public string ColorTransfer { get; set; }
+
+        public int SampleSize { get; set; }
     }
 }

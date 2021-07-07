@@ -27,7 +27,7 @@ namespace Compressarr.Pages
         [Inject]
         ISonarrService SonarrService { get; set; }
         [Inject]
-        IApplicationService settingsManager { get; set; }
+        IApplicationService applicationService { get; set; }
 
         private Job newJob = new();
 
@@ -45,6 +45,8 @@ namespace Compressarr.Pages
         protected async override Task OnInitializedAsync()
         {
             LayoutService.OnStateChanged += LayoutService_OnStateChanged;
+
+            await applicationService.InitialiseFFmpeg;
 
             radarrStatus = await RadarrService.GetStatus();
             sonarrStatus = await SonarrService.GetStatus();

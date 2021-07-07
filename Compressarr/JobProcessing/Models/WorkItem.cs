@@ -10,12 +10,15 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Threading;
 
 namespace Compressarr.JobProcessing.Models
 
 {
     public class WorkItem
     {
+
+        internal CancellationTokenSource CancellationTokenSource = new();
 
         public WorkItem(Movie movie, string basePath)
         {
@@ -24,7 +27,6 @@ namespace Compressarr.JobProcessing.Models
             SourceFile = movie.FilePath;
             Media = movie;
             Media.Source = MediaSource.Radarr;
-            Processing = new();
         }
 
         public WorkItem(EpisodeFile episodeFile, string basePath)
@@ -34,7 +36,6 @@ namespace Compressarr.JobProcessing.Models
             SourceFile = episodeFile.FilePath;
             Media = episodeFile;
             Media.Source = MediaSource.Sonarr;
-            Processing = new();
         }
 
         public event EventHandler<Update> OnUpdate;
@@ -43,6 +44,7 @@ namespace Compressarr.JobProcessing.Models
         public IEnumerable<string> Arguments { get; set; }
         public string Bitrate { get; internal set; }
         public decimal? Compression { get; internal set; }
+        public WorkItemCondition Condition { get; set; } = new();
         public ImmutableSortedSet<JobEvent> Console { get; set; }
         public string DestinationFile { get; set; }
         public string DestinationFileName => Path.GetFileName(DestinationFile);
@@ -70,7 +72,6 @@ namespace Compressarr.JobProcessing.Models
             }
         }
 
-        public bool Finished { get; internal set; } = false;
         public decimal? FPS { get; internal set; }
         public long? Frame { get; internal set; }
         public Job Job { get; set; }
@@ -79,9 +80,8 @@ namespace Compressarr.JobProcessing.Models
         public string MediaName { get; set; }
         public string Name => MediaName ?? SourceFileName;
         public int? Percent { get; internal set; }
-        public ConditionSwitch Processing { get; set; }
         public decimal? Q { get; internal set; }
-        public bool ShowArgs { get; set; }
+        public bool ShowDetails { get; set; }
         public string Size { get; internal set; }
         public string SourceFile { get; set; }
         public string SourceFileExtension => Path.GetExtension(SourceFile);
@@ -89,8 +89,8 @@ namespace Compressarr.JobProcessing.Models
         public int SourceID { get; set; }
         public decimal Speed { get; internal set; }
         public decimal? SSIM { get; set; }
-        public bool Success { get; internal set; } = false;
         public TimeSpan? TotalLength => Media.FFProbeMediaInfo?.format?.Duration;
+        internal CancellationToken CancellationToken => CancellationTokenSource.Token;
         private TimeSpan? eta { get; set; }
         public void Output(string message) => Output(new(message), false);
         public void Output(Update update, bool isFFmpegProgress = false)

@@ -6,6 +6,6 @@ namespace Compressarr.Presets
 {
     public interface IApplicationInitialiser
     {
-        Task InitialiseAsync(CancellationToken cancellationToken = default);
+        Task InitialiseAsync();
     }
 }

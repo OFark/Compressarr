@@ -16,6 +16,6 @@ namespace Compressarr.Presets.Models
         public long Size { get; set; }
         public long OriginalSize { get; set; }
 
-        public string SampleLength { get; set; }
+        public int SampleLength { get; set; }
     }
 }

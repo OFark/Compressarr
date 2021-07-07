@@ -6,23 +6,25 @@ using Compressarr.Services.Models;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace Compressarr.JobProcessing
 {
     public interface IJobManager
     {
         HashSet<Job> Jobs { get; }
-        
-        Task<bool> AddJobAsync(Job newJob);
+        Task<bool> AddJobAsync(Job newJob, CancellationToken token);
         void CancelJob(Job job);
         Task DeleteJob(Job job);
         bool FilterInUse(Guid id);
-        Task InitialiseJob(Job job);
-        void InitialiseJobs(Filter filter);
-        void InitialiseJobs(MediaSource source);
-        void InitialiseJobs(FFmpegPreset preset);
+        Task InitialiseJob(Job job, CancellationToken token);
+        void InitialiseJobs(Filter filter, CancellationToken token);
+        void InitialiseJobs(MediaSource source, CancellationToken token);
+        void InitialiseJobs(FFmpegPreset preset, CancellationToken token);
+        Task PrepareWorkItem(WorkItem wi, FFmpegPreset preset, CancellationToken token);
         bool PresetInUse(FFmpegPreset preset);
-        Job ReloadJob(Job job);
+        Task ProcessWorkItem(WorkItem wi, CancellationToken token);
+        Job ReloadJob(Job job, CancellationToken token);
         void RunJob(Job job);
     }
 }

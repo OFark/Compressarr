@@ -13,6 +13,12 @@ namespace Compressarr.JobProcessing.Models
             Level = level;
         }
 
+        public static Update Information(string message) => new Update(message);
+        public static Update Warning(string message) => new Update(message, LogLevel.Warning);
+        public static Update Debug(string message) => new Update(message, LogLevel.Debug);
+        public static Update Error(string message) => new Update(message, LogLevel.Error);
+        public static Update FromException(Exception ex) => new Update(ex);
+
         public Update(Exception ex) : this(ex, LogLevel.Error) { }
 
         public Update(Exception ex, LogLevel level)

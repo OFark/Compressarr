@@ -60,11 +60,6 @@
                     </MudToolBar>
                 </MudItem>
             </MudGrid>
-            @if (!string.IsNullOrWhiteSpace(AlertMessage))
-            {
-                <MudAlert Severity="Severity.Error">@AlertMessage</MudAlert>
-            }
-
 
             <MudPaper Class="my-2 filterList">
                 <table class="filterTableWrapper">

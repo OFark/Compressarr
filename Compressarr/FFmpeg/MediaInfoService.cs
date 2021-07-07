@@ -23,7 +23,7 @@ namespace Compressarr.FFmpeg
             this.logger = logger;
         }
 
-        public async Task<FFProbeResponse> GetMediaInfo(IMedia media)
+        public async Task<FFResult<FFProbeResponse>> GetMediaInfo(IMedia media, CancellationToken token)
         {
             var filePath = media.FilePath;
 
@@ -36,19 +36,15 @@ namespace Compressarr.FFmpeg
                     await applicationService.InitialiseFFmpeg;
 
                     logger.LogInformation($"Loading Info from source");
-                    var ffProbeResponse = await fFmpegProcessor.GetFFProbeInfo(filePath);
+                    var ffProbeResponse = await fFmpegProcessor.GetFFProbeInfo(filePath, token);
 
-                    if (ffProbeResponse.Success)
-                    {
-                        return media.FFProbeMediaInfo = ffProbeResponse.Result;
-                    }
+                    return ffProbeResponse;
                 }
             }
             finally
             {
                 mediaInfoSemaphore.Release();
             }
-            return null;
         }
 
     }

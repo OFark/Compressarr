@@ -133,38 +133,6 @@
         </MudCardHeader>
         <MudCardContent>
             <MudList>
-
-                <MudListItem>
-                    <MudSwitch Color="Color.Secondary" @bind-Checked="@applicationService.AlwaysCalculateSSIM" Label="Always calculate SSIM after encoding" />
-                </MudListItem>
-                <MudListItem>
-                    <MudText Typo="Typo.h6">Auto Calculation</MudText>
-                    <MudList Dense="true">
-                        <MudListItem>
-                            <MudItem md="4">
-                                <MudNumericField @bind-Value="@applicationService.ArgCalcSampleSeconds" Label="Sample length (Seconds)" />
-                            </MudItem>
-                        </MudListItem>
-                        <MudListItem>
-                            <MudItem md="4">
-                                <MudSelect Dense="true" @bind-Value="@applicationService.AutoCalculationType" Label="Calculation Type">
-                                    @foreach (AutoCalcType r in Enum.GetValues(typeof(AutoCalcType)))
-                                    {
-                                        <MudSelectItem Value="r">@r.ToString().Humanize()</MudSelectItem>
-                                    }
-                                </MudSelect>
-                            </MudItem>
-                        </MudListItem>
-                        @if (applicationService.AutoCalculationType == AutoCalcType.FirstPastThePost)
-                        {
-                            <MudListItem>
-                                <MudItem md="4">
-                                    <MudNumericField Style="" @bind-Value="minSSIMPost" Label="Minimum SSIM" Min="0" Max="100" Adornment="Adornment.End" AdornmentText="%" />
-                                </MudItem>
-                            </MudListItem>
-                        }
-                    </MudList>
-                </MudListItem>
                 <MudListItem>
                     <MudSelect T="LogLevel" @bind-Value="logLevel" Label="Log Level">
                         @foreach (LogLevel ll in Enum.GetValues(typeof(LogLevel)))
@@ -246,25 +214,7 @@
 
         _ = base.OnInitializedAsync();
     }
-
-    private int? minSSIMPost
-    {
-        get
-        {
-            return applicationService.AutoCalculationPost.HasValue ? (int)(applicationService.AutoCalculationPost * 100) : null;
-        }
-        set
-        {
-            if (value.HasValue)
-            {
-                applicationService.AutoCalculationPost = (decimal)value / 100;
-            }
-            else
-            {
-                applicationService.AutoCalculationPost = null;
-            }
-        }
-    }
+    
 
     private void deleteRadarrSetting()
     {
@@ -305,7 +255,7 @@
 
                 radarrService.ClearCache();
 
-                jobManager.InitialiseJobs(MediaSource.Radarr);
+                jobManager.InitialiseJobs(MediaSource.Radarr, applicationService.AppStoppingCancellationToken);
 
                 showRadarrStatus = false;
             }

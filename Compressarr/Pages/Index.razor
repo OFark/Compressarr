@@ -8,10 +8,10 @@
 
                 @foreach (var job in JobManager.Jobs)
                 {
-                    <JobView job="job"></JobView>
+                    <JobView Job="job"></JobView>
 
                 }
-                <JobView job="@newJob" NewJob="true" OnAdd="addJob"></JobView>
+                <JobView Job="@newJob" NewJob="true" OnAdd="addJob"></JobView>
             </MudExpansionPanels>
         </div>
     }

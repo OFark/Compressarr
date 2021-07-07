@@ -11,6 +11,6 @@ namespace Compressarr.JobProcessing
         List<string> GetArguments(WorkItem wi);
         List<string> GetArguments(WorkItem wi, string sourceFile, string destinationFile);
         List<string> GetArgumentTemplates(WorkItem wi);
-        Task SetArguments(FFmpegPreset preset, WorkItem wi, CancellationToken token);
+        Task<string> SetArguments(FFmpegPreset preset, WorkItem wi, CancellationToken token, bool force = false);
     }
 }

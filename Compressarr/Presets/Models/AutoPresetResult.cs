@@ -11,27 +11,31 @@ namespace Compressarr.Presets.Models
         public bool Best { get; set; }
         public double EncodingProgress { get; set; }
 
-        public long OriginalSize { get; set; }
-        public decimal Compression => Math.Round((decimal)Size / OriginalSize * 100M, 2);
+        //public long OriginalSize { get; set; }
+        public decimal Compression { get; set; } // => Math.Round((decimal)Size / OriginalSize * 100M, 2);
+
+        public bool Smaller => Compression < 1;
 
         public bool Processing { get; set; }
 
-        public long Size { get; private set; }
+        //public long Size { get; private set; }
 
         public decimal SSIM { get; set; }
         public double SSIMProgress { get; set; }
         public decimal Speed { get; set; }
         public void AddSize(long size, long origSize)
         {
-            Size = size;
-            OriginalSize = origSize;
+            Compression = (decimal)size / origSize;
+            //Size = size;
+            //OriginalSize = origSize;
         }
 
         public void Reset()
         {
             Best = default;
+            Compression = default;
             EncodingProgress = default;
-            Size = default;
+            //Size = default;
             SSIM = default;
             SSIMProgress = default;
         }

@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -43,34 +44,6 @@ namespace Compressarr.JobProcessing
         public static Regex ProgressReg { get => new(@"frame= *(\d*) fps= *([\d\.]*) q=*(-?[\d\.]*)(?: q=*-?[\d\.]*)* size= *([^ ]*) time= *([\d:\.]*) bitrate= *([^ ]*) speed= *([\d.]*x) *"); }
         public static Regex SSIMReg { get => new(@"\[Parsed_ssim_4\s@\s\w*\]\sSSIM\sY\:\d\.\d*\s\([inf\d\.]*\)\sU\:\d\.\d*\s\([inf\d\.]*\)\sV\:\d\.\d*\s\([inf\d\.]*\)\sAll\:(\d\.\d*)\s\([inf\d\.]*\)"); }
 
-        public async Task<SSIMResult> CalculateSSIM(FFmpegProgressEvent ffmpegProgress, string sourceFile, string destinationFile, string hardwareDecoder, CancellationToken token)
-        {
-            var arguments = $"{hardwareDecoder} -i \"{sourceFile}\" -i \"{destinationFile}\" -lavfi  \"[0:v]settb=AVTB,setpts=PTS-STARTPTS[main];[1:v]settb=AVTB,setpts=PTS-STARTPTS[ref];[main][ref]ssim\" -max_muxing_queue_size 2048 -f null -";
-            logger.LogDebug($"SSIM arguments: {arguments}");
-
-            decimal ssim = default;
-
-            try
-            {
-                logger.LogDebug("FFmpeg starting SSIM.");
-                var result = await fFmpegProcessor.RunProcess(FFProcess.FFmpeg, arguments, ffmpegProgress, (ssimresult) => ssim = ssimresult.SSIM);
-                logger.LogDebug($"FFmpeg finished SSIM. ({ssim})");
-
-                if (ssim != default)
-                    return new(ssim);
-
-                return new(false, ssim);
-            }
-            catch (OperationCanceledException)
-            {
-                return new(new OperationCanceledException("User cancelled SSIM check"));
-            }
-            catch (Exception ex)
-            {
-                return new(ex);
-            }
-        }
-
         public async Task<EncodingResult> EncodeAVideo(DataReceivedEventHandler dataRecieved, ConversionProgressEventHandler dataProgress, string arguments, CancellationToken token)
         {
             try
@@ -95,27 +68,26 @@ namespace Compressarr.JobProcessing
             }
         }
 
-        public async Task GenerateSample(string sampleFile, WorkItem wi, FFmpegPreset preset, CancellationToken token)
+        public async Task GenerateSamples(List<string> sampleFiles, WorkItem wi, CancellationToken token)
         {
 
             using (logger.BeginScope("Generating Sample"))
             {
-                var sampleListFile = Path.Combine(fileService.TempDir, $"sampleList.txt");
+                //var sampleListFile = Path.Combine(fileService.TempDir, $"sampleList.txt");
 
-                if (File.Exists(sampleListFile)) File.Delete(sampleListFile);
+                //if (File.Exists(sampleListFile)) File.Delete(sampleListFile);
 
-                var sampleTime = applicationService.ArgCalcSampleSeconds;
+                var sampleTime = wi.Job.ArgumentCalculationSettings.ArgCalcSampleSeconds;
                 var videoLength = wi.Media?.FFProbeMediaInfo?.format?.Duration.TotalSeconds ?? 3600;
 
-                var samplePitch = videoLength / 4;
+                var samplePitch = videoLength / (sampleFiles.Count + 1);
 
-                var partialSampleFiles = new List<string>();
-
-                for (int i = 1; i < 4; i++)
+                for (int i = 0; i < sampleFiles.Count; i++)
                 {
-                    var partialSampleFileName = Path.Combine(fileService.TempDir, $"sample{i}{wi.SourceFileExtension}");
-                    partialSampleFiles.Add(partialSampleFileName);
-                    var temparg = $"-y -ss {samplePitch * i} -t {sampleTime} -i \"{wi.SourceFile}\" -map 0 -codec copy \"{partialSampleFileName}\"";
+                    var sampleFile = Path.GetFileName(sampleFiles[i]);
+                    var partialSampleFileName = Path.Combine(fileService.TempDir, sampleFile);
+                    //sampleFiles.Add(partialSampleFileName);
+                    var temparg = $"-y -ss {samplePitch * (i + 1)} -t {sampleTime} -i \"{wi.SourceFile}\" -map 0 -codec copy \"{partialSampleFileName}\"";
 
                     logger.LogInformation($"Generating Sample {i}  with: {temparg}");
 
@@ -124,128 +96,77 @@ namespace Compressarr.JobProcessing
                     {
                         throw sampleEncodeResult.Exception ?? new("Not sure - something went wrong with encoding. Check the logs");
                     }
-                    File.AppendAllLines(sampleListFile, new List<string>() { $"file '{partialSampleFileName}'" });
+                    //File.AppendAllLines(sampleListFile, new List<string>() { $"file '{partialSampleFileName}'" });
                 }
 
-                var concatArg = $"-y -f concat -safe 0 -i {sampleListFile} -map 0 -c copy {sampleFile}";
+                //var concatArg = $"-y -f concat -safe 0 -i {sampleListFile} -map 0 -c copy {sampleFile}";
 
-                logger.LogInformation($"Concatenating samples  with: {concatArg}");
+                //logger.LogInformation($"Concatenating samples  with: {concatArg}");
 
-                var encodeResult = await EncodeAVideo(null, null, concatArg, token);
-                if (!encodeResult.Success)
-                {
-                    throw encodeResult.Exception ?? new("Not sure - something went wrong with encoding. Check the logs");
-                }
+                //var encodeResult = await EncodeAVideo(null, null, concatArg, token);
+                //if (!encodeResult.Success)
+                //{
+                //    throw encodeResult.Exception ?? new("Not sure - something went wrong with encoding. Check the logs");
+                //}
 
-                if (File.Exists(sampleListFile)) File.Delete(sampleListFile);
-                foreach (var f in partialSampleFiles)
-                {
-                    if (File.Exists(f)) File.Delete(f);
-                }
+                //if (File.Exists(sampleListFile)) File.Delete(sampleListFile);
+                //foreach (var f in partialSampleFiles)
+                //{
+                //    if (File.Exists(f)) File.Delete(f);
+                //}
             }
         }
 
-        public async Task Process(WorkItem workItem, CancellationToken token)
+        public async Task<bool> Process(WorkItem workItem, CancellationToken token)
         {
             try
             {
-                try
-                {
-                    await semaphore.WaitAsync(token);
 
-                    using (var jobRunner = new JobWorker(workItem.Job.Condition.Encode, workItem.Job.UpdateStatus))
+                await semaphore.WaitAsync(token);
+
+                using (logger.BeginScope("FFmpeg Process"))
+                {
+                    logger.LogInformation("Starting.");
+
+                    logger.LogDebug("FFmpeg process work item starting.");
+
+                    foreach (var arg in workItem.Arguments)
                     {
 
-                        using (logger.BeginScope("FFmpeg Process"))
+                        logger.LogDebug($"FFmpeg Process arguments: \"{arg}\"");
+
+                        var result = await EncodeAVideo((sender, args) => Converter_OnDataReceived(args, workItem), (sender, args) => Converter_OnProgress(args, workItem), arg, token);
+
+                        if (!result.Success)
                         {
-                            logger.LogInformation("Starting.");
-
-                            var succeded = true;
-
-                            
-                            var historyID = historyService.StartProcessing(workItem.Media.UniqueID, workItem.SourceFile, workItem.Job.FilterID, workItem.Job.PresetName, workItem.Arguments);
-                                                        
-                            logger.LogDebug("FFmpeg process work item starting.");
-
-                            foreach (var arg in workItem.Arguments)
-                            {
-                                if (succeded)
-                                {
-                                    logger.LogDebug($"FFmpeg Process arguments: \"{arg}\"");
-
-                                    var result = await EncodeAVideo((sender, args) => Converter_OnDataReceived(args, workItem), (sender, args) => Converter_OnProgress(args, workItem), arg, token);
-
-                                    if (!result.Success)
-                                    {
-                                        workItem.Update(result.Exception);
-                                        succeded = false;
-                                    }
-                                }
-                            }
-
-                            logger.LogInformation($"FFmpeg Process finished. Successful = {succeded}");
-
-                            if (succeded)
-                            {
-                                try
-                                {
-                                    var originalFileSize = new FileInfo(workItem.SourceFile).Length;
-                                    var newFileSize = new FileInfo(workItem.DestinationFile).Length;
-
-                                    workItem.Compression = newFileSize / (decimal)originalFileSize;
-                                    workItem.Update();
-
-                                }
-                                catch (Exception ex) when (ex is FileNotFoundException || ex is IOException)
-                                {
-                                    workItem.Update(new Update(ex, LogLevel.Warning));
-                                    logger.LogWarning(ex, "Error fetching file lengths");
-                                    return;
-                                }
-
-                                if (workItem.Job.SSIMCheck || applicationService.AlwaysCalculateSSIM)
-                                {
-                                    workItem.Update("Calculating SSIM");
-                                    var hardwareDecoder = workItem.Job.Preset.HardwareDecoder.Wrap("-hwaccel {0} ");
-
-                                    var result = await CalculateSSIM((args) => workItem.UpdateSSIM(args), workItem.SourceFile, workItem.DestinationFile, hardwareDecoder, token);
-
-                                    succeded = result.Success;
-                                    if(succeded)
-                                    {
-                                        workItem.SSIM = result.SSIM;
-                                    }
-                                    else
-                                    {
-                                        workItem.Update(result.Exception);
-                                    }
-                                }
-                            }
-
-                            historyService.EndProcessing(historyID, succeded, workItem);
-
-                            jobRunner.Succeed();
-
-                            workItem.Success = succeded;
-                            workItem.Finished = true;
-                            workItem.Update();
+                            workItem.Update(result.Exception);
+                            logger.LogInformation($"FFmpeg Process failed.", result.Exception);
+                            return false;
                         }
+
                     }
+
+                    logger.LogInformation($"FFmpeg Process finished.");
+                    return true;
                 }
-                catch (OperationCanceledException)
-                {
-                    // The token was cancelled and the semaphore was NOT entered...
-                    tokenCanceled = true;
-                }
+
             }
+            catch (OperationCanceledException)
+            {
+                // The token was cancelled and the semaphore was NOT entered...
+                tokenCanceled = true;
+            }
+
             finally
             {
                 if (!tokenCanceled)
                     semaphore.Release();
             }
+
+            return false;
         }
 
-        
+
 
         private void Converter_OnDataReceived(DataReceivedEventArgs e, WorkItem wi)
         {
@@ -262,7 +183,7 @@ namespace Compressarr.JobProcessing
             using (logger.BeginScope("Converter Data Received"))
             {
 
-                if(FFmpegProgress.TryParse(e.Data, out var progress))
+                if (FFmpegProgress.TryParse(e.Data, out var progress))
                 {
                     wi.Output(new(e.Data, LogLevel.Debug), true);
                     logger.LogTrace(e.Data);

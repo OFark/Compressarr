@@ -244,7 +244,7 @@
 
             await PresetManager.AddPresetAsync(preset);
 
-            JobManager.InitialiseJobs(preset);
+            JobManager.InitialiseJobs(preset, ApplicationService.AppStoppingCancellationToken);
 
             if (OnAdd.HasDelegate)
             {

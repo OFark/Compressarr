@@ -9,7 +9,6 @@
         Initialising,
         LoadingMediaInfo,
         New,
-        Preparing,
         Ready,
         Running,
         TestedFail,

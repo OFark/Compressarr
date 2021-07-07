@@ -39,7 +39,7 @@ namespace Compressarr.Presets
             InitialisationTask = Task.Run(() => InitialiseAsync());
         }
 
-        public async Task InitialiseAsync(CancellationToken cancellationToken = default)
+        public async Task InitialiseAsync()
         {
             using (logger.BeginScope("Initialising Application"))
             {
@@ -58,7 +58,7 @@ namespace Compressarr.Presets
                         foreach (var job in applicationService.Jobs.Where(j => !j.Initialised))
                         {
                             job.StatusUpdate += Job_StatusUpdate;
-                            await jobManager.InitialiseJob(job);
+                            await jobManager.InitialiseJob(job, applicationService.AppStoppingCancellationToken);
                             job.StatusUpdate -= Job_StatusUpdate;
                         }
                         Progress("Job Initialisation complete");
@@ -119,7 +119,7 @@ namespace Compressarr.Presets
                     logger.LogDebug("Running on Linux, CHMOD required");
                     foreach (var exe in new string[] { fileService.FFMPEGPath, fileService.FFPROBEPath })
                     {
-                        await fFmpegProcessor.RunProcess("/bin/bash", $"-c \"chmod +x {exe}\"");
+                        await fFmpegProcessor.RunProcess("/bin/bash", $"-c \"chmod +x {exe}\"", applicationService.AppStoppingCancellationToken);
                     }
                 }
             }
@@ -197,7 +197,7 @@ namespace Compressarr.Presets
 
             var encoders = new Dictionary<CodecType, SortedSet<Encoder>>();
 
-            var result = await fFmpegProcessor.GetAvailableEncodersAsync();
+            var result = await fFmpegProcessor.GetAvailableEncodersAsync(applicationService.AppStoppingCancellationToken);
 
             if (result.Success)
             {
@@ -220,7 +220,7 @@ namespace Compressarr.Presets
         {
             logger.LogDebug($"Get available hardware decoders.");
 
-            var result = await fFmpegProcessor.GetAvailableHardwareDecodersAsync();
+            var result = await fFmpegProcessor.GetAvailableHardwareDecodersAsync(applicationService.AppStoppingCancellationToken);
 
             if (result.Success)
             {
@@ -242,7 +242,7 @@ namespace Compressarr.Presets
                 { CodecType.Video, new() }
             };
 
-            var result = await fFmpegProcessor.GetAvailableCodecsAsync();
+            var result = await fFmpegProcessor.GetAvailableCodecsAsync(applicationService.AppStoppingCancellationToken);
 
             if (result.Success)
             {
@@ -259,7 +259,7 @@ namespace Compressarr.Presets
         {
             logger.LogDebug($"Get Available Containers.");
 
-            var result = await fFmpegProcessor.GetAvailableContainersAsync();
+            var result = await fFmpegProcessor.GetAvailableContainersAsync(applicationService.AppStoppingCancellationToken);
 
             if (result.Success)
             {
@@ -273,7 +273,7 @@ namespace Compressarr.Presets
         {
             using (logger.BeginScope("Get FFmpeg Version."))
             {
-                var result = await fFmpegProcessor.GetFFmpegVersionAsync();
+                var result = await fFmpegProcessor.GetFFmpegVersionAsync(applicationService.AppStoppingCancellationToken);
 
                 if (result.Success)
                     return result.Result;

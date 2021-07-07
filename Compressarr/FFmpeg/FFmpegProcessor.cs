@@ -10,6 +10,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Compressarr.FFmpeg
@@ -26,7 +27,35 @@ namespace Compressarr.FFmpeg
             this.logger = logger;
         }
 
-        public async Task<FFResult<string>> ConvertContainerToExtension(string container)
+        public async Task<SSIMResult> CalculateSSIM(FFmpegProgressEvent ffmpegProgress, string sourceFile, string destinationFile, string hardwareDecoder, CancellationToken token)
+        {
+            var arguments = $"{hardwareDecoder} -i \"{destinationFile}\" -i \"{sourceFile}\" -lavfi  \"[0:v]settb=AVTB,setpts=PTS-STARTPTS[main];[1:v]settb=AVTB,setpts=PTS-STARTPTS[ref];[main][ref]ssim\" -max_muxing_queue_size 2048 -f null -";
+            logger.LogDebug($"SSIM arguments: {arguments}");
+
+            decimal ssim = default;
+
+            try
+            {
+                logger.LogDebug("FFmpeg starting SSIM.");
+                var result = await RunProcess(FFProcess.FFmpeg, arguments, token, ffmpegProgress, (ssimresult) => ssim = ssimresult.SSIM);
+                logger.LogDebug($"FFmpeg finished SSIM. ({ssim})");
+
+                if (ssim != default)
+                    return new(ssim);
+
+                return new(false, ssim);
+            }
+            catch (OperationCanceledException)
+            {
+                return new(new OperationCanceledException("User cancelled SSIM check"));
+            }
+            catch (Exception ex)
+            {
+                return new(ex);
+            }
+        }
+
+        public async Task<FFResult<string>> ConvertContainerToExtension(string container, CancellationToken token)
         {
             await applicationService.InitialiseFFmpeg;
 
@@ -39,7 +68,7 @@ namespace Compressarr.FFmpeg
                     return new(false, (string)null);
                 }
 
-                var result = await RunProcess(FFProcess.FFmpeg, $"-v 1 -h muxer={container}");
+                var result = await RunProcess(FFProcess.FFmpeg, $"-v 1 -h muxer={container}", token);
 
                 if (result.Success)
                 {
@@ -55,14 +84,14 @@ namespace Compressarr.FFmpeg
             }
         }
 
-        public async Task<FFResult<CodecResponse>> GetAvailableCodecsAsync()
+        public async Task<FFResult<CodecResponse>> GetAvailableCodecsAsync(CancellationToken token)
         {
             using (logger.BeginScope("Get Available Codecs"))
             {
                 try
                 {
 
-                    var result = await RunProcess(FFProcess.FFmpeg, "-codecs -v 1");
+                    var result = await RunProcess(FFProcess.FFmpeg, "-codecs -v 1", token);
 
                     if (result.Success)
                     {
@@ -92,13 +121,13 @@ namespace Compressarr.FFmpeg
             }
         }
 
-        public async Task<FFResult<ContainerResponse>> GetAvailableContainersAsync()
+        public async Task<FFResult<ContainerResponse>> GetAvailableContainersAsync(CancellationToken token)
         {
             using (logger.BeginScope($"Get Available Containers"))
             {
                 try
                 {
-                    var result = await RunProcess(FFProcess.FFmpeg, "-formats -v 1");
+                    var result = await RunProcess(FFProcess.FFmpeg, "-formats -v 1", token);
 
                     if (result.Success)
                     {
@@ -123,12 +152,12 @@ namespace Compressarr.FFmpeg
             }
         }
 
-        public async Task<FFResult<EncoderResponse>> GetAvailableEncodersAsync()
+        public async Task<FFResult<EncoderResponse>> GetAvailableEncodersAsync(CancellationToken token)
         {
             using (logger.BeginScope("Get Available Encoders"))
             {
 
-                var result = await RunProcess(FFProcess.FFmpeg, "-encoders -v 1");
+                var result = await RunProcess(FFProcess.FFmpeg, "-encoders -v 1", token);
 
                 if (result.Success)
                 {
@@ -154,13 +183,13 @@ namespace Compressarr.FFmpeg
             }
         }
 
-        public async Task<FFResult<string>> GetAvailableHardwareDecodersAsync()
+        public async Task<FFResult<string>> GetAvailableHardwareDecodersAsync(CancellationToken token)
         {
             using (logger.BeginScope("Get available hardware decoders"))
             {
                 var hwdecoders = new SortedSet<string>();
 
-                var result = await RunProcess(FFProcess.FFmpeg, "-hwaccels -v 1");
+                var result = await RunProcess(FFProcess.FFmpeg, "-hwaccels -v 1", token);
 
                 if (result.Success)
                 {
@@ -181,7 +210,7 @@ namespace Compressarr.FFmpeg
                 return new(result);
             }
         }
-        public async Task<FFResult<string>> GetFFmpegVersionAsync()
+        public async Task<FFResult<string>> GetFFmpegVersionAsync(CancellationToken token)
         {
             using (logger.BeginScope("Get FFmpeg Version."))
             {
@@ -204,7 +233,7 @@ namespace Compressarr.FFmpeg
 
                     logger.LogDebug($"Version file missing. Trying manually");
 
-                    var result = await RunProcess(FFProcess.FFmpeg, "-version");
+                    var result = await RunProcess(FFProcess.FFmpeg, "-version", token);
 
                     if (result.Success)
                     {
@@ -225,13 +254,13 @@ namespace Compressarr.FFmpeg
                 }
             }
         }
-        public async Task<FFResult<FFProbeResponse>> GetFFProbeInfo(string filePath)
+        public async Task<FFResult<FFProbeResponse>> GetFFProbeInfo(string filePath, CancellationToken token)
         {
             using (logger.BeginScope("GetFFProbeInfo: {filePath}", filePath))
             {
                 try
                 {
-                    var result = await RunProcess(FFProcess.FFprobe, $"-v 1 -print_format json -show_format -show_streams -find_stream_info \"{filePath}\"");
+                    var result = await RunProcess(FFProcess.FFprobe, $"-v 1 -print_format json -show_format -show_streams -find_stream_info \"{filePath}\"", token);
 
                     if (result.Success)
                     {
@@ -249,13 +278,13 @@ namespace Compressarr.FFmpeg
             }
         }
 
-        public async Task<FFResult<string>> GetFFProbeJSON(string filePath)
+        public async Task<FFResult<string>> GetFFProbeJSON(string filePath, CancellationToken token)
         {
             using (logger.BeginScope("GetFFProbeInfo: {filePath}", filePath))
             {
                 try
                 {
-                    var result = await RunProcess(FFProcess.FFprobe, $"-v 1 -print_format json -show_format -show_streams -find_stream_info \"{filePath}\"");
+                    var result = await RunProcess(FFProcess.FFprobe, $"-v 1 -print_format json -show_format -show_streams -find_stream_info \"{filePath}\"", token);
 
                     if (result.Success)
                     {
@@ -272,8 +301,7 @@ namespace Compressarr.FFmpeg
                 }
             }
         }
-
-        public async Task<ProcessResponse> RunProcess(FFProcess process, string arguments, FFmpegProgressEvent OnProgress = null, FFmpegSSIMReportEvent OnSSIM = null)
+        public async Task<ProcessResponse> RunProcess(FFProcess process, string arguments, CancellationToken token, FFmpegProgressEvent OnProgress = null, FFmpegSSIMReportEvent OnSSIM = null)
         {
             var filePath = process switch
             {
@@ -282,10 +310,10 @@ namespace Compressarr.FFmpeg
                 _ => throw new NotImplementedException()
             };
 
-            return await RunProcess(filePath, arguments, OnProgress, OnSSIM);
+            return await RunProcess(filePath, arguments, token, OnProgress, OnSSIM);
         }
 
-        public async Task<ProcessResponse> RunProcess(string filePath, string arguments, FFmpegProgressEvent OnProgress = null, FFmpegSSIMReportEvent OnSSIM = null)
+        public async Task<ProcessResponse> RunProcess(string filePath, string arguments, CancellationToken token, FFmpegProgressEvent OnProgress = null, FFmpegSSIMReportEvent OnSSIM = null)
         {
             using (logger.BeginScope("Run Process: {filePath}", filePath))
             {
@@ -310,28 +338,34 @@ namespace Compressarr.FFmpeg
 
                 p.OutputDataReceived += new DataReceivedEventHandler((s, e) =>
                 {
-                    if (OnProgress != null && FFmpegProgress.TryParse(e.Data, out var result))
+                    if (!string.IsNullOrWhiteSpace(e?.Data))
                     {
-                        progressReport = result.CalculatePercentage(duration);
-                        OnProgress.Invoke(progressReport);
+                        if (OnProgress != null && FFmpegProgress.TryParse(e.Data, out var result))
+                        {
+                            progressReport = result.CalculatePercentage(duration);
+                            OnProgress.Invoke(progressReport);
+                        }
+                        else if (OnSSIM != null && FFmpegSSIMReport.TryParse(e.Data, out var ssimreport)) OnSSIM.Invoke(ssimreport);
+                        else if (FFmpegDurationReport.TryParse(e.Data, out var durationreport)) duration = duration != default && duration > durationreport.Duration ? duration : durationreport.Duration;
+                        else { stdOut.AppendLine(e.Data); }
                     }
-                    else if (OnSSIM != null && FFmpegSSIMReport.TryParse(e.Data, out var ssimreport)) OnSSIM.Invoke(ssimreport);
-                    else if (FFmpegDurationReport.TryParse(e.Data, out var durationreport)) duration = duration != default && duration > durationreport.Duration ? duration : durationreport.Duration;
-                    else { stdOut.AppendLine(e.Data); }
                 });
                 p.ErrorDataReceived += new DataReceivedEventHandler((s, e) =>
                 {
-                    if (OnProgress != null && FFmpegProgress.TryParse(e.Data, out var result))
+                    if (!string.IsNullOrWhiteSpace(e?.Data))
                     {
-                        progressReport = result.CalculatePercentage(duration);
-                        OnProgress.Invoke(progressReport);
-                    }
-                    else if (OnSSIM != null && FFmpegSSIMReport.TryParse(e.Data, out var ssimreport)) OnSSIM.Invoke(ssimreport);
-                    else if (FFmpegDurationReport.TryParse(e.Data, out var durationreport)) duration = duration != default && duration > durationreport.Duration ? duration : durationreport.Duration;
-                    else
-                    {
-                        logger.LogError(e.Data);
-                        stdErr.AppendLine(e.Data);
+                        if (OnProgress != null && FFmpegProgress.TryParse(e.Data, out var result))
+                        {
+                            progressReport = result.CalculatePercentage(duration);
+                            OnProgress.Invoke(progressReport);
+                        }
+                        else if (OnSSIM != null && FFmpegSSIMReport.TryParse(e.Data, out var ssimreport)) OnSSIM.Invoke(ssimreport);
+                        else if (FFmpegDurationReport.TryParse(e.Data, out var durationreport)) duration = duration != default && duration > durationreport.Duration ? duration : durationreport.Duration;
+                        else
+                        {
+                            logger.LogError(e.Data);
+                            stdErr.AppendLine(e.Data);
+                        }
                     }
                 });
 
@@ -341,9 +375,9 @@ namespace Compressarr.FFmpeg
                 p.BeginOutputReadLine();
                 p.BeginErrorReadLine();
 
-                await p.WaitForExitAsync();
+                await p.WaitForExitAsync(token);
 
-                p.WaitForExit(); //This waits for any handles to finish as well. 
+                p.WaitForExit(1000); //This waits for any handles to finish as well. 
 
                 response.StdOut = stdOut.ToString();
                 response.StdErr = stdErr.ToString();

@@ -22,47 +22,39 @@ namespace Compressarr.JobProcessing.Models
         [JsonIgnore]
         internal CancellationTokenSource CancellationTokenSource = new();
 
-        internal CancellationToken CancellationToken => CancellationTokenSource.Token;
-
         public event EventHandler StatusUpdate;
 
+        public ArgCalcSettings ArgumentCalculationSettings { get; set; }
         public bool AutoImport { get; set; }
 
-        public void Cancel()
-        {
-            if (CancellationToken.CanBeCanceled)
-                CancellationTokenSource.Cancel();
-        }
-
+        [JsonIgnore]
         public bool Cancelled => CancellationToken.IsCancellationRequested;
-         
+        [JsonIgnore]
+        public WorkItem CurrentWorkItem { get; set; }
 
         public string DestinationFolder { get; set; }
-
         [JsonIgnore]
         public ImmutableSortedSet<JobEvent> Events { get; set; }
 
         [JsonIgnore]
         public Filter Filter { get; internal set; }
 
+        public Guid FilterID { get; set; }
         [Obsolete("Depreciated in favour of FilterID")]
         public string FilterName { get; set; }
-        public Guid FilterID { get; set; }
 
         public Guid? ID { get; set; }
-
         [JsonIgnore]
         public IProgress<double> InitialisationProgress { get; set; }
 
         [JsonIgnore]
         public bool Initialised { get; set; }
+
         [JsonIgnore]
         public Action<Update> LogAction { get; set; }
 
         public decimal? MaxCompression { get; set; }
-
         public decimal? MinSSIM { get; set; }
-
         [JsonIgnore]
         public string Name => $"{Filter?.Name}|{PresetName}";
 
@@ -70,14 +62,10 @@ namespace Compressarr.JobProcessing.Models
         public FFmpegPreset Preset { get; internal set; }
 
         public string PresetName { get; set; }
-
-        [JsonIgnore]
-        public WorkItem CurrentWorkItem { get; set; }
-
         public bool SizeCheck => AutoImport && MaxCompression.HasValue;
-
         [JsonIgnore]
         public bool SSIMCheck => AutoImport && MinSSIM.HasValue;
+
         [JsonIgnore]
         public JobState State => Condition.Initialise.State switch
         {
@@ -108,21 +96,7 @@ namespace Compressarr.JobProcessing.Models
                     ConditionState.Succeeded => Condition.Process.State switch
                     {
                         ConditionState.NotStarted => JobState.Ready,
-                        ConditionState.Processing => Condition.Encode.State switch
-                        {
-                            ConditionState.NotStarted => Condition.Prepare.State switch
-                            {
-                                ConditionState.NotStarted => JobState.Waiting,
-                                ConditionState.Processing => JobState.Preparing,
-                                ConditionState.Succeeded => JobState.Waiting,
-                                ConditionState.Failed => Cancelled ? JobState.Cancelled : JobState.Error,
-                                _ => throw new NotImplementedException(),
-                            },
-                            ConditionState.Processing => JobState.Running,
-                            ConditionState.Succeeded => JobState.Waiting,
-                            ConditionState.Failed => Cancelled ? JobState.Cancelled : JobState.Error,
-                            _ => throw new NotImplementedException(),
-                        },
+                        ConditionState.Processing => JobState.Running,
                         ConditionState.Succeeded => JobState.Finished,
                         ConditionState.Failed => Cancelled ? JobState.Cancelled : JobState.Error,
                         _ => throw new NotImplementedException(),
@@ -136,8 +110,17 @@ namespace Compressarr.JobProcessing.Models
             ConditionState.Failed => JobState.Error,
             _ => throw new NotImplementedException()
         };
+
         [JsonIgnore]
         public HashSet<WorkItem> WorkLoad { get; internal set; }
+
+        internal CancellationToken CancellationToken => CancellationTokenSource.Token;
+
+        public void Cancel()
+        {
+            if (CancellationToken.CanBeCanceled)
+                CancellationTokenSource.Cancel();
+        }
 
         public void Log(Update update)
         {
@@ -165,13 +148,6 @@ namespace Compressarr.JobProcessing.Models
             }
             StatusUpdate?.Invoke(this, EventArgs.Empty);
         }
-
-        //public void UpdateMovieInfo()
-        //{
-        //    InitialisationProgress?.Report(WorkLoad.Count(w => w.Movie?.MediaInfo != null) / WorkLoad.Count() * 100);
-
-        //    StatusUpdate?.Invoke(this, EventArgs.Empty);
-        //}
 
         public void UpdateStatus(object sender, Update update = null)
         {

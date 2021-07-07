@@ -34,11 +34,6 @@ namespace Compressarr.Application
             this.configuration = configuration;
             this.fileService = fileService;
 
-            AlwaysCalculateSSIM = appSettings?.Value?.AlwaysCalculateSSIM ?? false;
-            ArgCalcSampleSeconds = appSettings?.Value?.ArgCalcSampleSeconds ?? 10;
-            AutoCalculationPost = appSettings?.Value?.AutoCalculationPost;
-            AutoCalculationType = appSettings?.Value?.AutoCalculationType ?? AutoCalcType.BestSSIM;
-
             Filters = filters?.Value ?? new();
             Jobs = jobs?.Value ?? new();
 
@@ -49,7 +44,21 @@ namespace Compressarr.Application
                 doSave = true;
             }
 
-            foreach (var job in Jobs.Where(j => j.FilterID == default))
+            foreach (var job in Jobs.Where(j => j.ArgumentCalculationSettings == null))
+            {
+                job.ArgumentCalculationSettings = new();
+                job.ArgumentCalculationSettings.ArgCalcSampleSeconds = 10;
+
+                if(appSettings?.Value != null)
+                {
+                    job.ArgumentCalculationSettings.AlwaysCalculateSSIM = appSettings.Value.AlwaysCalculateSSIM;
+                    job.ArgumentCalculationSettings.ArgCalcSampleSeconds = appSettings.Value.ArgCalcSampleSeconds;
+                    job.ArgumentCalculationSettings.AutoCalculationPost = appSettings.Value.AutoCalculationPost;
+                    job.ArgumentCalculationSettings.AutoCalculationType = appSettings.Value.AutoCalculationType;
+                }
+            }
+
+                foreach (var job in Jobs.Where(j => j.FilterID == default))
             {
 #pragma warning disable CS0618 // Type or member is obsolete this is to upgrade old databases
                 var filter = Filters.FirstOrDefault(x => x.Name == job.FilterName);
@@ -78,11 +87,8 @@ namespace Compressarr.Application
         public event EventHandler<string> OnBroadcast;
 
         //App Settings
-        public bool AlwaysCalculateSSIM { get; set; }
         public CancellationToken AppStoppingCancellationToken { get; set; }
-        public int ArgCalcSampleSeconds { get; set; }
-        public decimal? AutoCalculationPost { get; set; }
-        public AutoCalcType AutoCalculationType { get; set; }
+        
         public Dictionary<CodecType, SortedSet<Codec>> Codecs { get; set; }
         public SortedSet<ContainerResponse> Containers { get; set; }
         public Dictionary<CodecType, SortedSet<Encoder>> Encoders { get; set; }
@@ -119,13 +125,6 @@ namespace Compressarr.Application
                 jsonObj["Filters"] = JToken.FromObject(Filters);
                 jsonObj["Presets"] = JToken.FromObject(Presets.Select(x => new FFmpegPresetBase(x)));
                 jsonObj["Jobs"] = JToken.FromObject(Jobs);
-                jsonObj["Settings"] = JToken.FromObject(new AppSettings()
-                {
-                    AlwaysCalculateSSIM = AlwaysCalculateSSIM,
-                    ArgCalcSampleSeconds = ArgCalcSampleSeconds,
-                    AutoCalculationPost = AutoCalculationPost,
-                    AutoCalculationType = AutoCalculationType
-                });
 
                 await WriteAppSettings(jsonObj);
 

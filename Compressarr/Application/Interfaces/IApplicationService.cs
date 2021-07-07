@@ -6,7 +6,6 @@ using Compressarr.Presets.Models;
 using Compressarr.Services.Models;
 using Compressarr.Settings;
 using Microsoft.Extensions.Logging;
-using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -18,7 +17,7 @@ namespace Compressarr.Application
     {
         event EventHandler<string> OnBroadcast;
 
-        bool AlwaysCalculateSSIM { get; set; }
+        CancellationToken AppStoppingCancellationToken { get; set; }
         Dictionary<CodecType, SortedSet<Codec>> Codecs { get; set; }
         SortedSet<ContainerResponse> Containers { get; set; }
         Dictionary<CodecType, SortedSet<Encoder>> Encoders { get; set; }
@@ -32,15 +31,10 @@ namespace Compressarr.Application
         HashSet<FFmpegPreset> Presets { get; }
         double Progress { get; set; }
         APISettings RadarrSettings { get; set; }
+        IEnumerable<Series> Series { get; set; }
         APISettings SonarrSettings { get; set; }
         string State { get; set; }
         Queue<string> StateHistory { get; set; }
-        CancellationToken AppStoppingCancellationToken { get; set; }
-        int ArgCalcSampleSeconds { get; set; }
-        decimal? AutoCalculationPost { get; set; }
-        AutoCalcType AutoCalculationType { get; set; }
-        IEnumerable<Series> Series { get; set; }
-
         void Broadcast(string message);
         LogLevel GetLogLevel();
         Task SaveAppSetting();

@@ -1,4 +1,5 @@
-﻿using Compressarr.Filtering;
+﻿using Compressarr.Application;
+using Compressarr.Filtering;
 using Compressarr.Filtering.Models;
 using Compressarr.Helpers;
 using Compressarr.JobProcessing;
@@ -21,35 +22,18 @@ namespace Compressarr.Pages
 
 
         private string AlertMessage;
+        private Guid filterID;
+        private string filterPropertyStr = "Title";
         private string newFilterTextButton = "Add";
         private IEnumerable<Series> Series = new HashSet<Series>();
         private HashSet<TreeItemData> SeriesTreeItems = new();
         private bool showSaveDialog = false;
-        private string filterPropertyStr = "Title";
-        private Guid filterID;
-
+        [Inject] IApplicationService ApplicationService { get; set; }
         [Inject] IDialogService DialogService { get; set; }
         private List<DynamicLinqFilter> DlFilters { get; set; } = new();
         private string Filter { get; set; } = "";
         private FilterComparitor FilterComparitor => FilterManager.GetComparitors(FilterProperty).FirstOrDefault(x => x.Value == FilterComparitorStr);
         private string FilterComparitorStr { get; set; } = "==";
-        private decimal FilterIntValue
-        {
-            get
-            {
-                return decimal.TryParse(FilterValue, out var x) ? x : 0;
-            }
-            set
-            {
-                FilterValue = value.ToString();
-            }
-        }
-
-        [Inject] IFilterManager FilterManager { get; set; }
-        private string FilterName { get; set; }
-        private FilterProperty FilterProperty => FilterManager.SonarrFilterProperties.FirstOrDefault(x => x.Value == FilterPropertyStr);
-        private string FilterPropertyStr { get => filterPropertyStr; set { FilterValues = new(); filterPropertyStr = value; } }
-
         private Guid FilterID
         {
             get
@@ -78,6 +62,22 @@ namespace Compressarr.Pages
             }
         }
 
+        private decimal FilterIntValue
+        {
+            get
+            {
+                return decimal.TryParse(FilterValue, out var x) ? x : 0;
+            }
+            set
+            {
+                FilterValue = value.ToString();
+            }
+        }
+
+        [Inject] IFilterManager FilterManager { get; set; }
+        private string FilterName { get; set; }
+        private FilterProperty FilterProperty => FilterManager.SonarrFilterProperties.FirstOrDefault(x => x.Value == FilterPropertyStr);
+        private string FilterPropertyStr { get => filterPropertyStr; set { FilterValues = new(); filterPropertyStr = value; } }
         private string FilterValue { get; set; }
         private HashSet<string> FilterValues { get; set; }
         [Inject] IJobManager JobManager { get; set; }
@@ -316,7 +316,7 @@ namespace Compressarr.Pages
             else
             {
                 var id = await FilterManager.AddFilter(DlFilters, FilterName, MediaSource.Sonarr);
-                JobManager.InitialiseJobs(FilterManager.GetFilter(id));
+                JobManager.InitialiseJobs(FilterManager.GetFilter(id), ApplicationService.AppStoppingCancellationToken);
             }
         }
     }
