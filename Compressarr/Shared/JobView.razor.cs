@@ -18,8 +18,10 @@ namespace Compressarr.Shared
 {
     public partial class JobView : IDisposable
     {
-        private CancellationTokenSource cancellationTokenSource;
+        private CancellationTokenSource cts = new();
         private bool canReload, editJob, mouseOnButton;
+        private bool DisableCancelMediaInfoButton = true;
+        private bool disposedValue;
         private double initialisationProgress;
         [Parameter]
         public Job Job { get; set; }
@@ -29,8 +31,6 @@ namespace Compressarr.Shared
 
         [Parameter]
         public EventCallback OnAdd { get; set; }
-
-        [Inject] IHistoryService HistoryService { get; set; }
 
         [Inject] IApplicationService ApplicationService { get; set; }
         [Inject] IArgumentService ArgumentService { get; set; }
@@ -43,6 +43,7 @@ namespace Compressarr.Shared
         private string FilterImageSrc => $"https://raw.githubusercontent.com/{FilterType.Capitalise()}/{FilterType.Capitalise()}/develop/Logo/{FilterType.Capitalise()}.svg";
         [Inject] IFilterManager FilterManager { get; set; }
         private string FilterType => Job?.Filter?.MediaSource.ToString().ToLower();
+        [Inject] IHistoryService HistoryService { get; set; }
         [Inject] IJobManager JobManager { get; set; }
         [Inject] ILayoutService LayoutService { get; set; }
         private int? MaxComp
@@ -64,7 +65,7 @@ namespace Compressarr.Shared
             }
         }
 
-        [Inject] IMediaInfoService MediaInfoService { get; set; }
+        [Inject] IFFmpegProcessor FFmpegProcessor { get; set; }
         private int? MinSSIM
         {
             get
@@ -84,17 +85,17 @@ namespace Compressarr.Shared
             }
         }
 
-        private int? MinSSIMPost
+        private decimal? MinSSIMPost
         {
             get
             {
-                return Job.ArgumentCalculationSettings.AutoCalculationPost.HasValue ? (int)(Job.ArgumentCalculationSettings.AutoCalculationPost * 100) : null;
+                return Job.ArgumentCalculationSettings.AutoCalculationPost.HasValue ? Job.ArgumentCalculationSettings.AutoCalculationPost * 100 : null;
             }
             set
             {
                 if (value.HasValue)
                 {
-                    Job.ArgumentCalculationSettings.AutoCalculationPost = (decimal)value / 100;
+                    Job.ArgumentCalculationSettings.AutoCalculationPost = value / 100;
                 }
                 else
                 {
@@ -107,12 +108,45 @@ namespace Compressarr.Shared
 
         private bool SaveEnabled => (Editing || NewJob) && Job?.FilterID != null && Job?.PresetName != null && Job?.DestinationFolder != null;
 
-        void IDisposable.Dispose()
+        private int? VideoBitRateTarget
         {
-            if (Job != null)
+            get
             {
-                GC.SuppressFinalize(this);
-                Job.StatusUpdate -= JobStatusUpdate;
+                return Job.ArgumentCalculationSettings.VideoBitRateTarget.HasValue ? (int)(Job.ArgumentCalculationSettings.VideoBitRateTarget * 100) : null;
+            }
+            set
+            {
+                if (value.HasValue)
+                {
+                    Job.ArgumentCalculationSettings.VideoBitRateTarget = (decimal)value / 100;
+                }
+                else
+                {
+                    Job.ArgumentCalculationSettings.VideoBitRateTarget = null;
+                }
+            }
+        }
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    if (Job != null)
+                    {
+                        Job.StatusUpdate -= JobStatusUpdate;
+                    }
+                    cts.Cancel();
+                    cts.Dispose();
+                }
+                disposedValue = true;
             }
         }
 
@@ -121,6 +155,19 @@ namespace Compressarr.Shared
             if (NewJob) Job.ArgumentCalculationSettings ??= new();
             Job.StatusUpdate += JobStatusUpdate;
             Job.InitialisationProgress = new Progress<double>(JobProgress);
+        }
+
+        private void CancelProcessing(WorkItem wi)
+        {
+            if (wi.CancellationToken.CanBeCanceled)
+            {
+                wi.CancellationTokenSource.Cancel();
+            }
+        }
+
+        private async Task ClearAutoCalcHistory(WorkItem wi)
+        {
+            await HistoryService.ClearAutoCalcResult(wi.Media.FFProbeMediaInfo.GetStableHash());
         }
 
         private async void DeleteJob()
@@ -139,14 +186,6 @@ namespace Compressarr.Shared
                 }
             }
         }
-
-        private async Task ClearAutoCalcHistory(WorkItem wi)
-        {
-            await HistoryService.ClearAutoCalcResult(wi.Media.FFProbeMediaInfo.GetStableHash());
-        }
-
-        private bool DisableCancelMediaInfoButton = true;
-
         private async Task GetMediaInfo(WorkItem wi)
         {
             wi.CancellationTokenSource = new();
@@ -154,7 +193,7 @@ namespace Compressarr.Shared
 
             try
             {
-                var ffProbeResponse = await MediaInfoService.GetMediaInfo(wi.Media, wi.CancellationToken);
+                var ffProbeResponse = await FFmpegProcessor.GetFFProbeInfo(wi.Media.FilePath, wi.CancellationToken);
                 if (ffProbeResponse.Success)
                 {
                     wi.Media.FFProbeMediaInfo = ffProbeResponse.Result;
@@ -170,20 +209,6 @@ namespace Compressarr.Shared
             }
         }
 
-        private async Task PrepareWorkItem(WorkItem wi)
-        {
-            wi.CancellationTokenSource = new();
-            await JobManager.PrepareWorkItem(wi, Job.Preset, wi.CancellationToken);
-        }
-
-        private void CancelProcessing(WorkItem wi)
-        {
-            if (wi.CancellationToken.CanBeCanceled)
-            {
-                wi.CancellationTokenSource.Cancel();
-            }
-        }
-
         private void JobProgress(double val)
         {
             try
@@ -192,7 +217,7 @@ namespace Compressarr.Shared
                 initialisationProgress = val;
                 InvokeAsync(StateHasChanged);
             }
-            catch (ObjectDisposedException _) { }
+            catch (ObjectDisposedException) { }
         }
 
         private void JobStatusUpdate(object caller, EventArgs args)
@@ -200,6 +225,11 @@ namespace Compressarr.Shared
             InvokeAsync(StateHasChanged);
         }
 
+        private async Task PrepareWorkItem(WorkItem wi)
+        {
+            wi.CancellationTokenSource = new();
+            await JobManager.PrepareWorkItem(wi, Job.Preset, wi.CancellationToken);
+        }
         private async void ReInitialise()
         {
             await JobManager.InitialiseJob(Job, ApplicationService.AppStoppingCancellationToken);

@@ -17,6 +17,7 @@ namespace Compressarr.FFmpeg
 {
     public partial class FFmpegProcessor : IFFmpegProcessor
     {
+        private static SemaphoreSlim semLock = new(1, 1);
         private readonly IApplicationService applicationService;
         private readonly IFileService fileService;
         private readonly ILogger<FFmpegProcessor> logger;
@@ -369,20 +370,28 @@ namespace Compressarr.FFmpeg
                     }
                 });
 
-                logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
-                p.Start();
+                await semLock.WaitAsync(token);
+                try
+                {
+                    logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
+                    p.Start();
 
-                p.BeginOutputReadLine();
-                p.BeginErrorReadLine();
+                    p.BeginOutputReadLine();
+                    p.BeginErrorReadLine();
 
-                await p.WaitForExitAsync(token);
+                    await p.WaitForExitAsync(token);
+                    p.WaitForExit(1000); //This waits for any handles to finish as well. 
+                }
+                finally
+                {
+                    semLock.Release();
+                }
 
-                p.WaitForExit(1000); //This waits for any handles to finish as well. 
 
                 response.StdOut = stdOut.ToString();
                 response.StdErr = stdErr.ToString();
 
-                if(progressReport != null)
+                if (progressReport != null)
                 {
                     progressReport.Percentage = 100;
                     OnProgress.Invoke(progressReport);

@@ -73,7 +73,7 @@ namespace Compressarr.FFmpeg.Models
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "matches JSON source")]
     public class Format
     {
-        public string bit_rate { get; set; }
+        public int? bit_rate { get; set; }
         public string duration { get; set; }
         public TimeSpan Duration => TimeSpan.FromSeconds(double.TryParse(duration, out var dur) ? dur : 0);
             
@@ -100,7 +100,7 @@ namespace Compressarr.FFmpeg.Models
     public class Stream
     {
         public string avg_frame_rate { get; set; }
-        public string bit_rate { get; set; }
+        public int bit_rate { get; set; }
         public string bits_per_raw_sample { get; set; }
         public int? bits_per_sample { get; set; }
         public string channel_layout { get; set; }
@@ -128,6 +128,8 @@ namespace Compressarr.FFmpeg.Models
         public string divx_packed { get; set; }
         public string dmix_mode { get; set; }
         public string duration { get; set; }
+
+        public TimeSpan Duration => TimeSpan.FromSeconds(double.TryParse(duration, out var dur) ? dur : 0);
         public int? duration_ts { get; set; }
         public string field_order { get; set; }
         [JsonConverter(typeof(BoolConverter))]

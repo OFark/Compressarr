@@ -27,16 +27,14 @@ namespace Compressarr.JobProcessing
         private readonly IFileService fileService;
         private readonly IHistoryService historyService;
         private readonly ILogger<ArgumentService> logger;
-        private readonly IMediaInfoService mediaInfoService;
         private readonly IProcessManager processManager;
-        public ArgumentService(IApplicationService applicationService, IFFmpegProcessor fFmpegProcessor, IFileService fileService, IHistoryService historyService, ILogger<ArgumentService> logger, IMediaInfoService mediaInfoService, IProcessManager processManager)
+        public ArgumentService(IApplicationService applicationService, IFFmpegProcessor fFmpegProcessor, IFileService fileService, IHistoryService historyService, ILogger<ArgumentService> logger, IProcessManager processManager)
         {
             this.applicationService = applicationService;
             this.fFmpegProcessor = fFmpegProcessor;
             this.fileService = fileService;
             this.historyService = historyService;
             this.logger = logger;
-            this.mediaInfoService = mediaInfoService;
             this.processManager = processManager;
         }
 
@@ -74,7 +72,7 @@ namespace Compressarr.JobProcessing
 
                     if (wi.Media?.FFProbeMediaInfo == null)
                     {
-                        var ffProbeResponse = await mediaInfoService.GetMediaInfo(wi.Media, token);
+                        var ffProbeResponse = await fFmpegProcessor.GetFFProbeInfo(wi.Media.FilePath, token);
                         if (ffProbeResponse.Success)
                         {
                             wi.Media.FFProbeMediaInfo = ffProbeResponse.Result;
@@ -104,16 +102,12 @@ namespace Compressarr.JobProcessing
             {
                 var preset = wi.ArgumentCalculator.Preset;
 
-                Task genSampleTask = null;
-
                 if (wi.ArgumentCalculator.SampleSize == 0)
                 {
                     wi.ArgumentCalculator.SampleSize = 4; // new Random().Next(1, 5);
                 }
                 var sampleFiles = Enumerable.Range(1, wi.ArgumentCalculator.SampleSize).Select(x => Path.Combine(fileService.TempDir, $"sample{x}{wi.SourceFileExtension}")).ToList();
 
-
-                var hardwareDecoder = preset.HardwareDecoder.Wrap("-hwaccel {0} ");
                 var frameRate = preset.FrameRate.HasValue ? $" -r {preset.FrameRate}" : "";
                 var optionalArguments = preset.OptionalArguments;
 
@@ -145,7 +139,7 @@ namespace Compressarr.JobProcessing
 
                     veo.AutoPresetTests = new();
 
-                    //set it up first so we can show the progress on the page
+                    //Add Default
                     veo.AutoPresetTests.Add(new AutoPresetResult());
                     foreach (var key in range)
                     {
@@ -157,6 +151,91 @@ namespace Compressarr.JobProcessing
 
                 do
                 {
+                    if (wi.ArgumentCalculator.Preset.VideoBitRateAutoCalc)
+                    {
+                        wi.ArgumentCalculator.VideoBitRateCalculator ??= new();
+
+                        var vbc = wi.ArgumentCalculator.VideoBitRateCalculator;
+
+                        // Start at 50% of the original bitrate
+                        if (!vbc.SampleResults.Any())
+                        {
+                            vbc.OriginalBitrate = wi.Media.FFProbeMediaInfo.format.bit_rate ?? 5000000;
+                            vbc.CurrentBitrate = vbc.OriginalBitrate / 2;
+
+                            var test = new AutoPresetResult() { ArgumentValue = vbc.CurrentBitrate };
+                            vbc.SampleResults.Add(test);
+
+                            await TestAutoPreset(test, sampleFiles, wi, preset, token);
+                        }
+                        else
+                        {
+                            vbc.SampleResults.ForEach(x => x.Best = false);
+                        }
+
+                        bool targetmet() => wi.Job.ArgumentCalculationSettings.VideoBitRateTargetSSIM switch
+                        {
+                            true => vbc.SampleResults.Last().SSIM > wi.Job.ArgumentCalculationSettings.VideoBitRateTarget || vbc.SampleResults.Last().Compression >= 1,
+                            false => vbc.SampleResults.Last().Compression > wi.Job.ArgumentCalculationSettings.VideoBitRateTarget
+                        };
+
+                        // If the bitrate doesn't reach the target increase bitrate by 10% until it does or we're at > 90% original bitrate
+                        while (!targetmet() && vbc.CurrentBitrate + (vbc.OriginalBitrate / 10) < vbc.OriginalBitrate)
+                        {
+                            vbc.CurrentBitrate += (vbc.OriginalBitrate / 10);
+                            var test = new AutoPresetResult() { ArgumentValue = vbc.CurrentBitrate };
+                            vbc.SampleResults.Add(test);
+
+                            await TestAutoPreset(test, sampleFiles, wi, preset, token);
+
+                        }
+
+                        if (!targetmet())
+                        {
+                            // If the target is still not met increase by 5% original bitrate
+                            if (vbc.CurrentBitrate + (vbc.OriginalBitrate / 20) < vbc.OriginalBitrate)
+                            {
+                                vbc.CurrentBitrate += (vbc.OriginalBitrate / 20);
+                                var test = new AutoPresetResult() { ArgumentValue = vbc.CurrentBitrate };
+                                vbc.SampleResults.Add(test);
+
+                                await TestAutoPreset(test, sampleFiles, wi, preset, token);
+                            }
+                        }
+
+                        // If target is met lets reduce by 5% original bitrate
+                        while (targetmet())
+                        {
+                            vbc.CurrentBitrate -= (vbc.OriginalBitrate / 20);
+                            var test = new AutoPresetResult() { ArgumentValue = vbc.CurrentBitrate };
+                            vbc.SampleResults.Add(test);
+
+                            await TestAutoPreset(test, sampleFiles, wi, preset, token);
+                        }
+
+                        // Let increase bitrate by 1% until target is reached
+                        while (!targetmet() && vbc.CurrentBitrate + (vbc.OriginalBitrate / 100) < vbc.OriginalBitrate)
+                        {
+                            vbc.CurrentBitrate += (vbc.OriginalBitrate / 100);
+                            var test = new AutoPresetResult() { ArgumentValue = vbc.CurrentBitrate };
+                            vbc.SampleResults.Add(test);
+                            await TestAutoPreset(test, sampleFiles, wi, preset, token);
+                        }
+
+                        if (wi.Job.ArgumentCalculationSettings.VideoBitRateTargetSSIM)
+                        {
+                            // We've found the best SSIM narrow to the best one below compression
+                            vbc.SampleResults.OrderByDescending(x => x.SSIM).FirstOrDefault(x => x.Compression < 1).Best = true;
+                        }
+                        else
+                        {
+                            vbc.SampleResults.OrderByDescending(x => x.SSIM).FirstOrDefault(x => x.Compression <= wi.Job.ArgumentCalculationSettings.VideoBitRateTarget).Best = true;
+                        }
+
+                        vbc.CurrentBitrate = (int)vbc.SampleResults.FirstOrDefault(x => x.Best).ArgumentValue;
+                    }
+
+
                     foreach (var veo in wi.ArgumentCalculator.AutoCalcVideoEncoderOptions)
                     {
                         var prevVal = veo.Value;
@@ -175,98 +254,10 @@ namespace Compressarr.JobProcessing
 
                         foreach (var test in veo.AutoPresetTests)
                         {
-                            veo.Value = test.ArgumentValue;
+                            veo.Value = test.ArgumentValue?.ToString();
 
-                            test.Reset();
-                            test.Processing = true;
+                            await TestAutoPreset(test, sampleFiles, wi, preset, token);
 
-                            List<decimal> compressions = new();
-                            List<decimal> speeds = new();
-                            List<decimal> ssims = new();
-
-                            foreach (var sampleFile in sampleFiles)
-                            {
-                                var sampleFileIndex = sampleFiles.IndexOf(sampleFile);
-
-                                var tempEncFile = Path.Combine(fileService.TempDir, $"encFile.{preset.ContainerExtension}");
-
-                                if (token.IsCancellationRequested) return;
-
-                                wi.Update();
-
-                                var arg = string.Format(GetArgument(wi.ArgumentCalculator), sampleFile, tempEncFile);
-
-                                logger.LogInformation($"Trying: {arg}");
-
-                                var storedResult = await historyService.GetAutoCalcResult(wi.Media.FFProbeMediaInfo.GetStableHash(), arg, wi.Job.ArgumentCalculationSettings.ArgCalcSampleSeconds);
-
-                                if (storedResult != null && (!(wi.Job.ArgumentCalculationSettings.AutoCalculationType is AutoCalcType.BySpeed or AutoCalcType.Balanced or AutoCalcType.WeightedForCompression or AutoCalcType.WeightedForSpeed or AutoCalcType.WeightedForSSIM) || storedResult.Speed > 0))
-                                {
-                                    compressions.Add((decimal)storedResult.Size / storedResult.OriginalSize);
-                                    speeds.Add(storedResult.Speed);
-                                    ssims.Add(storedResult.SSIM);
-
-                                    //test.AddSize(storedResult.Size, storedResult.OriginalSize);
-                                    //test.SSIM = storedResult.SSIM;
-                                    //test.Speed = storedResult.Speed;
-                                    logger.LogDebug($"SSIM: {storedResult.SSIM}, Size: {storedResult.Size.ToFileSize()} {Math.Round((decimal)storedResult.Size / storedResult.OriginalSize * 100M, 2).Adorn("%")}");
-                                }
-                                else
-                                {
-                                    genSampleTask ??= processManager.GenerateSamples(sampleFiles, wi, token);
-                                    await genSampleTask;
-
-                                    var origSize = new FileInfo(sampleFile).Length;
-
-                                    logger.LogInformation($"Testing sample encode with: {arg}");
-
-                                    decimal tSpeed = 0;
-                                    await processManager.EncodeAVideo((sender, args) =>
-                                    {
-                                        if (FFmpegProgress.TryParse(args.Data, out var progress)) test.Speed = tSpeed = progress.Speed;
-                                    }
-                                    , (sender, args) =>
-                                    {
-                                        test.EncodingProgress = (args.Percent / sampleFiles.Count) + (100D / sampleFiles.Count * sampleFileIndex);
-                                        wi.Update();
-                                    }, arg, token);
-
-                                    test.EncodingProgress = 100D / sampleFiles.Count * (sampleFileIndex + 1);
-
-                                    speeds.Add(tSpeed);
-
-                                    if (token.IsCancellationRequested) return;
-
-                                    var size = new FileInfo(tempEncFile).Length;
-                                    compressions.Add((decimal)size / origSize);
-                                    wi.Update();
-
-                                    var ssimResult = await fFmpegProcessor.CalculateSSIM((args) =>
-                                    {
-                                        test.SSIMProgress = (args.Percentage / sampleFiles.Count) + (100D / sampleFiles.Count * sampleFileIndex);
-                                        wi.Update();
-                                    }, sampleFile, tempEncFile, hardwareDecoder, token);
-
-                                    test.SSIMProgress = 100D / sampleFiles.Count * (sampleFileIndex + 1);
-
-                                    if (ssimResult.Success)
-                                    {
-                                        ssims.Add(ssimResult.SSIM);
-                                        logger.LogDebug($"SSIM: {ssimResult.SSIM}, Size: {size.ToFileSize()} {Math.Round((decimal)size / origSize * 100M, 2).Adorn("%")}");
-                                        StoreAutoCalcResults(wi.Media.UniqueID, wi.Media.FFProbeMediaInfo.GetStableHash(), arg, ssimResult.SSIM, size, origSize, tSpeed, wi.Job.ArgumentCalculationSettings.ArgCalcSampleSeconds);
-                                    }
-                                }
-
-                                if (File.Exists(tempEncFile)) File.Delete(tempEncFile);
-                            }
-
-                            test.Compression = compressions.Average();
-                            test.Speed = speeds.Max();
-                            test.SSIM = ssims.Average();
-
-
-
-                            test.Processing = false;
                             wi.Update();
                         }
 
@@ -357,8 +348,8 @@ namespace Compressarr.JobProcessing
                         logger.LogDebug($"SSIM results:\r\n{string.Join("\r\n", resultLog)}");
 
 
-                        wi.Output($"Best Argument: {veo.EncoderOption.Arg.Replace("<val>", bestVal.ArgumentValue)}");
-                        veo.Value = bestVal.ArgumentValue;
+                        wi.Output($"Best Argument: {veo.EncoderOption.Arg.Replace("<val>", bestVal.ArgumentValue.ToString())}");
+                        veo.Value = bestVal.ArgumentValue.ToString();
                         veo.HasSettled = veo.HasSettled || veo.Value == prevVal;
                         wi.Update();
                     }
@@ -372,6 +363,100 @@ namespace Compressarr.JobProcessing
 
                 return;
             }
+        }
+
+        private async Task TestAutoPreset(AutoPresetResult test, List<string> sampleFiles, WorkItem wi, FFmpegPreset preset, CancellationToken token)
+        {
+            test.Reset();
+            test.Processing = true;
+
+            List<decimal> compressions = new();
+            List<decimal> speeds = new();
+            List<decimal> ssims = new();
+
+            foreach (var sampleFile in sampleFiles)
+            {
+                var sampleFileIndex = sampleFiles.IndexOf(sampleFile);
+
+                var tempEncFile = Path.Combine(fileService.TempDir, $"encFile.{preset.ContainerExtension}");
+
+                if (token.IsCancellationRequested) return;
+
+                wi.Update();
+
+                var args = GetArguments(wi, sampleFile, tempEncFile);
+
+                logger.LogInformation($"Trying: {string.Join("\r\n", args)}");
+
+                var storedResult = await historyService.GetAutoCalcResult(wi.Media.FFProbeMediaInfo.GetStableHash(), string.Join("|", args), wi.Job.ArgumentCalculationSettings.ArgCalcSampleSeconds);
+
+                if (storedResult != null && (!(wi.Job.ArgumentCalculationSettings.AutoCalculationType is AutoCalcType.BySpeed or AutoCalcType.Balanced or AutoCalcType.WeightedForCompression or AutoCalcType.WeightedForSpeed or AutoCalcType.WeightedForSSIM) || storedResult.Speed > 0))
+                {
+                    compressions.Add((decimal)storedResult.Size / storedResult.OriginalSize);
+                    speeds.Add(storedResult.Speed);
+                    ssims.Add(storedResult.SSIM);
+
+                    logger.LogDebug($"SSIM: {storedResult.SSIM}, Size: {storedResult.Size.ToFileSize()} {Math.Round((decimal)storedResult.Size / storedResult.OriginalSize * 100M, 2).Adorn("%")}");
+                }
+                else
+                {
+                    wi.ArgumentCalculator.GenSamplesTask ??= processManager.GenerateSamples(sampleFiles, wi, token);
+                    await wi.ArgumentCalculator.GenSamplesTask;
+
+                    var origSize = new FileInfo(sampleFile).Length;
+
+                    logger.LogInformation($"Testing sample encode with: {args}");
+
+                    decimal tSpeed = 0;
+                    foreach (var arg in args)
+                    {
+                        await processManager.EncodeAVideo((sender, args) =>
+                        {
+                            if (FFmpegProgress.TryParse(args.Data, out var progress)) test.Speed = tSpeed = progress.Speed;
+                        }
+                        , (sender, args) =>
+                        {
+                            test.EncodingProgress = (args.Percent / sampleFiles.Count) + (100D / sampleFiles.Count * sampleFileIndex);
+                            wi.Update();
+                        }, arg, token);
+                    }
+
+                    test.EncodingProgress = 100D / sampleFiles.Count * (sampleFileIndex + 1);
+
+                    speeds.Add(tSpeed);
+
+                    if (token.IsCancellationRequested) return;
+
+                    var size = new FileInfo(tempEncFile).Length;
+                    compressions.Add((decimal)size / origSize);
+                    wi.Update();
+
+                    var hardwareDecoder = preset.HardwareDecoder.Wrap("-hwaccel {0} ");
+
+                    var ssimResult = await fFmpegProcessor.CalculateSSIM((args) =>
+                    {
+                        test.SSIMProgress = (args.Percentage / sampleFiles.Count) + (100D / sampleFiles.Count * sampleFileIndex);
+                        wi.Update();
+                    }, sampleFile, tempEncFile, hardwareDecoder, token);
+
+                    test.SSIMProgress = 100D / sampleFiles.Count * (sampleFileIndex + 1);
+
+                    if (ssimResult.Success)
+                    {
+                        ssims.Add(ssimResult.SSIM);
+                        logger.LogDebug($"SSIM: {ssimResult.SSIM}, Size: {size.ToFileSize()} {Math.Round((decimal)size / origSize * 100M, 2).Adorn("%")}");
+                        StoreAutoCalcResults(wi.Media.UniqueID, wi.Media.FFProbeMediaInfo.GetStableHash(), string.Join("|", args), ssimResult.SSIM, size, origSize, tSpeed, wi.Job.ArgumentCalculationSettings.ArgCalcSampleSeconds);
+                    }
+                }
+
+                if (File.Exists(tempEncFile)) File.Delete(tempEncFile);
+            }
+
+            test.Compression = compressions.Average();
+            test.Speed = speeds.Max();
+            test.SSIM = ssims.Average();
+
+            test.Processing = false;
         }
 
         private static AutoPresetResult BalanceResults(IEnumerable<AutoPresetResult> validVals, decimal weightCompression = 1, decimal weightSpeed = 1, decimal weightSSIM = 1)
@@ -481,7 +566,7 @@ namespace Compressarr.JobProcessing
                $" -an -f null {(RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "NUL" : @"/dev/null")}" :
                string.IsNullOrWhiteSpace(preset.OptionalArguments) ? "" : $" {preset.OptionalArguments.Trim()}";
 
-            var bitrate = preset.VideoBitRate.HasValue ? $" -b:v {preset.VideoBitRate}k" : string.Empty;
+            var bitrate = (argCalc.Preset.VideoBitRateAutoCalc ? (argCalc.VideoBitRateCalculator.CurrentBitrate / 1000) : preset.VideoBitRate).Wrap(" -b:v {0}k");
             var frameRate = preset.FrameRate.HasValue ? $" -r {preset.FrameRate}" : string.Empty;
             var bframes = preset.B_Frames != 0 ? $" -bf {preset.B_Frames}" : string.Empty;
             var passStr = argCalc.TwoPass && !argCalc.VideoEncoderOptions.Any(vco => vco.EncoderOption.IncludePass) ? $" -pass {pass}" : string.Empty;
@@ -497,7 +582,7 @@ namespace Compressarr.JobProcessing
 
             return $"{hardwareDecoder}-y -i \"{{0}}\" {videoArguments}{opArgsStr}{globalVideoArgs}{audioArguments}{mapAllElse}{outputFile}";
         }
-        
+
 
         private void StoreAutoCalcResults(int mediaID, int mediaInfoID, string argument, decimal ssim, long size, long originalSize, decimal speed, int sampleLength)
         {

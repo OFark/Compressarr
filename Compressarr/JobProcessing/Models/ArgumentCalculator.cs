@@ -9,6 +9,8 @@ namespace Compressarr.JobProcessing.Models
 {
     public class ArgumentCalculator
     {
+        public Task GenSamplesTask = null;
+
         public ArgumentCalculator(WorkItem wi, FFmpegPreset preset)
         {
             if (wi?.Media?.FFProbeMediaInfo == null) throw new ArgumentException("MediaInfo is not available");
@@ -35,19 +37,14 @@ namespace Compressarr.JobProcessing.Models
         }
 
         public IEnumerable<Stream> AudioStreams { get; set; }
-        public IEnumerable<Stream> VideoStreams { get; set; }
-
-        public FFmpegPreset Preset { get; set; }
-
-        public HashSet<EncoderOptionValue> VideoEncoderOptions { get; set; }
-
         public IEnumerable<EncoderOptionValue> AutoCalcVideoEncoderOptions => VideoEncoderOptions?.Where(x => x.AutoCalculate);
-
-        public bool TwoPass => Preset?.VideoBitRate.HasValue ?? false;
-
         public string ColorPrimaries { get; set; }
         public string ColorTransfer { get; set; }
-
+        public FFmpegPreset Preset { get; set; }
         public int SampleSize { get; set; }
+        public bool TwoPass => Preset?.VideoBitRate.HasValue ?? false;
+        public VideoBitRateCalculator VideoBitRateCalculator { get; set; }
+        public HashSet<EncoderOptionValue> VideoEncoderOptions { get; set; }
+        public IEnumerable<Stream> VideoStreams { get; set; }
     }
 }

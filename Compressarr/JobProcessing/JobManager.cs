@@ -14,6 +14,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -32,14 +33,13 @@ namespace Compressarr.JobProcessing
         private readonly IHistoryService historyService;
         private readonly IOptionsMonitor<HashSet<Job>> jobsMonitor;
         private readonly ILogger<JobManager> logger;
-        private readonly IMediaInfoService mediaInfoService;
         private readonly IPresetManager presetManager;
         private readonly IProcessManager processManager;
         private readonly IRadarrService radarrService;
         private readonly ISonarrService sonarrService;
 
 
-        public JobManager(IApplicationService applicationService, IArgumentService argumentService, IFFmpegProcessor fFmpegProcessor, IFileService fileService, IFilterManager filterManager, IHistoryService historyService, ILogger<JobManager> logger, IMediaInfoService mediaInfoService, IOptionsMonitor<HashSet<Job>> jobsMonitor, IPresetManager presetManager, IProcessManager processManager, IRadarrService radarrService, ISonarrService sonarrService)
+        public JobManager(IApplicationService applicationService, IArgumentService argumentService, IFFmpegProcessor fFmpegProcessor, IFileService fileService, IFilterManager filterManager, IHistoryService historyService, ILogger<JobManager> logger, IOptionsMonitor<HashSet<Job>> jobsMonitor, IPresetManager presetManager, IProcessManager processManager, IRadarrService radarrService, ISonarrService sonarrService)
         {
             this.applicationService = applicationService;
             this.argumentService = argumentService;
@@ -49,7 +49,6 @@ namespace Compressarr.JobProcessing
             this.historyService = historyService;
             this.jobsMonitor = jobsMonitor;
             this.logger = logger;
-            this.mediaInfoService = mediaInfoService;
             this.presetManager = presetManager;
             this.processManager = processManager;
             this.radarrService = radarrService;
@@ -63,6 +62,8 @@ namespace Compressarr.JobProcessing
             using (logger.BeginScope("Adding Job"))
             {
                 logger.LogInformation($"Job name: {newJob.Name}");
+
+                newJob.PresetName = newJob.Preset?.Name ?? newJob.PresetName;
 
                 await InitialiseJob(newJob, token);
 
@@ -260,67 +261,81 @@ namespace Compressarr.JobProcessing
                                         {
 
                                             double i = 0;
-
-                                            await job.WorkLoad.AsyncParallelForEach(wi =>
+                                            var dirCheck = new ConcurrentBag<string>();
+                                            var semlock = new SemaphoreSlim(1, 1);
+                                            try
                                             {
-                                                return Task.Run(() =>
+                                                await job.WorkLoad.AsyncParallelForEach(wi =>
                                                 {
-                                                    using (logger.BeginScope("Work Item {SourceFileName}", wi.SourceFileName))
+                                                    return Task.Run(async () =>
                                                     {
-                                                        wi.Job = job;
-                                                        wi.OnUpdate += job.UpdateStatus;
-                                                        wi.CancellationTokenSource = new();
-
-
-                                                        var file = new FileInfo(wi.SourceFile);
-
-                                                        if (!file.Exists)
+                                                        using (logger.BeginScope("Work Item {SourceFileName}", wi.SourceFileName))
                                                         {
-                                                            Log(job, Update.Warning($"This file was not found: {file.FullName}"));
-                                                            Fail(job);
-                                                            return;
-                                                        }
+                                                            wi.Job = job;
+                                                            wi.OnUpdate += job.UpdateStatus;
+                                                            wi.CancellationTokenSource = new();
 
-                                                        var destinationpath = job.DestinationFolder;
+                                                            var file = new FileInfo(wi.SourceFile);
 
-                                                        if (string.IsNullOrWhiteSpace(destinationpath))
-                                                        {
-                                                            destinationpath = file.Directory.FullName;
-                                                        }
-                                                        else
-                                                        {
-                                                            destinationpath = job.Filter.MediaSource switch
+                                                            if (!file.Exists)
                                                             {
-                                                                MediaSource.Sonarr => Path.Combine(destinationpath, file.Directory.Parent.Name, file.Directory.Name),
-                                                                _ => Path.Combine(destinationpath, file.Directory.Name)
-                                                            };
-                                                        }
-
-                                                        if (!Directory.Exists(destinationpath))
-                                                        {
-                                                            try
-                                                            {
-                                                                Directory.CreateDirectory(destinationpath);
-                                                            }
-                                                            catch (Exception ex)
-                                                            {
-                                                                Log(job, Update.FromException(ex));
+                                                                Log(job, Update.Warning($"This file was not found: {file.FullName}"));
                                                                 Fail(job);
                                                                 return;
                                                             }
-                                                        }
 
-                                                        wi.DestinationFile = Path.Combine(destinationpath, file.Name);
-                                                        if (!string.IsNullOrWhiteSpace(job.Preset.ContainerExtension))
-                                                        {
-                                                            wi.DestinationFile = Path.ChangeExtension(wi.DestinationFile, job.Preset.ContainerExtension);
-                                                        }
+                                                            var destinationpath = job.DestinationFolder;
 
-                                                        job.InitialisationProgress?.Report(++i / job.WorkLoad.Count() * 100);
-                                                        job.UpdateStatus(this);
-                                                    }
+                                                            if (string.IsNullOrWhiteSpace(destinationpath))
+                                                            {
+                                                                destinationpath = file.Directory.FullName;
+                                                            }
+                                                            else
+                                                            {
+                                                                destinationpath = job.Filter.MediaSource switch
+                                                                {
+                                                                    MediaSource.Sonarr => Path.Combine(destinationpath, file.Directory.Parent.Name, file.Directory.Name),
+                                                                    _ => Path.Combine(destinationpath, file.Directory.Name)
+                                                                };
+                                                            }
+
+                                                            var checkFolder = Path.Combine(job.DestinationFolder, file.Directory.Name);
+                                                            await semlock.WaitAsync(token);
+                                                            try
+                                                            {
+                                                                if (!dirCheck.Contains(checkFolder))
+                                                                {
+                                                                    if (!Directory.Exists(checkFolder))
+                                                                    {
+                                                                        Directory.CreateDirectory(checkFolder);
+                                                                        Directory.Delete(checkFolder);
+                                                                        dirCheck.Add(checkFolder);
+                                                                    }
+                                                                }
+                                                            }
+                                                            finally
+                                                            {
+                                                                semlock.Release();
+                                                            }
+
+                                                            wi.DestinationFile = Path.Combine(destinationpath, file.Name);
+                                                            if (!string.IsNullOrWhiteSpace(job.Preset.ContainerExtension))
+                                                            {
+                                                                wi.DestinationFile = Path.ChangeExtension(wi.DestinationFile, job.Preset.ContainerExtension);
+                                                            }
+
+                                                            job.InitialisationProgress?.Report(++i / job.WorkLoad.Count() * 100);
+                                                            job.UpdateStatus(this);
+                                                        }
+                                                    });
                                                 });
-                                            });
+                                            }
+                                            catch (Exception ex)
+                                            {
+                                                Log(job, Update.FromException(ex));
+                                                Fail(job);
+                                                return;
+                                            }
 
                                             jobWorkLoad.Succeed();
                                             Log(job, Update.Debug("Workload compiled"), Update.Debug("Checking Destination Folder"), Update.Debug("Writing Test.txt file"));
@@ -537,6 +552,19 @@ namespace Compressarr.JobProcessing
                                                 if (!wi.Condition.HappyEncode) //skipped if done previously
                                                 {
                                                     Log(job, Update.Information("Processing"));
+                                                    if (!Directory.Exists(Path.GetDirectoryName(wi.DestinationFile)))
+                                                    {
+                                                        try
+                                                        {
+                                                            Directory.CreateDirectory(Path.GetDirectoryName(wi.DestinationFile));
+                                                        }
+                                                        catch (Exception ex)
+                                                        {
+                                                            Log(job, Update.FromException(ex));
+                                                            Fail(job);
+                                                            return;
+                                                        }
+                                                    }
                                                     await ProcessWorkItem(wi, lnkCTS.Token);
                                                 }
 

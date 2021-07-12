@@ -35,7 +35,7 @@
             <MudItem md="6">
                 <MudCard Class="my-2">
                     <MudCardContent>
-                        <MudSelect @bind-Value="preset.VideoEncoder" Label="Video Encoder" OffsetY="true" T="Encoder" Immediate="true" Class="mb-2">
+                        <MudSelect @bind-Value="preset.VideoEncoder" Label="Video Encoder" OffsetY="true" T="Encoder" Immediate="true" Class="">
                             <MudSelectItem T="Encoder" Value="@(new ())" />
                             <MudDivider />
                             @foreach (var c in PresetManager.VideoEncoders.Where(x => x.Options != null))
@@ -53,15 +53,18 @@
                                 <MudSelectItem Value="@c" />
                             }
                         </MudSelect>
-                        <MudSelect @bind-Value="preset.HardwareDecoder" Clearable="true" Label="Hardware Decoder" OffsetY="true" T="string" Immediate="true" Class="mb-2">
+                        <MudSelect @bind-Value="preset.HardwareDecoder" Clearable="true" Label="Hardware Decoder" OffsetY="true" T="string" Immediate="true" Class="mt-3">
                             @foreach (var hwd in ApplicationService.HardwareDecoders)
                             {
                                 <MudSelectItem Value="@hwd" />
                             }
                         </MudSelect>
-                        <MudTextField @bind-Value="preset.VideoBitRate" Label="Video Bitrate" Disabled="@disabledNoVideo" Class="mb-2" />
-                        <MudNumericField @bind-Value="preset.FrameRate" Label="Framerate" Placeholder="Same as source" Disabled="@disabledNoVideo" Class="mb-2" />
-                        <MudSelect @bind-Value="preset.B_Frames" Label="B Frames" Disabled="@disabledNoVideo" Class="mb-2">
+                        <MudToolBar DisableGutters="true" Dense="true" Class="mt-3">
+                            <MudNumericField @bind-Value="preset.VideoBitRate" Label="Video Bitrate" Disabled="@(disabledNoVideo || preset.VideoBitRateAutoCalc)" />
+                            <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" Disabled="@disabledNoVideo" ToggledColor="Color.Secondary" Toggled="preset.VideoBitRateAutoCalc" ToggledChanged="@((toggled) => { preset.VideoBitRate = null; preset.VideoBitRateAutoCalc = toggled; })" />
+                        </MudToolBar>
+                        <MudNumericField @bind-Value="preset.FrameRate" Label="Framerate" Placeholder="Same as source" Disabled="@disabledNoVideo" Class="mt-3" />
+                        <MudSelect @bind-Value="preset.B_Frames" Label="B Frames" Disabled="@disabledNoVideo" Class="mt-3">
                             <MudSelectItem Value="-1">Auto</MudSelectItem>
                             <MudSelectItem Value="0">Disabled</MudSelectItem>
                             <MudSelectItem Value="1"></MudSelectItem>
@@ -111,7 +114,7 @@
 
                                                     @if (option.EncoderOption.AutoTune != null)
                                                     {
-                                                        <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.IntValue = null; option.AutoCalculate = toggled; })" />
+                                                        <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" Disabled="option.EncoderOption.DisabledByVideoBitRate && disabledVideoBitrate" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.IntValue = null; option.AutoCalculate = toggled; })" />
                                                     }
                                                 </MudToolBar>
                                             }
@@ -123,7 +126,7 @@
                                                     <MudIconButton Size="Size.Small" Icon="@Icons.Outlined.Clear" OnClick="@(() => { option.IntValue = null; })" Disabled="@(option.AutoCalculate)" />
                                                     @if (option.EncoderOption.AutoTune != null)
                                                     {
-                                                        <MudToggleIconButton Size="Size.Small" Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.Value = null; option.AutoCalculate = toggled; })" />
+                                                        <MudToggleIconButton Size="Size.Small" Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" Disabled="option.EncoderOption.DisabledByVideoBitRate && disabledVideoBitrate" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.Value = null; option.AutoCalculate = toggled; })" />
                                                     }
                                                 </MudSlider>
 
@@ -140,7 +143,7 @@
                                                     </MudSelect>
                                                     @if (option.EncoderOption.AutoTune != null)
                                                     {
-                                                        <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.Value = null; option.AutoCalculate = toggled; })" />
+                                                        <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" Disabled="option.EncoderOption.DisabledByVideoBitRate && disabledVideoBitrate" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.Value = null; option.AutoCalculate = toggled; })" />
                                                     }
                                                 </MudToolBar>
                                             }
@@ -152,7 +155,7 @@
 
                                                     @if (option.EncoderOption.AutoTune != null)
                                                     {
-                                                        <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.Value = null; option.AutoCalculate = toggled; })" />
+                                                        <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" Disabled="option.EncoderOption.DisabledByVideoBitRate && disabledVideoBitrate" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.Value = null; option.AutoCalculate = toggled; })" />
                                                     }
                                                 </MudToolBar>
                                             }
@@ -198,7 +201,7 @@
     public EventCallback OnAdd { get; set; }
 
     private bool disabledNoVideo => preset.VideoEncoder?.IsCopy ?? true;
-    private bool disabledVideoBitrate => preset.VideoBitRate.HasValue;
+    private bool disabledVideoBitrate => preset.VideoBitRate.HasValue || preset.VideoBitRateAutoCalc;
 
     protected override void OnInitialized()
     {

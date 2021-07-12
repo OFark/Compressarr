@@ -55,7 +55,6 @@ namespace Compressarr
             services.AddTransient<IFilterManager, FilterManager>();
             services.AddTransient<IHistoryService, HistoryService>();
             services.AddTransient<IJobManager, JobManager>();
-            services.AddTransient<IMediaInfoService, MediaInfoService>();
             services.AddTransient<IPresetManager, PresetManager>();
             services.AddTransient<IRadarrService, RadarrService>();
             services.AddTransient<ISonarrService, SonarrService>();

@@ -1,23 +1,13 @@
 ﻿using Compressarr.Application;
-using Compressarr.FFmpeg;
 using Compressarr.FFmpeg.Models;
 using Compressarr.Filtering.Models;
-using Compressarr.Helpers;
-using Compressarr.JobProcessing;
-using Compressarr.JobProcessing.Models;
 using Compressarr.Presets.Models;
 using Compressarr.Services.Base;
-using Compressarr.Settings;
 using LiteDB;
 using Microsoft.Extensions.Logging;
-using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Linq.Dynamic.Core;
-using System.Runtime.InteropServices;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace Compressarr.Presets
@@ -26,20 +16,13 @@ namespace Compressarr.Presets
     {
 
         private readonly IApplicationService applicationService;
-        private readonly IArgumentService argumentService;
-        private readonly IFileService fileService;
         private readonly ILogger<PresetManager> logger;
-        private readonly IMediaInfoService mediaInfoService;
-        private readonly IProcessManager processManager;
 
-        public PresetManager(IApplicationService applicationService, IArgumentService argumentService, IFileService fileService, ILogger<PresetManager> logger, IMediaInfoService mediaInfoService, IProcessManager processManager)
+
+        public PresetManager(IApplicationService applicationService, ILogger<PresetManager> logger)
         {
             this.applicationService = applicationService;
-            this.argumentService = argumentService;
-            this.fileService = fileService;
             this.logger = logger;
-            this.mediaInfoService = mediaInfoService;
-            this.processManager = processManager;
         }
 
         public List<string> AudioBitrates

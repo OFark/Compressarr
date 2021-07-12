@@ -8,5 +8,8 @@ namespace Compressarr.JobProcessing.Models
         public int ArgCalcSampleSeconds { get; set; }
         public decimal? AutoCalculationPost { get; set; }
         public AutoCalcType AutoCalculationType { get; set; }
+
+        public bool VideoBitRateTargetSSIM { get; set; }
+        public decimal? VideoBitRateTarget { get; set; }
     }
 }

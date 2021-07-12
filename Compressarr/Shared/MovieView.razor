@@ -4,7 +4,7 @@
 
 @implements IDisposable
 @inject IApplicationService applicationService
-@inject IMediaInfoService mediaInfoService
+@inject IFFmpegProcessor ffmpegProcessor
 @inject IHistoryService historyService
 
 
@@ -40,8 +40,24 @@
 
     public void Dispose()
     {
-        cts.Cancel();
-        cts.Dispose();
+        // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+    }
+
+    private bool disposedValue;
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!disposedValue)
+        {
+            if (disposing)
+            {
+                cts.Cancel();
+                cts.Dispose();
+            }
+            disposedValue = true;
+        }
     }
 
     private void filterBy(string key, string value)
@@ -60,8 +76,8 @@
 
         await OnUpdate.InvokeAsync();
 
-        var response = await mediaInfoService.GetMediaInfo(movie, cts.Token);
-        if(response.Success)
+        var response = await ffmpegProcessor.GetFFProbeInfo(movie.FilePath, cts.Token);
+        if (response.Success)
         {
             movie.FFProbeMediaInfo = response.Result;
         }

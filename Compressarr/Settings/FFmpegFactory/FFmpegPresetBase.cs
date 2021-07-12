@@ -20,6 +20,7 @@ namespace Compressarr.Settings.FFmpegFactory
             Name = preset.Name;
             OptionalArguments = preset.OptionalArguments;
             VideoBitRate = preset.VideoBitRate;
+            VideoBitRateAutoCalc = preset.VideoBitRateAutoCalc;
             VideoEncoderOptions = preset.VideoEncoderOptions?.Select(x => new EncoderOptionValueBase(x)).ToHashSet();
             VideoEncoder = new(preset.VideoEncoder);
         }
@@ -34,6 +35,7 @@ namespace Compressarr.Settings.FFmpegFactory
         public string Name { get; set; }
         public string OptionalArguments { get; set; }
         public int? VideoBitRate { get; set; }
+        public bool VideoBitRateAutoCalc { get; set; }
 
         public int B_Frames { get; set; }
         public HashSet<EncoderOptionValueBase> VideoEncoderOptions { get; set; }

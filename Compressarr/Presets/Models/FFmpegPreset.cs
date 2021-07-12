@@ -26,6 +26,7 @@ namespace Compressarr.Presets.Models
             Name = presetBase?.Name;
             OptionalArguments = presetBase?.OptionalArguments;
             VideoBitRate = presetBase?.VideoBitRate;
+            VideoBitRateAutoCalc = presetBase.VideoBitRateAutoCalc;
             VideoEncoderOptions = presetBase?.VideoEncoderOptions?.Select(x => new EncoderOptionValue(x)).ToHashSet();
             _videoEncoder = presetBase.VideoEncoder != null ? new Encoder(presetBase.VideoEncoder) : null;
         }
