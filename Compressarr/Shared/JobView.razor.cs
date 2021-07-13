@@ -108,17 +108,17 @@ namespace Compressarr.Shared
 
         private bool SaveEnabled => (Editing || NewJob) && Job?.FilterID != null && Job?.PresetName != null && Job?.DestinationFolder != null;
 
-        private int? VideoBitRateTarget
+        private decimal? VideoBitRateTarget
         {
             get
             {
-                return Job.ArgumentCalculationSettings.VideoBitRateTarget.HasValue ? (int)(Job.ArgumentCalculationSettings.VideoBitRateTarget * 100) : null;
+                return Job.ArgumentCalculationSettings.VideoBitRateTarget.HasValue ? (Job.ArgumentCalculationSettings.VideoBitRateTarget * 100) : null;
             }
             set
             {
                 if (value.HasValue)
                 {
-                    Job.ArgumentCalculationSettings.VideoBitRateTarget = (decimal)value / 100;
+                    Job.ArgumentCalculationSettings.VideoBitRateTarget = value / 100;
                 }
                 else
                 {

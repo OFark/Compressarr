@@ -1,8 +1,11 @@
 ﻿using Compressarr.Presets.Models;
 using Compressarr.Settings.FFmpegFactory;
+using Compressarr.Shared.Models;
+using Humanizer;
 using Microsoft.AspNetCore.Components;
 using Newtonsoft.Json;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -18,6 +21,60 @@ namespace Compressarr.Helpers
         public static string Adorn(this object text, string adornment)
         {
             return string.IsNullOrWhiteSpace(text?.ToString()) ? string.Empty : $"{text}{adornment}";
+        }
+
+        public static Task AsyncParallelForEach<T>(this IEnumerable<T> source, Func<T, Task> body, int maxDegreeOfParallelism = DataflowBlockOptions.Unbounded, TaskScheduler scheduler = null)
+        {
+            var options = new ExecutionDataflowBlockOptions
+            {
+                MaxDegreeOfParallelism = maxDegreeOfParallelism
+            };
+            if (scheduler != null)
+                options.TaskScheduler = scheduler;
+
+            var block = new ActionBlock<T>(body, options);
+
+            foreach (var item in source)
+                block.Post(item);
+
+            block.Complete();
+            return block.Completion;
+        }
+
+        public static async Task AsyncParallelForEach<T>(this IAsyncEnumerable<T> source, Func<T, Task> body, int maxDegreeOfParallelism = DataflowBlockOptions.Unbounded, TaskScheduler scheduler = null)
+        {
+            var options = new ExecutionDataflowBlockOptions
+            {
+                MaxDegreeOfParallelism = maxDegreeOfParallelism
+            };
+            if (scheduler != null)
+                options.TaskScheduler = scheduler;
+
+            var block = new ActionBlock<T>(body, options);
+
+            await foreach (var item in source)
+                block.Post(item);
+
+            block.Complete();
+            await block.Completion;
+        }
+
+        public static string Capitalise(this string text)
+        {
+            return text switch
+            {
+                null => null,
+                "" => string.Empty,
+                _ => text.First().ToString().ToUpper() + text[1..]
+            };
+        }
+
+        public static void Clear<T>(this EventHandler<T> eh)
+        {
+            foreach (Delegate d in eh.GetInvocationList())
+            {
+                eh -= (EventHandler<T>)d;
+            }
         }
 
         public static SortedSet<Codec> Decoders(this SortedSet<Codec> codecs)
@@ -53,6 +110,8 @@ namespace Compressarr.Helpers
                 return hash1 + (hash2 * 1566083941);
             }
         }
+
+        public static string JoinWithIfNotNull(this string seperator, params string[] values) => string.Join(seperator, values.Where(x => !string.IsNullOrWhiteSpace(x)));
 
         /// <summary>
         /// Perform a deep Copy of the object, using Json as a serialization method. NOTE: Private members are not cloned using this method.
@@ -112,15 +171,6 @@ namespace Compressarr.Helpers
         {
             return String.Format(new FileSizeFormatProvider(), "{0:fs}", l);
         }
-
-        public static void Clear<T>(this EventHandler<T> eh)
-        {
-            foreach (Delegate d in eh.GetInvocationList())
-            {
-                eh -= (EventHandler<T>)d;
-            }
-        }
-
         public static string ToFileSize(this int l)
         {
             return String.Format(new FileSizeFormatProvider(), "{0:fs}", l);
@@ -130,17 +180,6 @@ namespace Compressarr.Helpers
         {
             return Math.Round(percent * 100, decimals).ToString();
         }
-
-        public static string Capitalise(this string text)
-        {
-            return text switch
-            {
-                null => null,
-                "" => string.Empty,
-                _ => text.First().ToString().ToUpper() + text[1..]
-            };
-        }
-
         public static string ToPercent(this decimal? percent, int decimals = 0)
         {
             return percent.HasValue ? ToPercent(percent.Value, decimals).ToString() : null;
@@ -150,6 +189,74 @@ namespace Compressarr.Helpers
         {
             return span.ToString(@"hh\:mm\:ss");
         }
+
+        public static bool IsSimple(this Type type) => TypeDescriptor.GetConverter(type).CanConvertFrom(typeof(string));
+
+        public static HashSet<TreeItemData> ToTreeItems(this object obj, string title = null)
+        {
+            if (obj != null)
+            {
+                var results = new HashSet<TreeItemData>();
+                var type = obj.GetType();
+
+                if (obj.GetType().IsSimple())
+                {
+                    results.Add(new(title ?? obj?.ToString(), title == null ? null : obj));
+                    return results;
+                }
+
+                if (type.GetInterfaces().Contains(typeof(IEnumerable)) && type.GetGenericArguments().Length > 0)
+                {
+                    var i = 0;
+                    foreach (var item in (IEnumerable)obj)
+                    {
+                        if (item.GetType().IsSimple())
+                        {
+                            if (item != null)
+                            {
+                                results.Add(new TreeItemData(title ?? type.Name, item));
+                            }
+                        }
+                        else
+                        {
+                            var tid = new TreeItemData((title ?? type.Name).Singularize(), i++)
+                            {
+                                TreeItems = item.ToTreeItems(title ?? type.Name)
+                            };
+                            results.Add(tid);
+                        }
+                    }
+
+                    return results;
+                }
+
+                foreach (var prop in type.GetProperties())
+                {
+                    if (prop.GetValue(obj) != null)
+                    {
+                        var tid = new TreeItemData(prop.Name);
+                        if (prop.PropertyType.IsSimple())
+                        {
+                            tid.Value = prop.GetValue(obj)?.ToString();
+                        }
+                        else
+                        {
+                            if (prop.PropertyType.GetInterfaces().Contains(typeof(IEnumerable)))
+                            {
+                                tid.Title = tid.Title.Pluralize();
+                            }
+                            tid.TreeItems = prop.GetValue(obj).ToTreeItems(prop.Name);
+                        }
+
+                        results.Add(tid);
+                    }
+                }
+
+                return results;
+            }
+            return null;
+        }
+
         public static bool TryMatch(this Regex reg, string input, out Match match)
         {
             if (input == null)
@@ -161,9 +268,6 @@ namespace Compressarr.Helpers
             match = reg.Match(input);
             return match.Success;
         }
-
-        public static string JoinWithIfNotNull(this string seperator, params string[] values) => string.Join(seperator, values.Where(x => !string.IsNullOrWhiteSpace(x)));
-
         public static HashSet<EncoderOptionValue> WithValues(this HashSet<EncoderOption> encoderOptions, IEnumerable<EncoderOptionValueBase> values = null)
         {
             var eovs = new HashSet<EncoderOptionValue>();
@@ -186,41 +290,6 @@ namespace Compressarr.Helpers
         {
             if (text == null || string.IsNullOrWhiteSpace(text.ToString())) return null;
             return string.Format(format, text);
-        }
-        public static Task AsyncParallelForEach<T>(this IEnumerable<T> source, Func<T, Task> body, int maxDegreeOfParallelism = DataflowBlockOptions.Unbounded, TaskScheduler scheduler = null)
-        {
-            var options = new ExecutionDataflowBlockOptions
-            {
-                MaxDegreeOfParallelism = maxDegreeOfParallelism
-            };
-            if (scheduler != null)
-                options.TaskScheduler = scheduler;
-
-            var block = new ActionBlock<T>(body, options);
-
-            foreach (var item in source)
-                block.Post(item);
-
-            block.Complete();
-            return block.Completion;
-        }
-
-        public static async Task AsyncParallelForEach<T>(this IAsyncEnumerable<T> source, Func<T, Task> body, int maxDegreeOfParallelism = DataflowBlockOptions.Unbounded, TaskScheduler scheduler = null)
-        {
-            var options = new ExecutionDataflowBlockOptions
-            {
-                MaxDegreeOfParallelism = maxDegreeOfParallelism
-            };
-            if (scheduler != null)
-                options.TaskScheduler = scheduler;
-
-            var block = new ActionBlock<T>(body, options);
-
-            await foreach (var item in source)
-                block.Post(item);
-
-            block.Complete();
-            await block.Completion;
         }
     }
 }

@@ -148,6 +148,7 @@ namespace Compressarr.JobProcessing
                     wi.Update();
                 }
 
+                if (token.IsCancellationRequested) return;
 
                 do
                 {
@@ -167,6 +168,7 @@ namespace Compressarr.JobProcessing
                             vbc.SampleResults.Add(test);
 
                             await TestAutoPreset(test, sampleFiles, wi, preset, token);
+                            if (token.IsCancellationRequested) return;
                         }
                         else
                         {
@@ -187,7 +189,7 @@ namespace Compressarr.JobProcessing
                             vbc.SampleResults.Add(test);
 
                             await TestAutoPreset(test, sampleFiles, wi, preset, token);
-
+                            if (token.IsCancellationRequested) return;
                         }
 
                         if (!targetmet())
@@ -200,6 +202,7 @@ namespace Compressarr.JobProcessing
                                 vbc.SampleResults.Add(test);
 
                                 await TestAutoPreset(test, sampleFiles, wi, preset, token);
+                                if (token.IsCancellationRequested) return;
                             }
                         }
 
@@ -211,6 +214,7 @@ namespace Compressarr.JobProcessing
                             vbc.SampleResults.Add(test);
 
                             await TestAutoPreset(test, sampleFiles, wi, preset, token);
+                            if (token.IsCancellationRequested) return;
                         }
 
                         // Let increase bitrate by 1% until target is reached
@@ -235,6 +239,7 @@ namespace Compressarr.JobProcessing
                         vbc.CurrentBitrate = (int)vbc.SampleResults.FirstOrDefault(x => x.Best).ArgumentValue;
                     }
 
+                    if (token.IsCancellationRequested) return;
 
                     foreach (var veo in wi.ArgumentCalculator.AutoCalcVideoEncoderOptions)
                     {
@@ -257,6 +262,7 @@ namespace Compressarr.JobProcessing
                             veo.Value = test.ArgumentValue?.ToString();
 
                             await TestAutoPreset(test, sampleFiles, wi, preset, token);
+                            if (token.IsCancellationRequested) return;
 
                             wi.Update();
                         }
@@ -342,6 +348,8 @@ namespace Compressarr.JobProcessing
                             bestVal = veo.AutoPresetTests.OrderBy(x => x.Compression).FirstOrDefault();
                         }
 
+                        if (token.IsCancellationRequested) return;
+
                         bestVal.Best = true;
 
                         var resultLog = veo.AutoPresetTests.Select(d => $"{d.ArgumentValue} | {d.SSIM} | {d.Compression.Adorn("%")} | {d.Speed.Adorn(" FPS")} {(d.Best ? "<=" : "")}");
@@ -353,6 +361,8 @@ namespace Compressarr.JobProcessing
                         veo.HasSettled = veo.HasSettled || veo.Value == prevVal;
                         wi.Update();
                     }
+
+                    if (token.IsCancellationRequested) return;
                 }
                 while (!wi.ArgumentCalculator.AutoCalcVideoEncoderOptions.All(x => x.HasSettled));
 

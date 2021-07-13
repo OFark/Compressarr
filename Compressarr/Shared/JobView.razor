@@ -238,9 +238,11 @@
                                                                 <MudCardContent>
                                                                     @if (context.Media.FFProbeMediaInfo != null)
                                                                             {
-                                                                        <MudTreeView Dense="true" T="string">
-                                                                            <MudTreeViewItem T="string" Text="@context.Media.FFProbeMediaInfo.format.filename"></MudTreeViewItem>
-                                                                        </MudTreeView>
+                                                                    <MudTreeView Dense="true" ExpandOnClick="true" Items="@context.Media.FFProbeTreeView" Context="mediaInfo">
+                                                                        <ItemTemplate>
+                                                                            <MudTreeViewItem @bind-Expanded="@mediaInfo.IsExpanded" Items="@mediaInfo.TreeItems" Text="@($"{mediaInfo.Title.Humanize(LetterCasing.Title)}{mediaInfo.Value.Wrap(": {0}")}")" />
+                                                                        </ItemTemplate>
+                                                                    </MudTreeView>
                                                                             }
                                                                 </MudCardContent>
                                                             </MudCard>

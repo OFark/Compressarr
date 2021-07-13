@@ -1,5 +1,7 @@
 ﻿using Compressarr.FFmpeg.Models;
 using Compressarr.Filtering;
+using Compressarr.Helpers;
+using Compressarr.Shared.Models;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
@@ -15,6 +17,7 @@ namespace Compressarr.Services.Interfaces
         public int UniqueID { get; }
 
         public FFProbeResponse FFProbeMediaInfo { get; set; }
+        public HashSet<TreeItemData> FFProbeTreeView { get; }
 
         public MediaSource Source { get; set; }
 

@@ -169,87 +169,10 @@
                         {
                         <MudCard>
                             <MudBlazor.MudCardContent>
-                                <MudTreeView T="string" ExpandOnClick="true">
-                                    <MudTreeViewItem Value='@($"Duration: {@context.FFProbeMediaInfo?.format?.Duration.ToStringTimeSeconds()}")' />
-                                    <MudTreeViewItem Value='@($"Path: {@context.path}")' />
-                                    <MudTreeViewItem Value='@($"Size: {@context.FFProbeMediaInfo?.format?.size}")' />
-                                    @if (context.FFProbeMediaInfo?.AttachmentStreams != null)
-                                    {
-                                        <MudTreeViewItem Value="@($"Attachment Streams: {context.FFProbeMediaInfo?.AttachmentStreams?.Count()}")">
-                                            @foreach (var s in context.FFProbeMediaInfo?.AttachmentStreams)
-                                            {
-                                                <MudTreeViewItem Value='@($"Stream: {s.index}")'>
-                                                    <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
-                                                    <MudTreeViewItem Value='@($"File Name: {s.tags?.filename}")' />
-                                                    <MudTreeViewItem Value='@($"MIME Type: {s.tags?.mimetype}")' />
-                                                </MudTreeViewItem>
-                                            }
-                                        </MudTreeViewItem>
-                                    }
-                                    @if (context.FFProbeMediaInfo?.AudioStreams != null)
-                                    {
-                                        <MudTreeViewItem Value="@($"Audio Streams: {context.FFProbeMediaInfo?.AudioStreams.Count()}")">
-                                            @foreach (var s in context.FFProbeMediaInfo?.AudioStreams)
-                                            {
-                                                <MudTreeViewItem Value='@($"Stream: {s.index}")'>
-                                                    <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
-                                                    <MudTreeViewItem Value='@($"Bitrate: {s.bit_rate}")' />
-                                                    <MudTreeViewItem Value='@($"Channels: {s.channels}")' />
-                                                    <MudTreeViewItem Value='@($"Sample Rate: {s.sample_rate}")' />
-                                                    <MudTreeViewItem Value='@($"Default: {s.disposition?.@default}")' />
-                                                    <MudTreeViewItem Value='@($"Language: {s.tags?.language}")' />
-                                                    <MudTreeViewItem Value='@($"Title: {s.tags?.title}")' />
-                                                </MudTreeViewItem>
-                                            }
-                                        </MudTreeViewItem>
-                                    }
-                                    @if (context.FFProbeMediaInfo?.DataStreams != null)
-                                    {
-                                        <MudTreeViewItem Value="@($"Data Streams: {context.FFProbeMediaInfo?.DataStreams.Count()}")">
-                                            @foreach (var s in context.FFProbeMediaInfo?.DataStreams)
-                                            {
-                                                <MudTreeViewItem Value='@($"Stream: {s.index}")'>
-                                                    <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
-                                                    <MudTreeViewItem Value='@($"Codec Tag: {s.codec_tag_string}")' />
-                                                    <MudTreeViewItem Value='@($"Language: {s.tags?.language}")' />
-                                                    <MudTreeViewItem Value='@($"Handler: {s.tags?.handler_name}")' />
-                                                </MudTreeViewItem>
-                                            }
-                                        </MudTreeViewItem>
-                                    }
-                                    @if (context.FFProbeMediaInfo?.VideoStreams != null)
-                                    {
-                                        <MudTreeViewItem Value="@($"Video Streams: {context.FFProbeMediaInfo?.VideoStreams.Count()}")">
-                                            @foreach (var s in context.FFProbeMediaInfo?.VideoStreams)
-                                            {
-                                                <MudTreeViewItem Value='@($"Stream: {s.index}")'>
-                                                    <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
-                                                    <MudTreeViewItem Value='@($"Bitrate: {s.bit_rate}")' />
-                                                    <MudTreeViewItem Value='@($"Framerate: {s.avg_frame_rate}")' />
-                                                    <MudTreeViewItem Value='@($"Height: {s.height}")' />
-                                                    <MudTreeViewItem Value='@($"Width: {s.width}")' />
-                                                    <MudTreeViewItem Value='@($"Pixel Format: {s.pix_fmt}")' />
-                                                    <MudTreeViewItem Value='@($"Ratio: {s.display_aspect_ratio}")' />
-                                                    <MudTreeViewItem Value='@($"Default: {s.disposition?.@default}")' />
-                                                </MudTreeViewItem>
-                                            }
-                                        </MudTreeViewItem>
-                                    }
-                                    @if (context.FFProbeMediaInfo?.SubtitleStreams != null)
-                                    {
-                                        <MudTreeViewItem Value="@($"Subtitle Streams: {context.FFProbeMediaInfo?.SubtitleStreams.Count()}")">
-                                            @foreach (var s in context.FFProbeMediaInfo?.SubtitleStreams)
-                                            {
-                                                <MudTreeViewItem Value='@($"Stream: {s.index}")'>
-                                                    <MudTreeViewItem Value='@($"Codec: {s.codec_name} - {s.codec_long_name}")' />
-                                                    <MudTreeViewItem Value='@($"Default: {s.disposition?.@default}")' />
-                                                    <MudTreeViewItem Value='@($"Forced: {s.disposition?.forced}")' />
-                                                    <MudTreeViewItem Value='@($"Language: {s.tags?.language}")' />
-                                                    <MudTreeViewItem Value='@($"Title: {s.tags?.title}")' />
-                                                </MudTreeViewItem>
-                                            }
-                                        </MudTreeViewItem>
-                                    }
+                                <MudTreeView Dense="true" ExpandOnClick="true" Items="@context.FFProbeTreeView" Context="mediaInfo">
+                                    <ItemTemplate>
+                                        <MudTreeViewItem @bind-Expanded="@mediaInfo.IsExpanded" Items="@mediaInfo.TreeItems" Text="@($"{mediaInfo.Title.Humanize(LetterCasing.Title)}{mediaInfo.Value.Wrap(": {0}")}")" />
+                                    </ItemTemplate>
                                 </MudTreeView>
                             </MudBlazor.MudCardContent>
                         </MudCard>

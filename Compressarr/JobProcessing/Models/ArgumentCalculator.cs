@@ -42,7 +42,7 @@ namespace Compressarr.JobProcessing.Models
         public string ColorTransfer { get; set; }
         public FFmpegPreset Preset { get; set; }
         public int SampleSize { get; set; }
-        public bool TwoPass => Preset?.VideoBitRate.HasValue ?? false;
+        public bool TwoPass => (Preset?.VideoBitRate.HasValue ?? false) || (Preset?.VideoBitRateAutoCalc ?? false);
         public VideoBitRateCalculator VideoBitRateCalculator { get; set; }
         public HashSet<EncoderOptionValue> VideoEncoderOptions { get; set; }
         public IEnumerable<Stream> VideoStreams { get; set; }
