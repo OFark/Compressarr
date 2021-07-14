@@ -53,7 +53,7 @@ namespace Compressarr.Application
                 {
                     job.ArgumentCalculationSettings.AlwaysCalculateSSIM = appSettings.Value.AlwaysCalculateSSIM;
                     job.ArgumentCalculationSettings.ArgCalcSampleSeconds = appSettings.Value.ArgCalcSampleSeconds;
-                    job.ArgumentCalculationSettings.AutoCalculationPost = appSettings.Value.AutoCalculationPost;
+                    job.ArgumentCalculationSettings.AutoCalculationSSIMPost = appSettings.Value.AutoCalculationPost;
                     job.ArgumentCalculationSettings.AutoCalculationType = appSettings.Value.AutoCalculationType;
                 }
             }

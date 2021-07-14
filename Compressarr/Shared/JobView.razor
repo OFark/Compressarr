@@ -111,6 +111,17 @@
                                                     <MudNumericField Style="" @bind-Value="MinSSIMPost" Label="Minimum SSIM" Min="0" Max="100" Adornment="Adornment.End" AdornmentText="%" />
                                                 </MudListItem>
                                             }
+
+                                            @if (Job.ArgumentCalculationSettings.AutoCalculationType == AutoCalcType.HappyMedium)
+                                            {
+                                                <MudListItem>
+                                                    <MudNumericField Style="" @bind-Value="MaxCompPost" Label="Minumum Compression" Min="0" Max="100" Adornment="Adornment.End" AdornmentText="%" />
+                                                </MudListItem>
+                                                <MudListItem>
+                                                    <MudNumericField Style="" @bind-Value="MinSSIMPost" Label="But SSIM must reach" Min="0" Max="100" Adornment="Adornment.End" AdornmentText="%" />
+                                                </MudListItem>
+                                            }
+
                                         </MudList>
                                     </MudForm>
                                 </MudCardContent>

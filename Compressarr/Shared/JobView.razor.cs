@@ -85,21 +85,40 @@ namespace Compressarr.Shared
             }
         }
 
-        private decimal? MinSSIMPost
+        private decimal? MaxCompPost
         {
             get
             {
-                return Job.ArgumentCalculationSettings.AutoCalculationPost.HasValue ? Job.ArgumentCalculationSettings.AutoCalculationPost * 100 : null;
+                return Job.ArgumentCalculationSettings.AutoCalculationCompPost.HasValue ? Job.ArgumentCalculationSettings.AutoCalculationCompPost * 100 : null;
             }
             set
             {
                 if (value.HasValue)
                 {
-                    Job.ArgumentCalculationSettings.AutoCalculationPost = value / 100;
+                    Job.ArgumentCalculationSettings.AutoCalculationCompPost = value / 100;
                 }
                 else
                 {
-                    Job.ArgumentCalculationSettings.AutoCalculationPost = null;
+                    Job.ArgumentCalculationSettings.AutoCalculationCompPost = null;
+                }
+            }
+        }
+
+        private decimal? MinSSIMPost
+        {
+            get
+            {
+                return Job.ArgumentCalculationSettings.AutoCalculationSSIMPost.HasValue ? Job.ArgumentCalculationSettings.AutoCalculationSSIMPost * 100 : null;
+            }
+            set
+            {
+                if (value.HasValue)
+                {
+                    Job.ArgumentCalculationSettings.AutoCalculationSSIMPost = value / 100;
+                }
+                else
+                {
+                    Job.ArgumentCalculationSettings.AutoCalculationSSIMPost = null;
                 }
             }
         }

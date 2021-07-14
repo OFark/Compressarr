@@ -22,6 +22,7 @@ namespace Compressarr.Settings
         BangForBuck,
         BySpeed,
         Balanced,
+        HappyMedium,
         WeightedForCompression,
         WeightedForSpeed,
         WeightedForSSIM

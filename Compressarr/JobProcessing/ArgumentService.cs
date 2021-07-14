@@ -104,7 +104,7 @@ namespace Compressarr.JobProcessing
 
                 if (wi.ArgumentCalculator.SampleSize == 0)
                 {
-                    wi.ArgumentCalculator.SampleSize = 4; // new Random().Next(1, 5);
+                    wi.ArgumentCalculator.SampleSize = 1; // new Random().Next(1, 5);
                 }
                 var sampleFiles = Enumerable.Range(1, wi.ArgumentCalculator.SampleSize).Select(x => Path.Combine(fileService.TempDir, $"sample{x}{wi.SourceFileExtension}")).ToList();
 
@@ -269,34 +269,19 @@ namespace Compressarr.JobProcessing
 
                         AutoPresetResult bestVal = default;
 
-                        if (wi.Job.ArgumentCalculationSettings.AutoCalculationType == AutoCalcType.Balanced)
+                        bestVal = wi.Job.ArgumentCalculationSettings.AutoCalculationType switch
                         {
-                            var validVals = veo.AutoPresetTests.Where(x => x != null && x.Smaller);
-                            bestVal = BalanceResults(validVals);
-                        }
+                            AutoCalcType.FirstPastThePost => veo.AutoPresetTests.Where(x => x != null && x.SSIM >= (wi.Job.ArgumentCalculationSettings.AutoCalculationSSIMPost ?? 99)).OrderBy(x => x.Compression).ThenByDescending(x => x.SSIM).FirstOrDefault(),
+                            AutoCalcType.BySpeed => veo.AutoPresetTests.OrderBy(x => Math.Abs(1 - x.Speed)).ThenByDescending(x => x.Speed > 1).ThenByDescending(x => x.SSIM).FirstOrDefault(),
+                            AutoCalcType.Balanced => BalanceResults(veo.AutoPresetTests.Where(x => x != null && x.Smaller)),
+                            AutoCalcType.HappyMedium => veo.AutoPresetTests.OrderBy(x => x.SSIM < wi.Job.ArgumentCalculationSettings.AutoCalculationSSIMPost).ThenBy(x => x.Compression > wi.Job.ArgumentCalculationSettings.AutoCalculationCompPost).ThenByDescending(x => x.SSIM).ThenBy(x => x.Compression).FirstOrDefault(),
+                            AutoCalcType.WeightedForCompression => BalanceResults(veo.AutoPresetTests.Where(x => x != null && x.Smaller), weightCompression: 2),
+                            AutoCalcType.WeightedForSpeed => BalanceResults(veo.AutoPresetTests.Where(x => x != null && x.Smaller), weightSpeed: 2),
+                            AutoCalcType.WeightedForSSIM => BalanceResults(veo.AutoPresetTests.Where(x => x != null && x.Smaller), weightSSIM: 2),
 
-                        if (wi.Job.ArgumentCalculationSettings.AutoCalculationType == AutoCalcType.WeightedForCompression)
-                        {
-                            var validVals = veo.AutoPresetTests.Where(x => x != null && x.Smaller);
-                            bestVal = BalanceResults(validVals, weightCompression: 2);
-                        }
+                            _ => null
+                        };                        
 
-                        if (wi.Job.ArgumentCalculationSettings.AutoCalculationType == AutoCalcType.WeightedForSpeed)
-                        {
-                            var validVals = veo.AutoPresetTests.Where(x => x != null && x.Smaller);
-                            bestVal = BalanceResults(validVals, weightSpeed: 2);
-                        }
-
-                        if (wi.Job.ArgumentCalculationSettings.AutoCalculationType == AutoCalcType.WeightedForSSIM)
-                        {
-                            var validVals = veo.AutoPresetTests.Where(x => x != null && x.Smaller);
-                            bestVal = BalanceResults(validVals, weightSSIM: 2);
-                        }
-
-                        if (wi.Job.ArgumentCalculationSettings.AutoCalculationType == AutoCalcType.BySpeed)
-                        {
-                            bestVal = veo.AutoPresetTests.OrderBy(x => Math.Abs(1 - x.Speed)).ThenByDescending(x => x.Speed > 1).ThenByDescending(x => x.SSIM).FirstOrDefault();
-                        }
 
                         if (wi.Job.ArgumentCalculationSettings.AutoCalculationType == AutoCalcType.BangForBuck)
                         {
@@ -333,11 +318,6 @@ namespace Compressarr.JobProcessing
                             }
                         }
 
-                        if (wi.Job.ArgumentCalculationSettings.AutoCalculationType == AutoCalcType.FirstPastThePost)
-                        {
-                            bestVal = veo.AutoPresetTests.Where(x => x != null && x.SSIM >= (wi.Job.ArgumentCalculationSettings.AutoCalculationPost ?? 99)).OrderBy(x => x.Compression).ThenByDescending(x => x.SSIM).FirstOrDefault();
-                        }
-
                         if (bestVal == null || bestVal.Equals(default(KeyValuePair<string, AutoPresetResult>)))
                         {
                             bestVal = veo.AutoPresetTests.Where(x => x != null && x.Smaller).OrderByDescending(x => x.SSIM).ThenBy(x => x.Compression).FirstOrDefault();
@@ -356,8 +336,8 @@ namespace Compressarr.JobProcessing
                         logger.LogDebug($"SSIM results:\r\n{string.Join("\r\n", resultLog)}");
 
 
-                        wi.Output($"Best Argument: {veo.EncoderOption.Arg.Replace("<val>", bestVal.ArgumentValue.ToString())}");
-                        veo.Value = bestVal.ArgumentValue.ToString();
+                        wi.Output($"Best Argument: {(bestVal.ArgumentValue == null ? "Default" : veo.EncoderOption.Arg.Replace("<val>", bestVal.ArgumentValue.ToString()))}");
+                        veo.Value = bestVal.ArgumentValue?.ToString();
                         veo.HasSettled = veo.HasSettled || veo.Value == prevVal;
                         wi.Update();
                     }
@@ -415,7 +395,7 @@ namespace Compressarr.JobProcessing
 
                     var origSize = new FileInfo(sampleFile).Length;
 
-                    logger.LogInformation($"Testing sample encode with: {args}");
+                    logger.LogInformation($"Testing sample encode with: {string.Join("\r\n", args)}");
 
                     decimal tSpeed = 0;
                     foreach (var arg in args)

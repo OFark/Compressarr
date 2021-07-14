@@ -30,7 +30,8 @@ namespace Compressarr.FFmpeg
 
         public async Task<SSIMResult> CalculateSSIM(FFmpegProgressEvent ffmpegProgress, string sourceFile, string destinationFile, string hardwareDecoder, CancellationToken token)
         {
-            var arguments = $"{hardwareDecoder} -i \"{destinationFile}\" -i \"{sourceFile}\" -lavfi  \"[0:v]settb=AVTB,setpts=PTS-STARTPTS[main];[1:v]settb=AVTB,setpts=PTS-STARTPTS[ref];[main][ref]ssim\" -max_muxing_queue_size 2048 -f null -";
+            //var arguments = $"{hardwareDecoder} -i \"{destinationFile}\" -i \"{sourceFile}\" -lavfi  \"[0:v]settb=AVTB,setpts=PTS-STARTPTS[main];[1:v]settb=AVTB,setpts=PTS-STARTPTS[ref];[main][ref]ssim\" -max_muxing_queue_size 2048 -f null -";
+            var arguments = $"{hardwareDecoder} -i \"{destinationFile}\" -i \"{sourceFile}\" -lavfi  \"[0:v]settb=AVTB,setpts=N[main];[1:v]settb=AVTB,setpts=N[ref];[main][ref]ssim\" -max_muxing_queue_size 2048 -f null -";
             logger.LogDebug($"SSIM arguments: {arguments}");
 
             decimal ssim = default;
