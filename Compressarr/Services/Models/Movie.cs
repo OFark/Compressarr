@@ -40,7 +40,7 @@ namespace Compressarr.Services.Models
         public string name { get; set; }
 
         [Filter("Resolution", FilterPropertyType.Enum)]
-        public string resolution { get; set; }
+        public int resolution { get; set; }
 
         [Filter("Source", FilterPropertyType.Enum)]
         public string source { get; set; }

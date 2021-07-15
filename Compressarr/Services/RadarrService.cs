@@ -292,6 +292,7 @@ namespace Compressarr.Services
                         else
                         {
                             logger.LogWarning($"Failed: {result.ReasonPhrase}");
+                            _ = fileService.DumpDebugFile("importMoviePayload.json", payloadJson);
                             _ = fileService.DumpDebugFile("importMovieResponse.json", await result.Content.ReadAsStringAsync());
                             return new ServiceResult<object>(false, result.StatusCode.ToString(), result.ReasonPhrase);
                         }
