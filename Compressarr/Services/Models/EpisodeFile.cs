@@ -56,8 +56,7 @@ namespace Compressarr.Services.Models
         public string SceneName { get; set; }
 
         [Filter("Quality", true)]
-        [JsonProperty("quality")]
-        public Quality Quality { get; set; }
+        public Quality quality { get; set; }
 
         [JsonProperty("language")]
         public Language Language { get; set; }
@@ -82,6 +81,41 @@ namespace Compressarr.Services.Models
         public int GetStableHash()
         {
             return JsonConvert.SerializeObject(this).GetStableHashCode();
+        }
+
+        public class FileQuality
+        {
+            public int id { get; set; }
+
+            [Filter("Modifier", FilterPropertyType.Enum)]
+            [JsonProperty("modifier")]
+            public string Modifier { get; set; }
+
+            [Filter("Name", FilterPropertyType.Enum)]
+            [JsonProperty("name")]
+            public string Name { get; set; }
+
+            [Filter("Resolution", FilterPropertyType.Enum)]
+            [JsonProperty("resolution")]
+            public string Resolution { get; set; }
+
+            [Filter("Source", FilterPropertyType.Enum)]
+            [JsonProperty("source")]
+            public string Source { get; set; }
+        }
+
+        public class Quality
+        {
+            [JsonProperty("customFormats")]
+            public List<object> CustomFormats { get; set; }
+
+            [Filter("File Quality", true)]
+            [JsonProperty("quality")]
+            public FileQuality FileQuality { get; set; }
+
+            [Filter("Revision", true)]
+            [JsonProperty("revision")]
+            public Revision Revision { get; set; }
         }
     }
 

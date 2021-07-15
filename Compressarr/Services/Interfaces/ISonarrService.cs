@@ -1,4 +1,5 @@
-﻿using Compressarr.Services.Base;
+﻿using Compressarr.JobProcessing.Models;
+using Compressarr.Services.Base;
 using Compressarr.Services.Models;
 using Compressarr.Settings;
 using System.Collections.Generic;
@@ -14,6 +15,7 @@ namespace Compressarr.Services
         Task<ServiceResult<IEnumerable<Series>>> GetSeriesAsync(bool force = false);
 
         Task<ServiceResult<List<string>>> GetValuesForPropertyAsync(string property);
+        Task<ServiceResult<object>> ImportEpisodeAsync(WorkItem workItem);
         Task<ServiceResult<IEnumerable<Series>>> RequestSeriesFilteredAsync(string filter, IEnumerable<string> filterValues);
         public Task<SystemStatus> TestConnectionAsync(APISettings settings);
     }

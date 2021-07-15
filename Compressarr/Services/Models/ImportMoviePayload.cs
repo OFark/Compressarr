@@ -18,7 +18,7 @@ namespace Compressarr.Services.Models
             public List<Language> languages { get; set; }
             public int movieId { get; set; }
             public string path { get; set; }
-            public Quality quality { get; set; }
+            public MovieFile.Quality quality { get; set; }
         }
     }
 

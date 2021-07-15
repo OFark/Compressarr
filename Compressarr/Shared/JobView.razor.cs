@@ -18,8 +18,8 @@ namespace Compressarr.Shared
 {
     public partial class JobView : IDisposable
     {
-        private CancellationTokenSource cts = new();
         private bool canReload, editJob, mouseOnButton;
+        private CancellationTokenSource cts = new();
         private bool DisableCancelMediaInfoButton = true;
         private bool disposedValue;
         private double initialisationProgress;
@@ -40,6 +40,7 @@ namespace Compressarr.Shared
         private string ButtonText => (mouseOnButton ? Job.Condition.SafeToRun ? "Go!" : Job.Condition.SafeToInitialise ? "Initialise" : Job.Condition.CanCancel ? "Cancel" : null : null) ?? Job.State.ToString().ToCamelCaseSplit();
         [Inject] IDialogService DialogService { get; set; }
         private bool Editing => editJob || NewJob;
+        [Inject] IFFmpegProcessor FFmpegProcessor { get; set; }
         private string FilterImageSrc => $"https://raw.githubusercontent.com/{FilterType.Capitalise()}/{FilterType.Capitalise()}/develop/Logo/{FilterType.Capitalise()}.svg";
         [Inject] IFilterManager FilterManager { get; set; }
         private string FilterType => Job?.Filter?.MediaSource.ToString().ToLower();
@@ -64,27 +65,6 @@ namespace Compressarr.Shared
                 }
             }
         }
-
-        [Inject] IFFmpegProcessor FFmpegProcessor { get; set; }
-        private int? MinSSIM
-        {
-            get
-            {
-                return Job.MinSSIM.HasValue ? (int)(Job.MinSSIM * 100) : null;
-            }
-            set
-            {
-                if (value.HasValue)
-                {
-                    Job.MinSSIM = (decimal)value / 100;
-                }
-                else
-                {
-                    Job.MinSSIM = null;
-                }
-            }
-        }
-
         private decimal? MaxCompPost
         {
             get
@@ -104,6 +84,24 @@ namespace Compressarr.Shared
             }
         }
 
+        private int? MinSSIM
+        {
+            get
+            {
+                return Job.MinSSIM.HasValue ? (int)(Job.MinSSIM * 100) : null;
+            }
+            set
+            {
+                if (value.HasValue)
+                {
+                    Job.MinSSIM = (decimal)value / 100;
+                }
+                else
+                {
+                    Job.MinSSIM = null;
+                }
+            }
+        }
         private decimal? MinSSIMPost
         {
             get
@@ -174,6 +172,15 @@ namespace Compressarr.Shared
             if (NewJob) Job.ArgumentCalculationSettings ??= new();
             Job.StatusUpdate += JobStatusUpdate;
             Job.InitialisationProgress = new Progress<double>(JobProgress);
+        }
+
+        protected async Task ImportVideo(WorkItem wi)
+        {
+            var importReport = await JobManager.ImportVideo(wi, wi.Job.Filter.MediaSource);
+            if (importReport != null)
+            {
+                wi.Update(Update.Warning(importReport));
+            }
         }
 
         private void CancelProcessing(WorkItem wi)
@@ -249,6 +256,13 @@ namespace Compressarr.Shared
             wi.CancellationTokenSource = new();
             await JobManager.PrepareWorkItem(wi, Job.Preset, wi.CancellationToken);
         }
+
+        private async Task ProcessWorkItem(WorkItem wi)
+        {
+            wi.CancellationTokenSource = new();
+            await JobManager.ProcessWorkItem(wi, wi.CancellationToken);
+        }
+
         private async void ReInitialise()
         {
             await JobManager.InitialiseJob(Job, ApplicationService.AppStoppingCancellationToken);

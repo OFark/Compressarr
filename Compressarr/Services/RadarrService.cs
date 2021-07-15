@@ -184,7 +184,7 @@ namespace Compressarr.Services
                 var link = $"{applicationService.RadarrSettings?.APIURL}/api/manualimport?folder={HttpUtility.UrlEncode(destinationFolder)}&filterExistingFiles=true&apikey={applicationService.RadarrSettings?.APIKey}";
                 logger.LogDebug($"Link: {link}");
 
-                ManualImportResponse mir = null;
+                ManualImportMovieResponse mir = null;
 
                 using (var hc = new HttpClient())
                 {
@@ -203,7 +203,7 @@ namespace Compressarr.Services
 
                         if (hrm.IsSuccessStatusCode)
                         {
-                            var mirs = JsonConvert.DeserializeObject<HashSet<ManualImportResponse>>(manualImportJSON);
+                            var mirs = JsonConvert.DeserializeObject<HashSet<ManualImportMovieResponse>>(manualImportJSON);
 
                             mir = mirs.FirstOrDefault(x => x?.movie?.id == workItem.SourceID && x?.relativePath == workItem.DestinationFileName);
 
@@ -238,9 +238,9 @@ namespace Compressarr.Services
 
                 if (mir.rejections.Any())
                 {
-                    logger.LogWarning($"Radarr rejection [{mir.rejections.FirstOrDefault().type}] : {mir.rejections.FirstOrDefault().reason}");
+                    logger.LogWarning($"Radarr rejection [{mir.rejections.FirstOrDefault().Type}] : {mir.rejections.FirstOrDefault().Reason}");
 
-                    return new(false, $"Radarr rejection: {mir.rejections.FirstOrDefault().type}", mir.rejections.FirstOrDefault().reason);
+                    return new(false, $"Radarr rejection: {mir.rejections.FirstOrDefault().Type}", mir.rejections.FirstOrDefault().Reason);
                 }
 
                 logger.LogInformation("Importing into Radarr");

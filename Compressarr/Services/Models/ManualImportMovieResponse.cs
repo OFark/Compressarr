@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Compressarr.Services.Models
 {
-    public class ManualImportResponse
+    public class ManualImportMovieResponse
     {
         //This is a response to the ManualImport GET not the ManualImport Command POST
 
@@ -14,15 +14,9 @@ namespace Compressarr.Services.Models
         public string name { get; set; }
         public long size { get; set; }
         public Movie movie { get; set; }
-        public Quality quality { get; set; }
+        public MovieFile.Quality quality { get; set; }
         public int qualityWeight { get; set; }
         public HashSet<Rejection> rejections { get; set; }
         public long id { get; set; }
-    }
-
-    public class Rejection
-    {
-        public string reason { get; set; }
-        public string type { get; set; }
     }
 }

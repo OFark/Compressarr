@@ -172,7 +172,23 @@ namespace Compressarr.JobProcessing
                             }
                         }
                         break;
+                    case MediaSource.Sonarr:
+                        {
+                            wi.Update(Update.Information("Importing into Sonarr"));
 
+                            var response = await sonarrService.ImportEpisodeAsync(wi);
+                            if (response.Success)
+                            {
+                                wiImporter.Succeed();
+                                wi.Update(Update.Information("Success"));
+                            }
+                            else
+                            {
+                                wi.Update(Update.Warning($"Import Failed [{response.ErrorCode}]: {response.ErrorMessage}"));
+                                return "Import Failed";
+                            }
+                        }
+                        break;
                     default:
                         {
                             wiImporter.Succeed(false);
@@ -434,6 +450,20 @@ namespace Compressarr.JobProcessing
 
         public async Task ProcessWorkItem(WorkItem wi, CancellationToken token)
         {
+            if (!Directory.Exists(Path.GetDirectoryName(wi.DestinationFile)))
+            {
+                try
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(wi.DestinationFile));
+                }
+                catch (Exception ex)
+                {
+                    wi.Update(Update.FromException(ex));
+                    logger.LogWarning(ex, "Error creating output directory");
+                    return;
+                }
+            }
+
             var historyID = historyService.StartProcessing(wi.Media.UniqueID, wi.SourceFile, wi.Job.FilterID, wi.Job.PresetName, wi.Arguments);
 
             if (!wi.Condition.Encode.Processing && !wi.Condition.Encode.Finished)
@@ -552,19 +582,6 @@ namespace Compressarr.JobProcessing
                                                 if (!wi.Condition.HappyEncode) //skipped if done previously
                                                 {
                                                     Log(job, Update.Information("Processing"));
-                                                    if (!Directory.Exists(Path.GetDirectoryName(wi.DestinationFile)))
-                                                    {
-                                                        try
-                                                        {
-                                                            Directory.CreateDirectory(Path.GetDirectoryName(wi.DestinationFile));
-                                                        }
-                                                        catch (Exception ex)
-                                                        {
-                                                            Log(job, Update.FromException(ex));
-                                                            Fail(job);
-                                                            return;
-                                                        }
-                                                    }
                                                     await ProcessWorkItem(wi, lnkCTS.Token);
                                                 }
 

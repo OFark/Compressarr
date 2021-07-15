@@ -96,6 +96,130 @@ namespace Compressarr.JobProcessing
             }
         }
 
+        private static AutoPresetResult BalanceResults(IEnumerable<AutoPresetResult> validVals, decimal weightCompression = 1, decimal weightSpeed = 1, decimal weightSSIM = 1)
+        {
+            AutoPresetResult bestVal;
+            var minCompression = validVals.Min(x => x.Compression);
+            var devCompression = validVals.Max(x => x.Compression) - minCompression;
+
+            var minSpeed = validVals.Min(x => x.Speed);
+            var devSpeed = validVals.Max(x => x.Speed) - minSpeed;
+
+            var minSSIM = validVals.Min(x => x.SSIM);
+            var devSSIM = validVals.Max(x => x.SSIM) - minSSIM;
+
+            bestVal = validVals.OrderByDescending(x =>
+                (devCompression == 0 ? 0 : (1 - ((x.Compression - minCompression) / devCompression)) * weightCompression) +
+                (devSpeed == 0 ? 0 : ((x.Speed - minSpeed) / devSpeed) * weightSpeed) +
+                (devSSIM == 0 ? 0 : ((x.SSIM - minSSIM) / devSSIM) * weightSSIM)
+                ).FirstOrDefault();
+            return bestVal;
+        }
+
+        private static string GetArgument(ArgumentCalculator argCalc, int pass = 0)
+        {
+            var preset = argCalc.Preset;
+            var firstPass = pass == 1;
+
+            var audioArguments = string.Empty;
+
+
+            if (!firstPass)
+            {
+                var audioStreamIndex = 0; //for stream output tracking
+
+                foreach (var stream in argCalc.AudioStreams)
+                {
+                    foreach (var audioPreset in preset.AudioStreamPresets)
+                    {
+                        var match = audioPreset.Filters.All(f =>
+                            f.Rule switch
+                            {
+                                AudioStreamRule.Any => true,
+                                AudioStreamRule.Codec => f.Matches == f.Values.Contains(stream.codec_name.ToLower()),
+                                AudioStreamRule.Channels => new List<int>() { stream.channels ?? 0 }.AsQueryable().Where($"it{f.NumberComparitor.Operator}{f.ChannelValue}").Any(),
+                                AudioStreamRule.Language => stream.tags?.language == null || f.Matches == f.Values.Contains(stream.tags?.language.ToLower()),
+                                _ => throw new NotImplementedException()
+                            }
+                        );
+
+                        if (match)
+                        {
+                            var audioStreamMap = $" -map 0:{stream.index} -c:a:{audioStreamIndex++}";
+                            audioArguments += audioPreset.Action switch
+                            {
+                                AudioStreamAction.Copy => $"{audioStreamMap} copy",
+                                AudioStreamAction.Delete => "",
+                                AudioStreamAction.DeleteUnlessOnly => preset.AudioStreamPresets.Last() == audioPreset && audioStreamIndex == 0 ? $"{audioStreamMap} copy" : "",
+                                AudioStreamAction.Clone => $"{audioStreamMap} copy  -map 0:{stream.index} -c:a:{audioStreamIndex++} {audioPreset.Encoder.Name}{(string.IsNullOrWhiteSpace(audioPreset.BitRate) ? "" : $" -b:a:{audioStreamIndex} ")}{audioPreset.BitRate}",
+                                AudioStreamAction.Encode => $"{audioStreamMap} {audioPreset.Encoder.Name}{(string.IsNullOrWhiteSpace(audioPreset.BitRate) ? "" : $" -b:a:{audioStreamIndex} ")}{audioPreset.BitRate}",
+                                _ => throw new System.NotImplementedException()
+                            };
+                            break;
+                        }
+                    }
+                }
+            }
+
+
+            var videoArguments = string.Empty;
+
+            if (preset.VideoEncoder.IsCopy)
+            {
+                videoArguments = " -map 0:v -c:v copy";
+            }
+            else
+            {
+
+                var videoStreamIndex = 0; //for stream output tracking
+
+                foreach (var vstream in argCalc.VideoStreams)
+                {
+                    var videoStreamMap = $" -map 0:{vstream.index} -c:v:{videoStreamIndex++}";
+
+                    if (vstream.disposition.attached_pic)
+                    {
+                        videoArguments += $"{videoStreamMap} copy";
+                    }
+                    else
+                    {
+
+                        var videoOptionArgs = string.Join(" ",
+                            argCalc.VideoEncoderOptions
+                                .Where(x => (!string.IsNullOrWhiteSpace(x.Value) || (x.EncoderOption.IncludePass && argCalc.TwoPass)) && (!argCalc.TwoPass || !x.EncoderOption.DisabledByVideoBitRate))
+                                .Select(x =>
+                                    $"{x.EncoderOption.Arg.Replace("<val>", x.Value?.Trim())}{(x.EncoderOption.IncludePass && pass != 0 ? $" pass={pass}" : "")}"
+                                )
+                        );
+                        videoArguments += $"{videoStreamMap} {preset.VideoEncoder.Name} {videoOptionArgs}";
+                    }
+                }
+
+            }
+
+            var hardwareDecoder = preset.HardwareDecoder.Wrap("-hwaccel {0} ");
+
+            var opArgsStr = firstPass ?
+               $" -an -f null {(RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "NUL" : @"/dev/null")}" :
+               string.IsNullOrWhiteSpace(preset.OptionalArguments) ? "" : $" {preset.OptionalArguments.Trim()}";
+
+            var bitrate = (argCalc.Preset.VideoBitRateAutoCalc ? (argCalc.VideoBitRateCalculator.CurrentBitrate / 1000) : preset.VideoBitRate).Wrap(" -b:v {0}k");
+            var frameRate = preset.FrameRate.HasValue ? $" -r {preset.FrameRate}" : string.Empty;
+            var bframes = preset.B_Frames != 0 ? $" -bf {preset.B_Frames}" : string.Empty;
+            var passStr = argCalc.TwoPass && !argCalc.VideoEncoderOptions.Any(vco => vco.EncoderOption.IncludePass) ? $" -pass {pass}" : string.Empty;
+
+            var colorPrimaries = argCalc.ColorPrimaries.Wrap(" -color_primaries {0}");
+            var colorTransfer = argCalc.ColorTransfer.Wrap(" -color_trc {0}");
+
+            var globalVideoArgs = firstPass ? "" : $"{bitrate}{frameRate}{bframes}{colorPrimaries}{colorTransfer}{passStr}";
+
+            var mapAllElse = firstPass ? "" : " -map 0:s? -c:s copy -map 0:t? -map 0:d? -movflags use_metadata_tags";
+
+            var outputFile = firstPass ? "" : " \"{1}\"";
+
+            return $"{hardwareDecoder}-y -i \"{{0}}\" {videoArguments}{opArgsStr}{globalVideoArgs}{audioArguments}{mapAllElse}{outputFile}";
+        }
+
         private async Task CalculateBestOptions(WorkItem wi, CancellationToken token)
         {
             using (logger.BeginScope("Calculating Best Encoder Options"))
@@ -274,13 +398,12 @@ namespace Compressarr.JobProcessing
                             AutoCalcType.FirstPastThePost => veo.AutoPresetTests.Where(x => x != null && x.SSIM >= (wi.Job.ArgumentCalculationSettings.AutoCalculationSSIMPost ?? 99)).OrderBy(x => x.Compression).ThenByDescending(x => x.SSIM).FirstOrDefault(),
                             AutoCalcType.BySpeed => veo.AutoPresetTests.OrderBy(x => Math.Abs(1 - x.Speed)).ThenByDescending(x => x.Speed > 1).ThenByDescending(x => x.SSIM).FirstOrDefault(),
                             AutoCalcType.Balanced => BalanceResults(veo.AutoPresetTests.Where(x => x != null && x.Smaller)),
-                            AutoCalcType.HappyMedium => veo.AutoPresetTests.OrderBy(x => x.SSIM < wi.Job.ArgumentCalculationSettings.AutoCalculationSSIMPost).ThenBy(x => x.Compression > wi.Job.ArgumentCalculationSettings.AutoCalculationCompPost).ThenByDescending(x => x.SSIM).ThenBy(x => x.Compression).FirstOrDefault(),
+                            AutoCalcType.HappyMedium => veo.AutoPresetTests.OrderBy(x => x.SSIM < wi.Job.ArgumentCalculationSettings.AutoCalculationSSIMPost).ThenBy(x => x.Compression > wi.Job.ArgumentCalculationSettings.AutoCalculationCompPost).ThenByDescending(x => x.Compression > wi.Job.ArgumentCalculationSettings.AutoCalculationCompPost ? wi.Job.ArgumentCalculationSettings.AutoCalculationCompPost - x.Compression : x.SSIM).FirstOrDefault(),
                             AutoCalcType.WeightedForCompression => BalanceResults(veo.AutoPresetTests.Where(x => x != null && x.Smaller), weightCompression: 2),
                             AutoCalcType.WeightedForSpeed => BalanceResults(veo.AutoPresetTests.Where(x => x != null && x.Smaller), weightSpeed: 2),
                             AutoCalcType.WeightedForSSIM => BalanceResults(veo.AutoPresetTests.Where(x => x != null && x.Smaller), weightSSIM: 2),
-
                             _ => null
-                        };                        
+                        };
 
 
                         if (wi.Job.ArgumentCalculationSettings.AutoCalculationType == AutoCalcType.BangForBuck)
@@ -352,6 +475,42 @@ namespace Compressarr.JobProcessing
                 }
 
                 return;
+            }
+        }
+
+        private void StoreAutoCalcResults(int mediaID, int mediaInfoID, string argument, decimal ssim, long size, long originalSize, decimal speed, int sampleLength)
+        {
+            using (logger.BeginScope("StoreAutoCalcResults"))
+            {
+                using var db = new LiteDatabase(fileService.GetAppFilePath(AppFile.mediaInfo));
+                var results = db.GetCollection<AutoCalcResult>();
+                var result = results.Query().Where(x => x.MediaInfoID == mediaInfoID && x.Argument == argument.Trim() && x.SampleLength == sampleLength).FirstOrDefault();
+
+                if (result == default)
+                {
+                    result = new() { Argument = argument.Trim(), MediaInfoID = mediaInfoID, SampleLength = sampleLength };
+                    try
+                    {
+                        results.Insert(result);
+                    }
+                    catch (LiteException)
+                    {
+                        db.DropCollection(typeof(AutoCalcResult).Name);
+                        logger.LogInformation("Data insert error, dropping table");
+                        results.Insert(result);
+                    }
+                }
+
+                result.UniqueID = mediaID;
+                result.Size = size;
+                result.SSIM = ssim;
+                result.OriginalSize = originalSize;
+                result.Speed = speed;
+
+                results.EnsureIndex(x => x.MediaInfoID);
+                results.EnsureIndex(x => x.Argument);
+
+                results.Update(result);
             }
         }
 
@@ -447,167 +606,6 @@ namespace Compressarr.JobProcessing
             test.SSIM = ssims.Average();
 
             test.Processing = false;
-        }
-
-        private static AutoPresetResult BalanceResults(IEnumerable<AutoPresetResult> validVals, decimal weightCompression = 1, decimal weightSpeed = 1, decimal weightSSIM = 1)
-        {
-            AutoPresetResult bestVal;
-            var minCompression = validVals.Min(x => x.Compression);
-            var devCompression = validVals.Max(x => x.Compression) - minCompression;
-
-            var minSpeed = validVals.Min(x => x.Speed);
-            var devSpeed = validVals.Max(x => x.Speed) - minSpeed;
-
-            var minSSIM = validVals.Min(x => x.SSIM);
-            var devSSIM = validVals.Max(x => x.SSIM) - minSSIM;
-
-            bestVal = validVals.OrderByDescending(x =>
-                (devCompression == 0 ? 0 : (1 - ((x.Compression - minCompression) / devCompression)) * weightCompression) +
-                (devSpeed == 0 ? 0 : ((x.Speed - minSpeed) / devSpeed) * weightSpeed) +
-                (devSSIM == 0 ? 0 : ((x.SSIM - minSSIM) / devSSIM) * weightSSIM)
-                ).FirstOrDefault();
-            return bestVal;
-        }
-
-        private static string GetArgument(ArgumentCalculator argCalc, int pass = 0)
-        {
-            var preset = argCalc.Preset;
-            var firstPass = pass == 1;
-
-            var audioArguments = string.Empty;
-
-
-            if (!firstPass)
-            {
-                var audioStreamIndex = 0; //for stream output tracking
-
-                foreach (var stream in argCalc.AudioStreams)
-                {
-                    foreach (var audioPreset in preset.AudioStreamPresets)
-                    {
-                        var match = audioPreset.Filters.All(f =>
-                            f.Rule switch
-                            {
-                                AudioStreamRule.Any => true,
-                                AudioStreamRule.Codec => f.Matches == f.Values.Contains(stream.codec_name.ToLower()),
-                                AudioStreamRule.Channels => new List<int>() { stream.channels ?? 0 }.AsQueryable().Where($"it{f.NumberComparitor.Operator}{f.ChannelValue}").Any(),
-                                AudioStreamRule.Language => stream.tags?.language == null || f.Matches == f.Values.Contains(stream.tags?.language.ToLower()),
-                                _ => throw new NotImplementedException()
-                            }
-                        );
-
-                        if (match)
-                        {
-                            var audioStreamMap = $" -map 0:{stream.index} -c:a:{audioStreamIndex++}";
-                            audioArguments += audioPreset.Action switch
-                            {
-                                AudioStreamAction.Copy => $"{audioStreamMap} copy",
-                                AudioStreamAction.Delete => "",
-                                AudioStreamAction.DeleteUnlessOnly => preset.AudioStreamPresets.Last() == audioPreset && audioStreamIndex == 0 ? $"{audioStreamMap} copy" : "",
-                                AudioStreamAction.Clone => $"{audioStreamMap} copy  -map 0:{stream.index} -c:a:{audioStreamIndex++} {audioPreset.Encoder.Name}{(string.IsNullOrWhiteSpace(audioPreset.BitRate) ? "" : $" -b:a:{audioStreamIndex} ")}{audioPreset.BitRate}",
-                                AudioStreamAction.Encode => $"{audioStreamMap} {audioPreset.Encoder.Name}{(string.IsNullOrWhiteSpace(audioPreset.BitRate) ? "" : $" -b:a:{audioStreamIndex} ")}{audioPreset.BitRate}",
-                                _ => throw new System.NotImplementedException()
-                            };
-                            break;
-                        }
-                    }
-                }
-            }
-
-
-            var videoArguments = string.Empty;
-
-            if (preset.VideoEncoder.IsCopy)
-            {
-                videoArguments = " -map 0:v -c:v copy";
-            }
-            else
-            {
-
-                var videoStreamIndex = 0; //for stream output tracking
-
-                foreach (var vstream in argCalc.VideoStreams)
-                {
-                    var videoStreamMap = $" -map 0:{vstream.index} -c:v:{videoStreamIndex++}";
-
-                    if (vstream.disposition.attached_pic)
-                    {
-                        videoArguments += $"{videoStreamMap} copy";
-                    }
-                    else
-                    {
-
-                        var videoOptionArgs = string.Join(" ",
-                            argCalc.VideoEncoderOptions
-                                .Where(x => (!string.IsNullOrWhiteSpace(x.Value) || (x.EncoderOption.IncludePass && argCalc.TwoPass)) && (!argCalc.TwoPass || !x.EncoderOption.DisabledByVideoBitRate))
-                                .Select(x =>
-                                    $"{x.EncoderOption.Arg.Replace("<val>", x.Value?.Trim())}{(x.EncoderOption.IncludePass && pass != 0 ? $" pass={pass}" : "")}"
-                                )
-                        );
-                        videoArguments += $"{videoStreamMap} {preset.VideoEncoder.Name} {videoOptionArgs}";
-                    }
-                }
-
-            }
-
-            var hardwareDecoder = preset.HardwareDecoder.Wrap("-hwaccel {0} ");
-
-            var opArgsStr = firstPass ?
-               $" -an -f null {(RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "NUL" : @"/dev/null")}" :
-               string.IsNullOrWhiteSpace(preset.OptionalArguments) ? "" : $" {preset.OptionalArguments.Trim()}";
-
-            var bitrate = (argCalc.Preset.VideoBitRateAutoCalc ? (argCalc.VideoBitRateCalculator.CurrentBitrate / 1000) : preset.VideoBitRate).Wrap(" -b:v {0}k");
-            var frameRate = preset.FrameRate.HasValue ? $" -r {preset.FrameRate}" : string.Empty;
-            var bframes = preset.B_Frames != 0 ? $" -bf {preset.B_Frames}" : string.Empty;
-            var passStr = argCalc.TwoPass && !argCalc.VideoEncoderOptions.Any(vco => vco.EncoderOption.IncludePass) ? $" -pass {pass}" : string.Empty;
-
-            var colorPrimaries = argCalc.ColorPrimaries.Wrap(" -color_primaries {0}");
-            var colorTransfer = argCalc.ColorTransfer.Wrap(" -color_trc {0}");
-
-            var globalVideoArgs = firstPass ? "" : $"{bitrate}{frameRate}{bframes}{colorPrimaries}{colorTransfer}{passStr}";
-
-            var mapAllElse = firstPass ? "" : " -map 0:s? -c:s copy -map 0:t? -map 0:d? -movflags use_metadata_tags";
-
-            var outputFile = firstPass ? "" : " \"{1}\"";
-
-            return $"{hardwareDecoder}-y -i \"{{0}}\" {videoArguments}{opArgsStr}{globalVideoArgs}{audioArguments}{mapAllElse}{outputFile}";
-        }
-
-
-        private void StoreAutoCalcResults(int mediaID, int mediaInfoID, string argument, decimal ssim, long size, long originalSize, decimal speed, int sampleLength)
-        {
-            using (logger.BeginScope("StoreAutoCalcResults"))
-            {
-                using var db = new LiteDatabase(fileService.GetAppFilePath(AppFile.mediaInfo));
-                var results = db.GetCollection<AutoCalcResult>();
-                var result = results.Query().Where(x => x.MediaInfoID == mediaInfoID && x.Argument == argument.Trim() && x.SampleLength == sampleLength).FirstOrDefault();
-
-                if (result == default)
-                {
-                    result = new() { Argument = argument.Trim(), MediaInfoID = mediaInfoID, SampleLength = sampleLength };
-                    try
-                    {
-                        results.Insert(result);
-                    }
-                    catch (LiteException)
-                    {
-                        db.DropCollection(typeof(AutoCalcResult).Name);
-                        logger.LogInformation("Data insert error, dropping table");
-                        results.Insert(result);
-                    }
-                }
-
-                result.UniqueID = mediaID;
-                result.Size = size;
-                result.SSIM = ssim;
-                result.OriginalSize = originalSize;
-                result.Speed = speed;
-
-                results.EnsureIndex(x => x.MediaInfoID);
-                results.EnsureIndex(x => x.Argument);
-
-                results.Update(result);
-            }
         }
     }
 }

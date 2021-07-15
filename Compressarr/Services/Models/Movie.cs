@@ -29,23 +29,6 @@ namespace Compressarr.Services.Models
         public int votes { get; set; }
     }
 
-    public class FileQuality
-    {
-        public int id { get; set; }
-
-        [Filter("Modifier", FilterPropertyType.Enum)]
-        public string modifier { get; set; }
-
-        [Filter("Name", FilterPropertyType.Enum)]
-        public string name { get; set; }
-
-        [Filter("Resolution", FilterPropertyType.Enum)]
-        public int resolution { get; set; }
-
-        [Filter("Source", FilterPropertyType.Enum)]
-        public string source { get; set; }
-    }
-
     public class MovieMediaInfo
     {
         [Filter("Audio - Additional Features")]
@@ -316,16 +299,42 @@ namespace Compressarr.Services.Models
 
         [Filter("Size(F)", FilterPropertyType.Number, FilterOn = "size")]
         public string sizeNice => size.ToFileSize();
+
+        public class FileQuality
+        {
+            public int id { get; set; }
+
+            [Filter("Modifier", FilterPropertyType.Enum)]
+            [JsonProperty("modifier")]
+            public string Modifier { get; set; }
+
+            [Filter("Name", FilterPropertyType.Enum)]
+            [JsonProperty("name")]
+            public string Name { get; set; }
+
+            [Filter("Resolution", FilterPropertyType.Enum)]
+            [JsonProperty("resolution")]
+            public int Resolution { get; set; }
+
+            [Filter("Source", FilterPropertyType.Enum)]
+            [JsonProperty("source")]
+            public string Source { get; set; }
+        }
+
+        public class Quality
+        {
+            [JsonProperty("customFormats")]
+            public List<object> CustomFormats { get; set; }
+
+            [Filter("File Quality", true)]
+            [JsonProperty("quality")]
+            public FileQuality FileQuality { get; set; }
+
+            [Filter("Revision", true)]
+            [JsonProperty("revision")]
+            public Revision Revision { get; set; }
+        }
     }
 
-    public class Quality
-    {
-        public List<object> customFormats { get; set; }
-
-        [Filter("File Quality", true)]
-        public FileQuality quality { get; set; }
-
-        [Filter("Revision", true)]
-        public Revision revision { get; set; }
-    }
+    
 }

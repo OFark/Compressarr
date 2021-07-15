@@ -17,6 +17,7 @@ namespace Compressarr.JobProcessing
         void CancelJob(Job job);
         Task DeleteJob(Job job);
         bool FilterInUse(Guid id);
+        Task<string> ImportVideo(WorkItem wi, MediaSource source);
         Task InitialiseJob(Job job, CancellationToken token);
         void InitialiseJobs(Filter filter, CancellationToken token);
         void InitialiseJobs(MediaSource source, CancellationToken token);

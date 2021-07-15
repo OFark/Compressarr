@@ -64,11 +64,14 @@ namespace Compressarr.Services.Models
         public IEnumerable<EpisodeFile> EpisodeFiles { get; set; } = new HashSet<EpisodeFile>();
     }
 
-    public class Series
+    public partial class Series
     {
         [Filter("Title")]
         [JsonProperty("title")]
         public string Title { get; set; }
+
+        [JsonProperty("ended")]
+        public bool Ended { get; set; }
 
         [JsonProperty("alternateTitles")]
         public List<AlternateTitle> AlternateTitles { get; set; }

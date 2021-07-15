@@ -62,9 +62,9 @@
                                             <MudListItem>
                                                 <MudSelect Required="true" Label="Preset" @bind-Value="Job.Preset" OffsetY="true">
                                                     @foreach (var c in PresetManager.Presets)
-                                                    {
+                                                        {
                                                         <MudSelectItem Value="c" />
-                                                    }
+                                                        }
                                                 </MudSelect>
                                             </MudListItem>
                                             <MudListItem>
@@ -240,7 +240,7 @@
                                             <MudTr>
                                                 <MudTd colspan="14">
                                                     <MudTabs PanelClass="pa-4" Position="Position.Left">
-                                                        <MudTabPanel Icon="@Icons.Outlined.CheckCircleOutline">
+                                                        <MudTabPanel Icon="@Icons.Outlined.CheckCircleOutline" Text="Analyse">
                                                             <MudCard>
                                                                 <MudCardActions>
                                                                     <MudButton Disabled="context.Media.FFProbeMediaInfo != null" Variant="Variant.Outlined" Class="mr-2" Color="Color.Info" StartIcon="@Icons.Rounded.PlayArrow" OnClick="@(() => GetMediaInfo(context))">Get Media Info</MudButton>
@@ -249,16 +249,16 @@
                                                                 <MudCardContent>
                                                                     @if (context.Media.FFProbeMediaInfo != null)
                                                                             {
-                                                                    <MudTreeView Dense="true" ExpandOnClick="true" Items="@context.Media.FFProbeTreeView" Context="mediaInfo">
-                                                                        <ItemTemplate>
-                                                                            <MudTreeViewItem @bind-Expanded="@mediaInfo.IsExpanded" Items="@mediaInfo.TreeItems" Text="@($"{mediaInfo.Title.Humanize(LetterCasing.Title)}{mediaInfo.Value.Wrap(": {0}")}")" />
-                                                                        </ItemTemplate>
-                                                                    </MudTreeView>
+                                                                        <MudTreeView Dense="true" ExpandOnClick="true" Items="@context.Media.FFProbeTreeView" Context="mediaInfo">
+                                                                            <ItemTemplate>
+                                                                                <MudTreeViewItem @bind-Expanded="@mediaInfo.IsExpanded" Items="@mediaInfo.TreeItems" Text="@($"{mediaInfo.Title.Humanize(LetterCasing.Title)}{mediaInfo.Value.Wrap(": {0}")}")" />
+                                                                            </ItemTemplate>
+                                                                        </MudTreeView>
                                                                             }
                                                                 </MudCardContent>
                                                             </MudCard>
                                                         </MudTabPanel>
-                                                        <MudTabPanel Icon="@Icons.Outlined.PlaylistAdd">
+                                                        <MudTabPanel Icon="@Icons.Outlined.PlaylistAdd" Text="Arguments">
                                                             <MudCard>
                                                                 <MudCardActions>
                                                                     <MudToolBar Style="width: 100%;">
@@ -394,9 +394,18 @@
                                                                             </tbody>
                                                                         </MudSimpleTable>
                                                                             }
+                                                                </MudCardContent>
+                                                            </MudCard>
+                                                        </MudTabPanel>
+                                                        <MudTabPanel Icon="@Icons.Rounded.PlayCircleOutline" Text="Encode">
+                                                            <MudCard>
+                                                                <MudCardActions>
+                                                                    <MudButton Disabled="!context.Condition.Prepare.Succeeded || context.Condition.Encode.Started" Variant="Variant.Outlined" Class="mr-2" Color="Color.Primary" OnClick="@(() => ProcessWorkItem(context))" StartIcon="@Icons.Rounded.PlayArrow">Encode Video</MudButton>
+                                                                    <MudButton Disabled="!context.Condition.CreatingVideo" Variant="Variant.Outlined" StartIcon="@Icons.Rounded.Cancel" Color="Color.Error" OnClick="@(() => CancelProcessing(context))">Cancel</MudButton>
+                                                                </MudCardActions>
+                                                                <MudCardContent>
                                                                     @if (context.Arguments != null)
                                                                             {
-
                                                                         <MudList Dense="true" Class="my-3">
                                                                             @foreach (var arg in context.Arguments)
                                                                                     {
@@ -407,23 +416,17 @@
                                                                 </MudCardContent>
                                                             </MudCard>
                                                         </MudTabPanel>
-                                                        <MudTabPanel Icon="@Icons.Rounded.PlayCircleOutline">
+                                                        <MudTabPanel Icon="@Icons.Rounded.CloudUpload" Text="Import">
                                                             <MudCard>
                                                                 <MudCardActions>
-                                                                    <MudButton Disabled="!context.Condition.Prepare.Succeeded" Variant="Variant.Outlined" Class="mr-2" Color="Color.Primary" StartIcon="@Icons.Rounded.PlayArrow">Encode Video</MudButton>
-                                                                    <MudButton Disabled="!context.Condition.CreatingVideo" Variant="Variant.Outlined" StartIcon="@Icons.Rounded.Cancel" Color="Color.Error" OnClick="@(() => CancelProcessing(context))">Cancel</MudButton>
+                                                                    <MudButton Disabled="!context.Condition.HappyEncode" Variant="Variant.Outlined" Class="mr-2" Color="Color.Tertiary" OnClick="@(() => ImportVideo(context))" StartIcon="@Icons.Rounded.CloudUpload">Import to @Job.Filter?.MediaSource.ToString()</MudButton>
+                                                                    <MudButton Disabled="!context.Condition.Import.Processing" Variant="Variant.Outlined" StartIcon="@Icons.Rounded.Cancel" Color="Color.Error" OnClick="@(() => CancelProcessing(context))">Cancel</MudButton>
                                                                 </MudCardActions>
                                                                 <MudCardContent>
-                                                                    @if (context.Media.FFProbeMediaInfo != null)
-                                                                            {
-                                                                        <MudTreeView Dense="true" T="string">
-                                                                            <MudTreeViewItem T="string" Text="@context.Media.FFProbeMediaInfo.format.filename"></MudTreeViewItem>
-                                                                        </MudTreeView>
-                                                                            }
                                                                 </MudCardContent>
                                                             </MudCard>
                                                         </MudTabPanel>
-                                                        <MudTabPanel Icon="@Icons.Filled.FeaturedPlayList">
+                                                        <MudTabPanel Icon="@Icons.Filled.FeaturedPlayList" Text="Log">
                                                             @if (context.Console != null)
                                                                     {
                                                                 <MudPaper Outlined="false" Square="true" class="jobEventsScrollWrapper">
@@ -438,7 +441,6 @@
                                                                 </MudPaper>
                                                                     }
                                                         </MudTabPanel>
-
                                                     </MudTabs>
                                                 </MudTd>
                                             </MudTr>

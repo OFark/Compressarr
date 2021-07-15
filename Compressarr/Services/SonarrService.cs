@@ -1,5 +1,6 @@
 ﻿using Compressarr.Application;
 using Compressarr.Helpers;
+using Compressarr.JobProcessing.Models;
 using Compressarr.Services.Base;
 using Compressarr.Services.Models;
 using Compressarr.Settings;
@@ -8,12 +9,15 @@ using Newtonsoft.Json;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Net.Http;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Web;
 
 namespace Compressarr.Services
 {
@@ -64,39 +68,6 @@ namespace Compressarr.Services
 
         }
 
-        private IEnumerable<Series> FilterSeries(IQueryable<Series> series, string filter, IEnumerable<string> filterValues)
-        {
-            logger.LogDebug("Filtering Series");
-            logger.LogDebug($"Filter: {filter}");
-            logger.LogDebug($"Filter Values: {string.Join(", ", filterValues)}");
-
-            return RecursiveFilter(series, filter, filterValues.ToArray()).Cast<Series>();
-            
-        }
-
-        private IEnumerable RecursiveFilter(IEnumerable collection, string filter, string[] filterValues)
-        {
-            var reg = new Regex(@"(\w+\|)");
-
-            if (reg.IsMatch(filter))
-            {
-                var match = reg.Match(filter);
-                var prop = match.Value;
-
-                filter = filter.Replace(prop, "");
-                prop = prop.Replace("|", "");
-
-                foreach (var ent in collection)
-                {
-                    ent.GetType().GetProperty(prop).SetValue(ent, RecursiveFilter(ent.GetType().GetProperty(prop).GetValue(ent) as IEnumerable, filter, filterValues));
-                }
-
-                return collection.AsQueryable().Where($"{prop}.Any()");
-            }
-
-            return collection.AsQueryable().Where(filter, filterValues);
-        }
-
         public async Task<ServiceResult<IEnumerable<Series>>> GetSeriesFilteredAsync(string filter, IEnumerable<string> filterValues)
         {
             using (logger.BeginScope("Get Filtered Movies"))
@@ -108,22 +79,6 @@ namespace Compressarr.Services
                 SeriesFilterValues = filterValues;
                 return await GetSeriesAsync();
             }
-        }
-
-        public async Task<ServiceResult<IEnumerable<Series>>> RequestSeriesFilteredAsync(string filter, IEnumerable<string> filterValues)
-        {
-            var requestSeriesResponse = await RequestSeries();
-
-            if (requestSeriesResponse.Success)
-            {
-                if (!string.IsNullOrWhiteSpace(filter))
-                {
-                    return new(true, FilterSeries(requestSeriesResponse.Results.AsQueryable(), filter, filterValues));
-                }
-
-                return new(true, requestSeriesResponse.Results.AsQueryable());
-            }
-            return requestSeriesResponse;
         }
 
         public async Task<StatusResult> GetStatus()
@@ -180,6 +135,204 @@ namespace Compressarr.Services
             }
         }
 
+        public async Task<ServiceResult<object>> ImportEpisodeAsync(WorkItem workItem)
+        {
+            //Get ManualImport 
+            //Request URL: /api/manualimport?folder=C%3A%5CCompressarr%5C&filterExistingFiles=true
+
+            //Do Import
+            //Request URL: /api/v3/command - /api/command may also work
+            //FormData: {
+            //  "name": "ManualImport",
+            //  "files": [
+            //    {
+            //      "path": "/downloads/TV/Loki.S01E06.For.All.Time.Always.1080p.DSNP.WEB-DL.DDP5.1.H.264-EVO.mkv",
+            //      "seriesId": 321,
+            //      "episodeIds": [
+            //        26601
+            //      ],
+            //      "quality": {
+            //          "quality": {
+            //              "id": 3,
+            //              "name": "WEBDL-1080p",
+            //              "source": "web",
+            //              "resolution": 1080
+            //           },
+            //          "revision": {
+            //              "version": 1,
+            //              "real": 0,
+            //              "isRepack": false
+            //          }
+            //      },
+            //      "language": {
+            //          "id": 1,
+            //          "name": "English"
+            //      }
+            //   }
+            //  ],
+            //  "importMode": "copy"
+            //}
+
+            //Refresh
+            //Request URL: /api/v3/command - /api/command may also work
+            //FormData: {"name":"RefreshMovie","movieIds":[1]}:
+
+            using (logger.BeginScope("Import Episode"))
+            {
+                logger.LogInformation("Asking Sonarr to validate imports");
+
+                //We need the show folder not the season folder for Sonarr to recognise it.
+                var destinationFolder = Path.GetDirectoryName(Path.GetDirectoryName(workItem.DestinationFile));
+
+                var link = $"{applicationService.SonarrSettings?.APIURL}/api/manualimport?folder={HttpUtility.UrlEncode(destinationFolder)}&filterExistingFiles=true&apikey={applicationService.SonarrSettings?.APIKey}";
+                logger.LogDebug($"Link: {link}");
+
+                ManualImportEpisodeResponse mir = null;
+
+                using (var hc = new HttpClient())
+                {
+                    try
+                    {
+                        logger.LogDebug("Requesting ManualImport");
+
+                        var hrm = await hc.GetAsync(link);
+
+                        var manualImportJSON = await hrm.Content.ReadAsStringAsync();
+
+                        if (AppEnvironment.IsDevelopment)
+                        {
+                            _ = fileService.DumpDebugFile("manualImport.json", manualImportJSON).ConfigureAwait(false);
+                        }
+
+                        if (hrm.IsSuccessStatusCode)
+                        {
+                            var mirs = JsonConvert.DeserializeObject<HashSet<ManualImportEpisodeResponse>>(manualImportJSON);
+
+                            mir = mirs.FirstOrDefault(x => (x?.Episodes?.Any(e => e.EpisodeFileId == workItem.SourceID) ?? false) && x?.Path == workItem.DestinationFile);
+
+                            if (mir == null)
+                            {
+                                _ = fileService.DumpDebugFile("manualImport.json", manualImportJSON).ConfigureAwait(false);
+                                logger.LogWarning("Failed: Sonarr didn't recognise the file to import");
+                                return new(false, "Failed", "Sonarr didn't recognise the file to import");
+                            }
+
+                            logger.LogInformation($"Success.");
+                        }
+                        else
+                        {
+                            _ = fileService.DumpDebugFile("manualImport.json", manualImportJSON).ConfigureAwait(false);
+                            logger.LogWarning($"Failed: {hrm.StatusCode}");
+                            if (hrm.ReasonPhrase != hrm.StatusCode.ToString())
+                            {
+                                logger.LogWarning($"Failed: {hrm.ReasonPhrase}");
+                                return new(false, "Failed", hrm.ReasonPhrase);
+                            }
+
+                            return new(false, "Failed", hrm.StatusCode.ToString());
+                        }
+
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex.ToString());
+                        return new ServiceResult<object>(false, "Exception", ex.ToString());
+                    }
+                }
+
+                if (mir.Rejections.Any())
+                {
+                    logger.LogWarning($"Sonarr rejection [{mir.Rejections.FirstOrDefault().Type}] : {mir.Rejections.FirstOrDefault().Reason}");
+
+                    return new(false, $"Sonarr rejection: {mir.Rejections.FirstOrDefault().Type}", mir.Rejections.FirstOrDefault().Reason);
+                }
+
+                logger.LogInformation("Importing into Sonarr");
+
+                var payload = new ImportEpisodePayload();
+
+
+                logger.LogDebug("Get FileInfo");
+
+                var encodedFile = new FileInfo(workItem.DestinationFile);
+
+                var file = new ImportEpisodePayload.File()
+                {
+                    EpisodeIds = mir.Episodes.Where(e => e.EpisodeFileId == workItem.SourceID).Select(e => e.Id).ToList(),
+                    Language = new Language() { Id = 1, Name = "English" },
+                    Path = mir.Path,
+                    Quality = mir.Quality,
+                    SeriesId = mir.Series.Id
+                };
+
+                payload.Files = new() { file };
+
+                link = $"{applicationService.SonarrSettings?.APIURL}/api/command?apikey={applicationService.SonarrSettings?.APIKey}";
+                logger.LogDebug($"Link: {link}");
+
+
+                using (var hc = new HttpClient())
+                {
+                    try
+                    {
+                        logger.LogDebug("POSTing payload");
+
+                        var payloadJson = JsonConvert.SerializeObject(payload);
+
+                        var result = await hc.PostAsync(link, new StringContent(payloadJson, Encoding.UTF8, "application/json"));
+
+                        if (AppEnvironment.IsDevelopment)
+                        {
+                            _ = fileService.DumpDebugFile("importEpisodePayload.json", payloadJson);
+                            _ = fileService.DumpDebugFile("importEpisodeResponse.json", await result.Content.ReadAsStringAsync());
+                        }
+
+                        if (result.IsSuccessStatusCode)
+                        {
+                            logger.LogDebug("Success");
+                            ClearCache();
+                            return new ServiceResult<object>(true, true);
+                        }
+                        else
+                        {
+                            logger.LogWarning($"Failed: {result.ReasonPhrase}");
+                            _ = fileService.DumpDebugFile("importEpisodePayload.json", payloadJson);
+                            _ = fileService.DumpDebugFile("importEpisodeResponse.json", await result.Content.ReadAsStringAsync());
+                            return new ServiceResult<object>(false, result.StatusCode.ToString(), result.ReasonPhrase);
+                        }
+
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex.ToString());
+                        return new ServiceResult<object>(false, "Exception", ex.ToString());
+                    }
+                }
+            }
+        }
+
+        public void ClearCache()
+        {
+            applicationService.Series = new HashSet<Series>();
+        }
+
+
+        public async Task<ServiceResult<IEnumerable<Series>>> RequestSeriesFilteredAsync(string filter, IEnumerable<string> filterValues)
+        {
+            var requestSeriesResponse = await RequestSeries();
+
+            if (requestSeriesResponse.Success)
+            {
+                if (!string.IsNullOrWhiteSpace(filter))
+                {
+                    return new(true, FilterSeries(requestSeriesResponse.Results.AsQueryable(), filter, filterValues));
+                }
+
+                return new(true, requestSeriesResponse.Results.AsQueryable());
+            }
+            return requestSeriesResponse;
+        }
+
         public async Task<SystemStatus> TestConnectionAsync(APISettings settings)
         {
             using (logger.BeginScope("Test Connection"))
@@ -232,6 +385,16 @@ namespace Compressarr.Services
             }
         }
 
+        private IEnumerable<Series> FilterSeries(IQueryable<Series> series, string filter, IEnumerable<string> filterValues)
+        {
+            logger.LogDebug("Filtering Series");
+            logger.LogDebug($"Filter: {filter}");
+            logger.LogDebug($"Filter Values: {string.Join(", ", filterValues)}");
+
+            return RecursiveFilter(series, filter, filterValues.ToArray()).Cast<Series>();
+            
+        }
+
         private async IAsyncEnumerable<EpisodeFile> GetEpisodeFiles(int seriesID)
         {
             using (logger.BeginScope($"Requesting Episode files for Series {seriesID}"))
@@ -258,7 +421,7 @@ namespace Compressarr.Services
 
                         episodeFiles = fileArr.Where(f => !string.IsNullOrWhiteSpace(f.Path)).OrderBy(s => s.RelativePath).ToHashSet();
 
-                        foreach(var epsf in episodeFiles)
+                        foreach (var epsf in episodeFiles)
                         {
                             epsf.BasePath = applicationService.SonarrSettings.BasePath;
                         }
@@ -288,6 +451,28 @@ namespace Compressarr.Services
             }
         }
 
+        private IEnumerable RecursiveFilter(IEnumerable collection, string filter, string[] filterValues)
+        {
+            var reg = new Regex(@"(\w+\|)");
+
+            if (reg.IsMatch(filter))
+            {
+                var match = reg.Match(filter);
+                var prop = match.Value;
+
+                filter = filter.Replace(prop, "");
+                prop = prop.Replace("|", "");
+
+                foreach (var ent in collection)
+                {
+                    ent.GetType().GetProperty(prop).SetValue(ent, RecursiveFilter(ent.GetType().GetProperty(prop).GetValue(ent) as IEnumerable, filter, filterValues));
+                }
+
+                return collection.AsQueryable().Where($"{prop}.Any()");
+            }
+
+            return collection.AsQueryable().Where(filter, filterValues);
+        }
         private async Task<ServiceResult<IEnumerable<Series>>> RequestSeries()
         {
             using (logger.BeginScope("Requesting Series"))
