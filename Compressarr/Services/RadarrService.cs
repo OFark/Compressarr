@@ -205,7 +205,7 @@ namespace Compressarr.Services
                         {
                             var mirs = JsonConvert.DeserializeObject<HashSet<ManualImportMovieResponse>>(manualImportJSON);
 
-                            mir = mirs.FirstOrDefault(x => x?.movie?.id == workItem.SourceID && x?.relativePath == workItem.DestinationFileName);
+                            mir = mirs.FirstOrDefault(x => x?.movie?.Id == workItem.SourceID && x?.relativePath == workItem.DestinationFileName);
 
                             if (mir == null)
                             {

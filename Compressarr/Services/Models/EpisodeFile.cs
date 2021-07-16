@@ -72,9 +72,6 @@ namespace Compressarr.Services.Models
         [JsonProperty("qualityCutoffNotMet")]
         public bool QualityCutoffNotMet { get; set; }
 
-        [JsonProperty("id")]
-        public int Id { get; set; }
-
         [JsonIgnore]
         public string FilePath => $"{BasePath}{Path}";
 

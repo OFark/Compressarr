@@ -2,6 +2,7 @@
 using Compressarr.Filtering;
 using Compressarr.Helpers;
 using Compressarr.Shared.Models;
+using Newtonsoft.Json;
 using System.Collections.Generic;
 
 namespace Compressarr.Services.Models
@@ -10,11 +11,11 @@ namespace Compressarr.Services.Models
     {
         public string BasePath { get; set; }
 
-        public int UniqueID => int.Parse($"{(int)Source}{id}");
+        public int UniqueID => int.Parse($"{(int)Source}{Id}");
 
         [Filter("ID", FilterPropertyType.Number)]
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "From JSON source")]
-        public int id { get; set; }
+        [JsonProperty("id")]
+        public int Id { get; set; }
 
         public HashSet<TreeItemData> MediaHistory { get; set; }
 

@@ -68,7 +68,7 @@
                                                 </MudSelect>
                                             </MudListItem>
                                             <MudListItem>
-                                                <DirectoryLookup @bind-Folder="@Job.DestinationFolder" Label="Destination Folder" Required="true" />
+                                                <DirectoryLookup @bind-Folder="@Job.DestinationFolder" Label="Destination Folder" />
                                             </MudListItem>
                                         </MudList>
                                     </MudForm>
@@ -90,7 +90,7 @@
                                                     </MudSelect>
                                                 </MudListItem>
                                                 <MudListItem>
-                                                    <MudNumericField @bind-Value="@VideoBitRateTarget" Min="1" Max="100" Label="Target Percentage" Adornment="Adornment.End" AdornmentText="%" />
+                                                    <MudNumericField @bind-Value="@VideoBitRateTarget" Min="1" Max="100" Label="Target Percentage" Adornment="Adornment.End" AdornmentText="%" Required="true" />
                                                 </MudListItem>
                                             }
                                             <MudListItem>
@@ -102,23 +102,23 @@
                                                 </MudSelect>
                                             </MudListItem>
                                             <MudListItem>
-                                                <MudNumericField @bind-Value="@Job.ArgumentCalculationSettings.ArgCalcSampleSeconds" Min="1" Label="Sample length (Seconds)" />
+                                                <MudNumericField @bind-Value="@Job.ArgumentCalculationSettings.ArgCalcSampleSeconds" Min="1" Label="Sample length (Seconds)" Required="true" />
                                             </MudListItem>
 
                                             @if (Job.ArgumentCalculationSettings.AutoCalculationType == AutoCalcType.FirstPastThePost)
                                             {
                                                 <MudListItem>
-                                                    <MudNumericField Style="" @bind-Value="MinSSIMPost" Label="Minimum SSIM" Min="0" Max="100" Adornment="Adornment.End" AdornmentText="%" />
+                                                    <MudNumericField Style="" @bind-Value="MinSSIMPost" Label="Minimum SSIM" Min="0" Max="100" Adornment="Adornment.End" AdornmentText="%" Required="true" />
                                                 </MudListItem>
                                             }
 
                                             @if (Job.ArgumentCalculationSettings.AutoCalculationType == AutoCalcType.HappyMedium)
                                             {
                                                 <MudListItem>
-                                                    <MudNumericField Style="" @bind-Value="MaxCompPost" Label="Minimum Compression" Min="0" Max="100" Adornment="Adornment.End" AdornmentText="%" />
+                                                    <MudNumericField Style="" @bind-Value="MaxCompPost" Label="Minimum Compression" Min="0" Max="100" Adornment="Adornment.End" AdornmentText="%" Required="true" />
                                                 </MudListItem>
                                                 <MudListItem>
-                                                    <MudNumericField Style="" @bind-Value="MinSSIMPost" Label="But SSIM must reach" Min="0" Max="100" Adornment="Adornment.End" AdornmentText="%" />
+                                                    <MudNumericField Style="" @bind-Value="MinSSIMPost" Label="But SSIM must reach" Min="0" Max="100" Adornment="Adornment.End" AdornmentText="%" Required="true" />
                                                 </MudListItem>
                                             }
 
@@ -137,7 +137,7 @@
                                                 <MudSwitch Color="Color.Secondary" @bind-Checked="@Job.ArgumentCalculationSettings.AlwaysCalculateSSIM" Label="Always calculate SSIM after encoding" />
                                             </MudListItem>
                                             <MudListItem>
-                                                <MudSwitch Color="Color.Secondary" @bind-Checked="Job.AutoImport" Label="Auto Import" Disabled="@(FilterManager.GetFilter(Job.FilterID)?.MediaSource == MediaSource.Sonarr)"></MudSwitch>
+                                                <MudSwitch Color="Color.Secondary" @bind-Checked="Job.AutoImport" Label="Auto Import"></MudSwitch>
                                             </MudListItem>
                                             <MudListItem>
                                                 <MudNumericField Style="" @bind-Value="MinSSIM" Label="Minimum SSIM" Min="0" Max="100" Adornment="Adornment.End" AdornmentText="%" Disabled="!Job.AutoImport" />

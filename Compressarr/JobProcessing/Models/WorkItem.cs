@@ -22,7 +22,7 @@ namespace Compressarr.JobProcessing.Models
 
         public WorkItem(Movie movie, string basePath)
         {
-            SourceID = movie.id;
+            SourceID = movie.Id;
             MediaHash = movie.GetStableHash();
             SourceFile = movie.FilePath;
             Media = movie;
@@ -31,7 +31,7 @@ namespace Compressarr.JobProcessing.Models
 
         public WorkItem(EpisodeFile episodeFile, string basePath)
         {
-            SourceID = episodeFile.id;
+            SourceID = episodeFile.Id;
             MediaHash = episodeFile.GetStableHash();
             SourceFile = episodeFile.FilePath;
             Media = episodeFile;

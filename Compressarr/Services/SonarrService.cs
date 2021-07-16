@@ -213,7 +213,7 @@ namespace Compressarr.Services
                             if (mir == null)
                             {
                                 _ = fileService.DumpDebugFile("manualImport.json", manualImportJSON).ConfigureAwait(false);
-                                logger.LogWarning("Failed: Sonarr didn't recognise the file to import");
+                                logger.LogWarning($"Failed: Sonarr didn't recognise the file to import. SourceID: {workItem.SourceID}");
                                 return new(false, "Failed", "Sonarr didn't recognise the file to import");
                             }
 
