@@ -80,12 +80,12 @@
         vertical-align: middle; }
     body app #content {
       padding-top: 1.1rem; }
+      body app #content select.mudReplacement, body app #content select.mudReplacement:focus-visible {
+        padding: 4px 0 6px;
+        border: none;
+        outline: none; }
       body app #content #divRadarr .filterList .filterTableWrapper, body app #content #divSonarr .filterList .filterTableWrapper {
         border-collapse: separate; }
-        body app #content #divRadarr .filterList .filterTableWrapper thead th:not(.hide) select, body app #content #divRadarr .filterList .filterTableWrapper thead th:not(.hide) select:focus-visible, body app #content #divSonarr .filterList .filterTableWrapper thead th:not(.hide) select, body app #content #divSonarr .filterList .filterTableWrapper thead th:not(.hide) select:focus-visible {
-          padding: 4px 0 6px;
-          border: none;
-          outline: none; }
         body app #content #divRadarr .filterList .filterTableWrapper thead th:not(.hide) option, body app #content #divSonarr .filterList .filterTableWrapper thead th:not(.hide) option {
           /*                    background-color: $overBackground*/ }
         body app #content #divRadarr .filterList .filterTableWrapper tbody, body app #content #divSonarr .filterList .filterTableWrapper tbody {

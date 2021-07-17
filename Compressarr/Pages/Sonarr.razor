@@ -45,21 +45,21 @@
             </MudTreeView>
         </MudItem>
         <MudItem sm="8">
-            <MudGrid>
-                <MudItem xs="6"></MudItem>
-                <MudItem xs="6">
-                    <MudToolBar>
-                        <MudToolBarSpacer />
-                        <MudButton StartIcon="@Icons.Outlined.MovieCreation" Color="Color.Secondary" Class="mt-6 mr-4" OnClick="@(() => SonarrService.GetSeriesAsync(true))">Refresh</MudButton>
-                        <MudSelect Strict="true" @bind-Value="FilterID" Label="Filters" OffsetY="true" Immediate="true">
+            <MudCardActions Class="px-4">
+                <MudSpacer />
+                <MudButton StartIcon="@Icons.Outlined.MovieCreation" Color="Color.Secondary" Class="mt-6 mr-4" OnClick="@(() => SonarrService.GetSeriesAsync(true))">Refresh</MudButton>
+
+                <div class="mud-input-control-input-container">
+                    <div class="mud-input mud-input-text mud-input-underline mud-shrink">
+                        <select @bind="FilterID" class="mudReplacement" required>
                             @foreach (var filter in FilterManager.GetFilters(MediaSource.Sonarr))
                             {
-                                <MudSelectItem Value="@filter.ID">@filter.Name</MudSelectItem>
+                                <option value="@filter.ID">@filter.Name</option>
                             }
-                        </MudSelect>
-                    </MudToolBar>
-                </MudItem>
-            </MudGrid>
+                        </select>
+                    </div>
+                </div>
+            </MudCardActions>
 
             <MudPaper Class="my-2 filterList">
                 <table class="filterTableWrapper">
@@ -71,7 +71,7 @@
                                 <div class="mud-input-control mud-input-input-control">
                                     <div class="mud-input-control-input-container">
                                         <div class="mud-input mud-input-text mud-input-underline mud-shrink">
-                                            <select @bind="FilterPropertyStr" required>
+                                            <select @bind="FilterPropertyStr" class="mudReplacement" required>
                                                 @foreach (var fp in FilterManager.SonarrFilterProperties.OrderBy(f => f.Key))
                                                 {
                                                     <option value="@fp.Value">@fp.Key</option>
@@ -85,7 +85,7 @@
                                 <div class="mud-input-control mud-input-input-control">
                                     <div class="mud-input-control-input-container">
                                         <div class="mud-input mud-input-text mud-input-underline mud-shrink">
-                                            <select @bind="FilterComparitorStr" required>
+                                            <select @bind="FilterComparitorStr" class="mudReplacement" required>
                                                 <option value="" disabled selected hidden>is...</option>
                                                 @if (FilterProperty != null)
                                                 {

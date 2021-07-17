@@ -5,7 +5,7 @@ namespace Compressarr.JobProcessing.Models
     public class ArgCalcSettings
     {
         public bool AlwaysCalculateSSIM { get; set; }
-        public int ArgCalcSampleSeconds { get; set; }
+        public int ArgCalcSampleSeconds { get; set; } = 20;
         public decimal? AutoCalculationSSIMPost { get; set; }
         public decimal? AutoCalculationCompPost { get; set; }
         public AutoCalcType AutoCalculationType { get; set; }

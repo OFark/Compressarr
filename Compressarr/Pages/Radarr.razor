@@ -8,21 +8,22 @@
 @inject IApplicationService applicationService
 
 <MudPaper id="divRadarr" Elevation="0">
-    <MudGrid>
-        <MudItem xs="9"></MudItem>
-        <MudItem xs="3">
-            <MudToolBar>
-                <MudToolBarSpacer />
-                <MudButton StartIcon="@Icons.Outlined.MovieCreation" Color="Color.Secondary" Class="mt-6 mr-4" OnClick="@(() => radarrService.GetMoviesAsync(true))">Refresh</MudButton>
-                <MudSelect Strict="true" @bind-Value="filterID" Label="Filters" OffsetY="true" Immediate="true">
+    <MudCardActions Class="px-4">
+        <MudSpacer />
+        <MudButton StartIcon="@Icons.Outlined.MovieCreation" Color="Color.Secondary" Class="mt-6 mr-4" OnClick="@(() => radarrService.GetMoviesAsync(true))">Refresh</MudButton>
+
+        <div class="mud-input-control-input-container">
+            <div class="mud-input mud-input-text mud-input-underline mud-shrink">
+                <select @bind="filterID" class="mudReplacement" required>
                     @foreach (var filter in filterManager.GetFilters(MediaSource.Radarr))
                     {
-                        <MudSelectItem Value="@filter.ID">@filter.Name</MudSelectItem>
+                        <option value="@filter.ID">@filter.Name</option>
                     }
-                </MudSelect>
-            </MudToolBar>
-        </MudItem>
-    </MudGrid>
+                </select>
+            </div>
+        </div>
+
+    </MudCardActions>
     @if (!string.IsNullOrWhiteSpace(AlertMessage))
     {
         <MudAlert Severity="Severity.Error">@AlertMessage</MudAlert>
@@ -39,7 +40,7 @@
                         <div class="mud-input-control mud-input-input-control">
                             <div class="mud-input-control-input-container">
                                 <div class="mud-input mud-input-text mud-input-underline mud-shrink">
-                                    <select @bind="filterPropertyStr" required>
+                                    <select @bind="filterPropertyStr" class="mudReplacement" required>
                                         @foreach (var fp in filterManager.RadarrFilterProperties.OrderBy(f => f.Key))
                                         {
                                             <option value="@fp.Value">@fp.Key</option>
@@ -53,7 +54,7 @@
                         <div class="mud-input-control mud-input-input-control">
                             <div class="mud-input-control-input-container">
                                 <div class="mud-input mud-input-text mud-input-underline mud-shrink">
-                                    <select @bind="filterComparitorStr" required>
+                                    <select @bind="filterComparitorStr" class="mudReplacement" required>
                                         <option value="" disabled selected hidden>is...</option>
                                         @if (FilterProperty != null)
                                         {
@@ -167,17 +168,18 @@
                     <td colspan="99">
                         @if (context.FFProbeMediaInfo != null)
                         {
-                        <MudCard>
-                            <MudBlazor.MudCardContent>
-                                <MudTreeView Dense="true" ExpandOnClick="true" Items="@context.FFProbeTreeView" Context="mediaInfo">
-                                    <ItemTemplate>
-                                        <MudTreeViewItem @bind-Expanded="@mediaInfo.IsExpanded" Items="@mediaInfo.TreeItems" Text="@($"{mediaInfo.Title.Humanize(LetterCasing.Title)}{mediaInfo.Value.Wrap(": {0}")}")" />
-                                    </ItemTemplate>
-                                </MudTreeView>
-                            </MudBlazor.MudCardContent>
-                        </MudCard>
+                            <MudCard>
+                                <MudBlazor.MudCardContent>
+                                    <MudTreeView Dense="true" ExpandOnClick="true" Items="@context.FFProbeTreeView" Context="mediaInfo">
+                                        <ItemTemplate>
+                                            <MudTreeViewItem @bind-Expanded="@mediaInfo.IsExpanded" Items="@mediaInfo.TreeItems" Text="@($"{mediaInfo.Title.Humanize(LetterCasing.Title)}{mediaInfo.Value.Wrap(": {0}")}")" />
+                                        </ItemTemplate>
+                                    </MudTreeView>
+                                </MudBlazor.MudCardContent>
+                            </MudCard>
                         }
-                        else{
+                        else
+                        {
                             <MudText Class="pa-2">Probing file&hellip;</MudText>
                         }
                     </td>
@@ -189,13 +191,14 @@
                     <td colspan="99">
                         @if (context.MediaHistory != null)
                         {
-                        <MudTreeView ExpandOnClick="true" Items="@context.MediaHistory" Context="history">
-                            <ItemTemplate>
-                                <MudTreeViewItem @bind-Expanded="@history.IsExpanded" Items="@history.TreeItems" Text="@($"{history.Title}{history.Value.Wrap(": {0}")}")" />
-                            </ItemTemplate>
-                        </MudTreeView>
+                            <MudTreeView ExpandOnClick="true" Items="@context.MediaHistory" Context="history">
+                                <ItemTemplate>
+                                    <MudTreeViewItem @bind-Expanded="@history.IsExpanded" Items="@history.TreeItems" Text="@($"{history.Title}{history.Value.Wrap(": {0}")}")" />
+                                </ItemTemplate>
+                            </MudTreeView>
                         }
-                        else{
+                        else
+                        {
                             <MudText Class="pa-2">No history for this video</MudText>
                         }
                     </td>

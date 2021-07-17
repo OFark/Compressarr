@@ -1,4 +1,4 @@
-﻿<MudExpansionPanel Class="job" DisableGutters="true">
+﻿<MudExpansionPanel Class="job" DisableGutters="true" @bind-IsExpanded="isExpanded">
     <TitleContent>
         <MudText>
             @if (NewJob)
@@ -35,8 +35,8 @@
                     <CardHeaderActions>
                         @if (!NewJob)
                         {
-                            <MudIconButton Color="Color.Warning" Icon="@Icons.Material.Outlined.Sync" Disabled="@(!Job.Condition.SafeToInitialise)" @onclick="ReInitialise" title="Re-Initialise" />
-                            <MudIconButton Color="Color.Primary" Icon="@Icons.Material.Outlined.Edit" Disabled="@(!Job.Condition.SafeToInitialise)" @onclick="() => { editJob = !editJob; }" />
+                            <MudButton Color="Color.Warning" StartIcon="@Icons.Material.Outlined.Sync" Disabled="@(!Job.Condition.SafeToInitialise)" @onclick="ReInitialise">Re-Initialise</MudButton>
+                            <MudButton Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Edit" Disabled="@(!Job.Condition.SafeToInitialise)" @onclick="() => { editJob = !editJob; }">Edit</MudButton>
                         }
                     </CardHeaderActions>
                 </MudCardHeader>
@@ -46,10 +46,10 @@
                     <MudItem xs="12">
                         @if (Editing)
                         {
-                            <MudCard Class="mb-3">
-                                <MudCardHeader><CardHeaderContent><MudText Typo="Typo.h5">Workload</MudText></CardHeaderContent></MudCardHeader>
-                                <MudCardContent>
-                                    <MudForm>
+                            <MudForm @ref="jobEditorForm">
+                                <MudCard Class="mb-3">
+                                    <MudCardHeader><CardHeaderContent><MudText Typo="Typo.h5">Workload</MudText></CardHeaderContent></MudCardHeader>
+                                    <MudCardContent>
                                         <MudList Dense="true">
                                             <MudListItem>
                                                 <MudSelect Strict="true" Required="true" Label="Filter" @bind-Value="Job.FilterID" OffsetY="true">
@@ -68,18 +68,16 @@
                                                 </MudSelect>
                                             </MudListItem>
                                             <MudListItem>
-                                                <DirectoryLookup @bind-Folder="@Job.DestinationFolder" Label="Destination Folder" />
+                                                <DirectoryLookup @bind-Folder="@Job.DestinationFolder" Label="Destination Folder" Required="true" />
                                             </MudListItem>
                                         </MudList>
-                                    </MudForm>
-                                </MudCardContent>
-                            </MudCard>
-                            <MudCard Class="mb-3">
-                                <MudCardHeader>
-                                    <CardHeaderContent><MudText Typo="Typo.h5">FFmpeg Options</MudText></CardHeaderContent>
-                                </MudCardHeader>
-                                <MudCardContent>
-                                    <MudForm>
+                                    </MudCardContent>
+                                </MudCard>
+                                <MudCard Class="mb-3">
+                                    <MudCardHeader>
+                                        <CardHeaderContent><MudText Typo="Typo.h5">FFmpeg Options</MudText></CardHeaderContent>
+                                    </MudCardHeader>
+                                    <MudCardContent>
                                         <MudList Dense="true">
                                             @if (Job.Preset?.VideoBitRateAutoCalc ?? false)
                                             {
@@ -123,15 +121,13 @@
                                             }
 
                                         </MudList>
-                                    </MudForm>
-                                </MudCardContent>
-                            </MudCard>
-                            <MudCard Class="mb-3">
-                                <MudCardHeader>
-                                    <CardHeaderContent><MudText Typo="Typo.h5">Post-Processing</MudText></CardHeaderContent>
-                                </MudCardHeader>
-                                <MudCardContent>
-                                    <MudForm>
+                                    </MudCardContent>
+                                </MudCard>
+                                <MudCard Class="mb-3">
+                                    <MudCardHeader>
+                                        <CardHeaderContent><MudText Typo="Typo.h5">Post-Processing</MudText></CardHeaderContent>
+                                    </MudCardHeader>
+                                    <MudCardContent>
                                         <MudList Dense="true">
                                             <MudListItem>
                                                 <MudSwitch Color="Color.Secondary" @bind-Checked="@Job.ArgumentCalculationSettings.AlwaysCalculateSSIM" Label="Always calculate SSIM after encoding" />
@@ -146,10 +142,9 @@
                                                 <MudNumericField @bind-Value="MaxComp" Label="Maximum Compression" Min="0" Max="100" Adornment="Adornment.End" AdornmentText="%" Disabled="!Job.AutoImport" />
                                             </MudListItem>
                                         </MudList>
-
-                                    </MudForm>
-                                </MudCardContent>
-                            </MudCard>
+                                    </MudCardContent>
+                                </MudCard>
+                            </MudForm>
                         }
                         else
                         {
@@ -455,9 +450,7 @@
                                 </MudPaper>
                                 @if (!NewJob)
                                 {
-                                    <MudToolBar>
-                                        <MudButton Variant="Variant.Filled" FullWidth="true" Color="@ButtonColour" @onclick="StartJob" @onmouseover="() => { mouseOnButton = true; }" @onmouseout="() => { mouseOnButton = false; }">@ButtonText</MudButton>
-                                    </MudToolBar>
+                                    <MudButton Variant="Variant.Filled" Class="my-3" FullWidth="true" Color="@ButtonColour" @onclick="StartJob" @onmouseover="() => { mouseOnButton = true; }" @onmouseout="() => { mouseOnButton = false; }">@ButtonText</MudButton>
                                 }
                             }
                             else
@@ -479,11 +472,11 @@
                                     @if (Job.Events != null)
                                     {
                                         <pre>
-                                @foreach (var e in Job.Events)
-                                {
+                                            @foreach (var e in Job.Events)
+                                            {
                                         <MudText Class="event" Color="e.Color" Typo="Typo.body2">@e.Date.ToString("HH:mm:ss") - @e.Message</MudText>
-                                }
-                            </pre>
+                                            }
+                                             </pre>
                                     }
                                 </MudPaper>
                             </MudPaper>
@@ -496,18 +489,21 @@
                     </MudItem>
                 </MudGrid>
             </MudCardContent>
-            <MudCardActions>
+            <MudCardActions Class="px-4">
                 @if (Editing)
                 {
-                    <MudButton @onclick="SaveJob" Variant="Variant.Filled" FullWidth="true" Size="Size.Large" Disabled="@(!SaveEnabled)" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Save">Save</MudButton>
+                    <MudButton @onclick="SaveJob" Size="Size.Large" Disabled="@(!SaveEnabled)" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Save">Save</MudButton>
+                    <MudSpacer />
                     @if (!NewJob)
                     {
-                        <MudButton @onclick="DeleteJob" Color="Color.Error" StartIcon="@Icons.Material.Outlined.Delete">Delete</MudButton>
+                        <MudButton @onclick="DeleteJob" Color="Color.Error" Class="ml-3" StartIcon="@Icons.Material.Outlined.Delete">Delete</MudButton>
+                        <MudButton @onclick="() => { editJob = !editJob; }" Color="Color.Warning" Class="ml-3" StartIcon="@Icons.Material.Outlined.Cancel">Cancel</MudButton>
                         @if (canReload)
                         {
                             <MudButton StartIcon="@Icons.Material.Outlined.Refresh" Color="Color.Secondary" @onclick="ReloadJob">Reload</MudButton>
                         }
                     }
+
                 }
             </MudCardActions>
         </MudCard>

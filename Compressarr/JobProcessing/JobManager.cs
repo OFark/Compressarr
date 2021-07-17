@@ -78,10 +78,12 @@ namespace Compressarr.JobProcessing
                     else
                     {
                         logger.LogDebug($"Adding Job ({newJob.Name}).");
-                        Jobs.Add(newJob);
+                        //var job = newJob.JsonClone();
+                        Jobs.Add(newJob); // job);
+                        //_ = InitialiseJob(job, token);
                     }
 
-                    _ = applicationService.SaveAppSetting();
+                    await applicationService.SaveAppSetting();
                     return true;
                 }
                 return false;

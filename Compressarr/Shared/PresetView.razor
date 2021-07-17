@@ -184,6 +184,7 @@
             <MudButton OnClick="savePreset" Color="Color.Primary" StartIcon="@Icons.Outlined.Save" Class="mr-3">Save</MudButton>
             @if (!NewPreset)
             {
+                <MudSpacer />
                 <MudButton OnClick="deletePreset" Color="Color.Error" StartIcon="@Icons.Outlined.Delete" Disabled="@JobManager.PresetInUse(preset)">Delete</MudButton>
             }
         </MudCardActions>

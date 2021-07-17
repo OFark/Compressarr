@@ -21,7 +21,9 @@ namespace Compressarr.Shared
         private bool canReload, editJob, mouseOnButton;
         private CancellationTokenSource cts = new();
         private bool DisableCancelMediaInfoButton = true;
+        private bool isExpanded;
         private bool disposedValue;
+        MudForm jobEditorForm;
         private double initialisationProgress;
         [Parameter]
         public Job Job { get; set; }
@@ -33,7 +35,6 @@ namespace Compressarr.Shared
         public EventCallback OnAdd { get; set; }
 
         [Inject] IApplicationService ApplicationService { get; set; }
-        [Inject] IArgumentService ArgumentService { get; set; }
         private Color ButtonColour =>
             Job.Condition.SafeToRun ? Color.Primary : Job.Condition.SafeToInitialise ? Color.Secondary : Job.State == JobState.Error ? Color.Error : Color.Warning;
 
@@ -123,7 +124,7 @@ namespace Compressarr.Shared
 
         [Inject] IPresetManager PresetManager { get; set; }
 
-        private bool SaveEnabled => (Editing || NewJob) && Job?.FilterID != null && Job?.PresetName != null && Job?.DestinationFolder != null;
+        private bool SaveEnabled => (Editing || NewJob) && Job?.FilterID != null && Job?.Preset != null && Job?.DestinationFolder != null;
 
         private decimal? VideoBitRateTarget
         {
@@ -167,13 +168,6 @@ namespace Compressarr.Shared
             }
         }
 
-        protected override void OnInitialized()
-        {
-            if (NewJob) Job.ArgumentCalculationSettings ??= new();
-            Job.StatusUpdate += JobStatusUpdate;
-            Job.InitialisationProgress = new Progress<double>(JobProgress);
-        }
-
         protected async Task ImportVideo(WorkItem wi)
         {
             var importReport = await JobManager.ImportVideo(wi, wi.Job.Filter.MediaSource);
@@ -183,6 +177,12 @@ namespace Compressarr.Shared
             }
         }
 
+        protected override void OnInitialized()
+        {
+            if (NewJob) Job.ArgumentCalculationSettings ??= new();
+            Job.StatusUpdate += JobStatusUpdate;
+            Job.InitialisationProgress = new Progress<double>(JobProgress);
+        }
         private void CancelProcessing(WorkItem wi)
         {
             if (wi.CancellationToken.CanBeCanceled)
@@ -245,7 +245,6 @@ namespace Compressarr.Shared
             }
             catch (ObjectDisposedException) { }
         }
-
         private void JobStatusUpdate(object caller, EventArgs args)
         {
             InvokeAsync(StateHasChanged);
@@ -280,26 +279,23 @@ namespace Compressarr.Shared
 
         private async void SaveJob()
         {
-            using (LayoutService.Working("Saving..."))
+            jobEditorForm.Validate();
+            if (jobEditorForm.IsValid)
             {
-
                 var success = await JobManager.AddJobAsync(Job, ApplicationService.AppStoppingCancellationToken);
                 editJob = !success;
                 canReload = !success && !NewJob;
 
-                if (success && NewJob)
+                if(success && NewJob)
                 {
-                    if (OnAdd.HasDelegate)
-                    {
-                        _ = OnAdd.InvokeAsync();
-                        return;
-                    }
+                    Job = new();
+                    Job.ArgumentCalculationSettings = new();
+                    isExpanded = false;
                 }
-                else
-                {
-                    await InvokeAsync(StateHasChanged);
-                }
+
+                LayoutService.RaiseChange();
             }
+
         }
 
         private void StartJob()

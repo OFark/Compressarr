@@ -122,6 +122,12 @@ body {
         #content {
             padding-top: 1.1rem;
 
+            select.mudReplacement, select.mudReplacement:focus-visible {
+                padding: 4px 0 6px;
+                border: none;
+                outline: none;
+            }
+
             #divRadarr, #divSonarr {
                 .filterList {
                     .filterTableWrapper {
@@ -130,11 +136,7 @@ body {
                         thead {
                             th:not(.hide) {
 
-                                select, select:focus-visible {
-                                    padding: 4px 0 6px;
-                                    border: none;
-                                    outline: none;
-                                }
+
 
                                 option {
                                     /*                    background-color: $overBackground*/

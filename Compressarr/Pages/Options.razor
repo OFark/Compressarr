@@ -63,11 +63,12 @@
 
         </MudCardContent>
         <MudCardActions>
+            <MudButton Color="Color.Primary" OnClick="saveRadarrSettings" Disabled="@(string.IsNullOrWhiteSpace(radarrURL) || string.IsNullOrWhiteSpace(radarrAPIKey))" StartIcon="@Icons.Material.Outlined.Save">Save</MudButton>
+            <MudSpacer />
             @if (applicationService.RadarrSettings?.APIURL != null)
             {
-                <MudButton Color="Color.Warning" OnClick="deleteRadarrSetting" StartIcon="@Icons.Outlined.Delete">Delete</MudButton>
+                <MudButton Color="Color.Error" OnClick="deleteRadarrSetting" StartIcon="@Icons.Outlined.Delete">Delete</MudButton>
             }
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="saveRadarrSettings" Disabled="@(string.IsNullOrWhiteSpace(radarrURL) || string.IsNullOrWhiteSpace(radarrAPIKey))" StartIcon="@Icons.Material.Outlined.Save">Save</MudButton>
         </MudCardActions>
     </MudCard>
 
@@ -117,11 +118,12 @@
             </MudList>
         </MudCardContent>
         <MudCardActions>
+            <MudButton Color="Color.Primary" OnClick="saveSonarrSettings" Disabled="@(string.IsNullOrWhiteSpace(sonarrURL) || string.IsNullOrWhiteSpace(sonarrAPIKey))" StartIcon="@Icons.Material.Outlined.Save">Save</MudButton>
+            <MudSpacer />
             @if (applicationService.SonarrSettings?.APIURL != null)
             {
-                <MudButton Color="Color.Warning" OnClick="deleteSonarrSetting" StartIcon="@Icons.Outlined.Delete">Delete</MudButton>
+                <MudButton Color="Color.Error" OnClick="deleteSonarrSetting" StartIcon="@Icons.Outlined.Delete">Delete</MudButton>
             }
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="saveSonarrSettings" Disabled="@(string.IsNullOrWhiteSpace(sonarrURL) || string.IsNullOrWhiteSpace(sonarrAPIKey))" StartIcon="@Icons.Material.Outlined.Save">Save</MudButton>
         </MudCardActions>
     </MudCard>
 

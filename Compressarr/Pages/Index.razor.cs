@@ -60,10 +60,5 @@ namespace Compressarr.Pages
         {
             await InvokeAsync(StateHasChanged);
         }
-
-        private void addJob()
-        {
-            newJob = new();
-        }
     }
 }

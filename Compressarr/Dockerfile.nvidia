@@ -8,7 +8,7 @@ RUN dotnet publish -c Release -o /app/publish
 
 FROM jrottenberg/ffmpeg:snapshot-nvidia AS ffmpeg
 
-FROM mcr.microsoft.com/dotnet/aspnet:5.0-focal
+FROM mcr.microsoft.com/dotnet/aspnet:5.0
 WORKDIR /app
 COPY --from=build /app/publish ./
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
