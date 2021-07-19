@@ -16,24 +16,31 @@
             }
             else
             {
-                <MudAvatar Rounded="true" Image="https://upload.wikimedia.org/wikipedia/commons/thumb/7/76/FFmpeg_icon.svg/1024px-FFmpeg_icon.svg.png" Style="vertical-align: middle;" Class="mr-3" />
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/76/FFmpeg_icon.svg/1024px-FFmpeg_icon.svg.png" style="width: 40px; height: auto; vertical-align: middle; margin-right: 12px;" />
+                @*<MudAvatar Rounded="true" Image="https://upload.wikimedia.org/wikipedia/commons/thumb/7/76/FFmpeg_icon.svg/1024px-FFmpeg_icon.svg.png" Style="vertical-align: middle;" Class="mr-3" />*@
                 @:@preset.ToString()
             }
         </MudText>
     </TitleContent>
     <ChildContent>
-        <MudTextField @bind-Value="preset.Name" Label="Name" Class="mb-2" />
-        <MudSelect @bind-Value="preset.Container" Label="Container" OffsetY="true" T="string" Strict="true" Class="mb-2">
-            <MudSelectItem Value="@("copy")">copy - No change</MudSelectItem>
-            <MudDivider />
-            @foreach (var c in PresetManager.Containers)
-            {
-                <MudSelectItem Value="@c.Name">@c</MudSelectItem>
-            }
-        </MudSelect>
+        <MudCard Class="mb-3">
+            <CardHeader Title="Preset" HelpURL="https://github.com/OFark/Compressarr/wiki/FFmpeg"></CardHeader>
+            <MudCardContent>
+                <MudTextField @bind-Value="preset.Name" Label="Name" Class="mb-2" />
+                <MudSelect @bind-Value="preset.Container" Label="Container" OffsetY="true" T="string" Strict="true" Class="mb-2">
+                    <MudSelectItem Value="@("copy")">copy - No change</MudSelectItem>
+                    <MudDivider />
+                    @foreach (var c in PresetManager.Containers)
+                    {
+                        <MudSelectItem Value="@c.Name">@c</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudCardContent>
+        </MudCard>
         <MudGrid>
             <MudItem md="6">
                 <MudCard Class="my-2">
+                    <CardHeader Title="Video" HelpURL="https://github.com/OFark/Compressarr/wiki/FFmpeg#video"></CardHeader>
                     <MudCardContent>
                         <MudSelect @bind-Value="preset.VideoEncoder" Label="Video Encoder" OffsetY="true" T="Encoder" Immediate="true" Class="">
                             <MudSelectItem T="Encoder" Value="@(new ())" />
@@ -89,11 +96,7 @@
                 @if (preset.VideoEncoder != null && !preset.VideoEncoder.IsCopy && preset.VideoEncoderOptions != null)
                 {
                     <MudCard Class="my-2">
-                        <MudCardHeader>
-                            <CardHeaderContent>
-                                <MudText Typo="Typo.h6">Additional codec based options</MudText>
-                            </CardHeaderContent>
-                        </MudCardHeader>
+                        <CardHeader Title="Additional codec based options" HelpURL="https://github.com/OFark/Compressarr/wiki/FFmpeg#additional-codec-based-options"></CardHeader>
                         <MudCardContent>
                             @foreach (var option in preset.VideoEncoderOptions)
                             {
@@ -168,14 +171,16 @@
                 }
             </MudItem>
             <MudItem md="6">
-                @foreach (var fasp in preset.AudioStreamPresets)
-                {
-                    <AudioPreset AudioStreamPreset="@fasp" OnUpdate="AudioPresetUpdate" OnCopy="CopyAudioStreamPreset" />
-                }
+                <MudCard>
+                    <CardHeader Title="Audio" HelpURL="https://github.com/OFark/Compressarr/wiki/FFmpeg#audio" />
+                    <MudCardContent>
+                        @foreach (var fasp in preset.AudioStreamPresets)
+                        {
+                            <AudioPreset AudioStreamPreset="@fasp" OnUpdate="AudioPresetUpdate" OnCopy="CopyAudioStreamPreset" />
+                        }
+                    </MudCardContent>
+                </MudCard>
             </MudItem>
-
-
-
         </MudGrid>
 
         <MudTextField @bind-Value="preset.OptionalArguments" Label="Additional arguments" Class="mb-2" />

@@ -1,0 +1,22 @@
+﻿<MudCardHeader>
+    <CardHeaderContent><MudText Typo="Typo.h5">@Title</MudText></CardHeaderContent>
+    <CardHeaderActions>
+        @if (ChildContent != null)
+        {
+            @ChildContent;
+        }
+        @if (!string.IsNullOrWhiteSpace(HelpURL))
+        {
+            <MudLink Href="@HelpURL" Target="help">
+                <MudIconButton Icon="@Icons.Material.Filled.HelpOutline" Color="Color.Info" />
+            </MudLink>
+        }
+    </CardHeaderActions>
+</MudCardHeader>
+
+
+@code {
+    [Parameter] public string Title { get; set; }
+    [Parameter] public string HelpURL { get; set; }
+    [Parameter] public RenderFragment ChildContent { get; set; }
+}

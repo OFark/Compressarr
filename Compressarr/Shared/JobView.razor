@@ -28,18 +28,13 @@
         <MudCard Elevation="0">
             @if (!Editing)
             {
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="@Typo.h6">Workload</MudText>
-                    </CardHeaderContent>
-                    <CardHeaderActions>
-                        @if (!NewJob)
-                        {
-                            <MudButton Color="Color.Warning" StartIcon="@Icons.Material.Outlined.Sync" Disabled="@(!Job.Condition.SafeToInitialise)" @onclick="ReInitialise">Re-Initialise</MudButton>
-                            <MudButton Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Edit" Disabled="@(!Job.Condition.SafeToInitialise)" @onclick="() => { editJob = !editJob; }">Edit</MudButton>
-                        }
-                    </CardHeaderActions>
-                </MudCardHeader>
+                <CardHeader Title="Workload" HelpURL="https://github.com/OFark/Compressarr/wiki/Jobs#a-job">
+                    @if (!NewJob)
+                    {
+                        <MudButton Color="Color.Warning" StartIcon="@Icons.Material.Outlined.Sync" Disabled="@(!Job.Condition.SafeToInitialise)" @onclick="ReInitialise">Re-Initialise</MudButton>
+                        <MudButton Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Edit" Disabled="@(!Job.Condition.SafeToInitialise)" @onclick="() => { editJob = !editJob; }" Class="mr-4">Edit</MudButton>
+                    }
+                </CardHeader>
             }
             <MudCardContent>
                 <MudGrid>
@@ -48,7 +43,7 @@
                         {
                             <MudForm @ref="jobEditorForm">
                                 <MudCard Class="mb-3">
-                                    <MudCardHeader><CardHeaderContent><MudText Typo="Typo.h5">Workload</MudText></CardHeaderContent></MudCardHeader>
+                                    <CardHeader Title="Workload" HelpURL="https://github.com/OFark/Compressarr/wiki/Jobs#new-job"></CardHeader>
                                     <MudCardContent>
                                         <MudList Dense="true">
                                             <MudListItem>
@@ -74,9 +69,7 @@
                                     </MudCardContent>
                                 </MudCard>
                                 <MudCard Class="mb-3">
-                                    <MudCardHeader>
-                                        <CardHeaderContent><MudText Typo="Typo.h5">FFmpeg Options</MudText></CardHeaderContent>
-                                    </MudCardHeader>
+                                    <CardHeader Title="FFmpeg Options" HelpURL="https://github.com/OFark/Compressarr/wiki/Jobs#ffmpeg-options"></CardHeader>
                                     <MudCardContent>
                                         <MudList Dense="true">
                                             @if (Job.Preset?.VideoBitRateAutoCalc ?? false)
@@ -124,9 +117,7 @@
                                     </MudCardContent>
                                 </MudCard>
                                 <MudCard Class="mb-3">
-                                    <MudCardHeader>
-                                        <CardHeaderContent><MudText Typo="Typo.h5">Post-Processing</MudText></CardHeaderContent>
-                                    </MudCardHeader>
+                                    <CardHeader Title="Post-Processing" HelpURL="https://github.com/OFark/Compressarr/wiki/Jobs#post-processing"></CardHeader>
                                     <MudCardContent>
                                         <MudList Dense="true">
                                             <MudListItem>
