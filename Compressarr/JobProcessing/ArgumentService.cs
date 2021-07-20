@@ -393,12 +393,15 @@ namespace Compressarr.JobProcessing
 
                         AutoPresetResult bestVal = default;
 
+                        var ssimPost = wi.Job.ArgumentCalculationSettings.AutoCalculationSSIMPost ?? default;
+                        var compPost = wi.Job.ArgumentCalculationSettings.AutoCalculationCompPost ?? default;
+
                         bestVal = wi.Job.ArgumentCalculationSettings.AutoCalculationType switch
                         {
                             AutoCalcType.FirstPastThePost => veo.AutoPresetTests.Where(x => x != null && x.SSIM >= (wi.Job.ArgumentCalculationSettings.AutoCalculationSSIMPost ?? 99)).OrderBy(x => x.Compression).ThenByDescending(x => x.SSIM).FirstOrDefault(),
                             AutoCalcType.BySpeed => veo.AutoPresetTests.OrderBy(x => Math.Abs(1 - x.Speed)).ThenByDescending(x => x.Speed > 1).ThenByDescending(x => x.SSIM).FirstOrDefault(),
                             AutoCalcType.Balanced => BalanceResults(veo.AutoPresetTests.Where(x => x != null && x.Smaller)),
-                            AutoCalcType.HappyMedium => veo.AutoPresetTests.OrderBy(x => x.SSIM < wi.Job.ArgumentCalculationSettings.AutoCalculationSSIMPost || x.Compression > wi.Job.ArgumentCalculationSettings.AutoCalculationCompPost).ThenByDescending(x => x.SSIM).ThenBy(x => x.Compression).FirstOrDefault(),
+                            AutoCalcType.HappyMedium => veo.AutoPresetTests.OrderBy(x => x.SSIM < ssimPost).ThenBy(x => x.SSIM < ssimPost || x.Compression > compPost).ThenBy(x => x.SSIM < ssimPost ? 100 - x.SSIM : (Math.Abs(compPost - x.Compression))).FirstOrDefault(),
                             AutoCalcType.WeightedForCompression => BalanceResults(veo.AutoPresetTests.Where(x => x != null && x.Smaller), weightCompression: 2),
                             AutoCalcType.WeightedForSpeed => BalanceResults(veo.AutoPresetTests.Where(x => x != null && x.Smaller), weightSpeed: 2),
                             AutoCalcType.WeightedForSSIM => BalanceResults(veo.AutoPresetTests.Where(x => x != null && x.Smaller), weightSSIM: 2),
