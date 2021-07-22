@@ -604,9 +604,9 @@ namespace Compressarr.JobProcessing
                 if (File.Exists(tempEncFile)) File.Delete(tempEncFile);
             }
 
-            test.Compression = compressions.Average();
-            test.Speed = speeds.Max();
-            test.SSIM = ssims.Average();
+            test.Compression = compressions.Any() ? compressions.Average() : default;
+            test.Speed = speeds.Any() ? speeds.Max() : default;
+            test.SSIM = ssims.Any() ? ssims.Average() : default;
 
             test.Processing = false;
         }
