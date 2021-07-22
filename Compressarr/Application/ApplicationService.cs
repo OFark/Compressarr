@@ -90,7 +90,8 @@ namespace Compressarr.Application
         public CancellationToken AppStoppingCancellationToken { get; set; }
         
         public Dictionary<CodecType, SortedSet<Codec>> Codecs { get; set; }
-        public SortedSet<ContainerResponse> Containers { get; set; }
+        public SortedSet<FFmpegFormat> Formats { get; set; }
+        public SortedSet<string> DemuxerExtensions { get; set; }
         public Dictionary<CodecType, SortedSet<Encoder>> Encoders { get; set; }
         public string FFmpegVersion { get; set; }
         public HashSet<Filter> Filters { get; set; }

@@ -12,6 +12,7 @@
     public enum MediaSource
     {
         Radarr,
-        Sonarr
+        Sonarr,
+        Folder
     }
 }

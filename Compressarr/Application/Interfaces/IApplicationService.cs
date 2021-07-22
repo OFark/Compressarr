@@ -19,7 +19,6 @@ namespace Compressarr.Application
 
         CancellationToken AppStoppingCancellationToken { get; set; }
         Dictionary<CodecType, SortedSet<Codec>> Codecs { get; set; }
-        SortedSet<ContainerResponse> Containers { get; set; }
         Dictionary<CodecType, SortedSet<Encoder>> Encoders { get; set; }
         string FFmpegVersion { get; set; }
         HashSet<Filter> Filters { get; set; }
@@ -35,6 +34,9 @@ namespace Compressarr.Application
         APISettings SonarrSettings { get; set; }
         string State { get; set; }
         Queue<string> StateHistory { get; set; }
+        SortedSet<string> DemuxerExtensions { get; set; }
+        SortedSet<FFmpegFormat> Formats { get; set; }
+
         void Broadcast(string message);
         LogLevel GetLogLevel();
         Task SaveAppSetting();

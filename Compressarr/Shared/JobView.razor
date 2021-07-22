@@ -14,12 +14,18 @@
                 {
                     <MudFab Size="Size.Small" Class="mr-3" Icon="@Icons.Outlined.Sync" Color="Color.Tertiary" />
                 }
+                else if (Job.MediaSource == MediaSource.Folder)
+                {
+                    <MudAvatar Color="Color.Tertiary" Class="mr-3" Style="vertical-align: middle;">
+                        <MudIcon Icon="@Icons.Outlined.FolderOpen" />
+                    </MudAvatar>
+                }
                 else
                 {
                     //<MudAvatar Color="Color.Transparent" Rounded="true" Image="@FilterImageSrc" Style="vertical-align: middle;" Class="mr-3" />
                     <img src="@FilterImageSrc" style="width: 40px; height: auto; vertical-align: middle; margin-right: 12px;" />
                 }
-                @:@Job.Filter?.Name | @Job.Preset => @Job.DestinationFolder
+                @:@(Job.Filter?.Name ?? "Folder") | @Job.Preset => @Job.DestinationFolder
                 <MudChip Color="@ButtonColour">@ButtonText</MudChip>
             }
         </MudText>
@@ -47,15 +53,22 @@
                                     <MudCardContent>
                                         <MudList Dense="true">
                                             <MudListItem>
-                                                <MudSelect Strict="true" Required="true" Label="Filter" @bind-Value="Job.FilterID" OffsetY="true">
+                                                <MudSelect Strict="true" Required="true" Label="Source" @bind-Value="JobFilterID" OffsetY="true">
                                                     @foreach (var c in FilterManager.Filters)
                                                         {
-                                                        <MudSelectItem Value="@c.ID">@c.Name - @c.MediaSource</MudSelectItem>
+                                                        <MudSelectItem Value="@c.ID.ToString()">@c.Name - @c.MediaSource</MudSelectItem>
                                                         }
+                                                    <MudSelectItem Value="@("folder")">Folder&hellip;</MudSelectItem>
                                                 </MudSelect>
                                             </MudListItem>
+                                            @if (showFolderSource)
+                                            {
+                                                <MudListItem>
+                                                    <DirectoryLookup Label="Source Folder" Required="true" @bind-Folder="@Job.SourceFolder" />
+                                                </MudListItem>
+                                            }
                                             <MudListItem>
-                                                <MudSelect Required="true" Label="Preset" @bind-Value="Job.Preset" OffsetY="true">
+                                                <MudSelect Required="true" Label="FFmpeg Preset" @bind-Value="Job.Preset" OffsetY="true">
                                                     @foreach (var c in PresetManager.Presets)
                                                         {
                                                         <MudSelectItem Value="c" />

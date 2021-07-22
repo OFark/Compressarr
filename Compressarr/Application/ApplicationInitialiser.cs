@@ -19,15 +19,14 @@ namespace Compressarr.Presets
     public class ApplicationInitialiser : IApplicationInitialiser
     {
 
-        private readonly IFileService fileService;
-        private readonly IJobManager jobManager;
-        private readonly ILogger<ApplicationInitialiser> logger;
         private readonly IApplicationService applicationService;
         private readonly IFFmpegProcessor fFmpegProcessor;
-
+        private readonly IFileService fileService;
         [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0052:Remove unread private members", Justification = "This may come in handy")]
         private readonly Task InitialisationTask;
 
+        private readonly IJobManager jobManager;
+        private readonly ILogger<ApplicationInitialiser> logger;
         public ApplicationInitialiser(IApplicationService applicationService, IFileService fileService, IJobManager jobManager, ILogger<ApplicationInitialiser> logger, IFFmpegProcessor fFmpegProcessor)
         {
             this.applicationService = applicationService;
@@ -71,6 +70,129 @@ namespace Compressarr.Presets
                 {
                     logger.LogError(ex, "Initialisation Error");
                 }
+            }
+        }
+
+        private async Task<Dictionary<CodecType, SortedSet<Codec>>> GetAvailableCodecsAsync()
+        {
+            logger.LogDebug($"Get available codecs.");
+
+            var codecs = new Dictionary<CodecType, SortedSet<Codec>>
+            {
+                { CodecType.Audio, new() },
+                { CodecType.Subtitle, new() },
+                { CodecType.Video, new() }
+            };
+
+            var result = await fFmpegProcessor.GetAvailableCodecsAsync(applicationService.AppStoppingCancellationToken);
+
+            if (result.Success)
+            {
+                foreach (var c in result.Results)
+                {
+                    codecs[c.Type].Add(new(c.Name, c.Description, c.IsDecoder, c.IsEncoder));
+                }
+                return codecs;
+            }
+            return null;
+        }
+
+        private async Task<SortedSet<FFmpegFormat>> GetAvailableContainersAsync()
+        {
+            logger.LogDebug($"Get Available Containers.");
+
+            var result = await fFmpegProcessor.GetAvailableFormatsAsync(applicationService.AppStoppingCancellationToken);
+
+            if (result.Success)
+            {
+                return new(result.Results);
+            }
+
+            return null;
+        }
+
+        private async Task<Dictionary<CodecType, SortedSet<Encoder>>> GetAvailableEncodersAsync()
+        {
+            logger.LogDebug($"Get available encoders.");
+
+            var encoders = new Dictionary<CodecType, SortedSet<Encoder>>();
+
+            var result = await fFmpegProcessor.GetAvailableEncodersAsync(applicationService.AppStoppingCancellationToken);
+
+            if (result.Success)
+            {
+                encoders.Add(CodecType.Audio, new());
+                encoders.Add(CodecType.Subtitle, new());
+                encoders.Add(CodecType.Video, new());
+
+                foreach (var e in result.Results)
+                {
+                    encoders[e.Type].Add(new(e.Name, e.Description, await GetOptionsAsync(e.Name)));
+                }
+
+                return encoders;
+            }
+
+            return null;
+        }
+
+        private async Task<SortedSet<string>> GetAvailableHardwareDecodersAsync()
+        {
+            logger.LogDebug($"Get available hardware decoders.");
+
+            var result = await fFmpegProcessor.GetAvailableHardwareDecodersAsync(applicationService.AppStoppingCancellationToken);
+
+            if (result.Success)
+            {
+                return new(result.Results);
+            }
+
+            return null;
+
+        }
+
+        private async Task<SortedSet<string>> GetFFmpegDemuxerExtensions()
+        {
+            logger.LogDebug($"Get FFmpeg demuxer extensions.");
+
+            var result = await fFmpegProcessor.GetFFmpegExtensionsAsync(applicationService.Formats, applicationService.AppStoppingCancellationToken);
+
+            if (result.Success)
+            {
+                return new(result.Results);
+            }
+
+            return null;
+        }
+
+        private async Task<string> GetFFmpegVersionAsync()
+        {
+            using (logger.BeginScope("Get FFmpeg Version."))
+            {
+                var result = await fFmpegProcessor.GetFFmpegVersionAsync(applicationService.AppStoppingCancellationToken);
+
+                if (result.Success)
+                    return result.Result;
+
+                return null;
+            }
+        }
+
+        private async Task<HashSet<EncoderOption>> GetOptionsAsync(string codec)
+        {
+            using (logger.BeginScope("Get Codec Options"))
+            {
+                var optionsFile = fileService.GetFilePath(AppDir.CodecOptions, $"{codec}.json");
+
+                if (fileService.HasFile(optionsFile))
+                {
+                    return await fileService.ReadJsonFileAsync<HashSet<EncoderOption>>(optionsFile);
+                }
+                else
+                {
+                    logger.LogTrace($"Codec Options file not found.");
+                }
+                return null;
             }
         }
 
@@ -130,31 +252,19 @@ namespace Compressarr.Presets
 
             var versionLoader = GetFFmpegVersionAsync();
             var codecLoader = GetAvailableCodecsAsync();
-            var containerLoader = GetAvailableContainersAsync();
+            var formatLoader = GetAvailableContainersAsync();
             var decoderLoader = GetAvailableHardwareDecodersAsync();
             var encoderLoader = GetAvailableEncodersAsync();
 
             applicationService.FFmpegVersion = await versionLoader;
             applicationService.Codecs = await codecLoader;
-            applicationService.Containers = await containerLoader;
+            applicationService.Formats = await formatLoader;
             applicationService.Encoders = await encoderLoader;
             applicationService.HardwareDecoders = await decoderLoader;
 
+            applicationService.DemuxerExtensions = await GetFFmpegDemuxerExtensions();
+
             Progress("FFmpeg Initialisation complete");
-        }
-
-        private void Job_StatusUpdate(object sender, EventArgs e)
-        {
-            applicationService.Progress = (double)100 * jobManager.Jobs.Sum(j => j.WorkLoad?.Count(x => x.Arguments != null) ?? 0) / jobManager.Jobs.Sum(j => j.WorkLoad?.Count ?? 1);
-            applicationService.Broadcast("");
-        }
-
-        private void Progress(string message)
-        {
-            applicationService.StateHistory.Enqueue(message);
-            applicationService.State = message;
-            logger.LogInformation(message);
-            applicationService.Broadcast(message);
         }
 
         private async Task InitialisePresets()
@@ -191,115 +301,19 @@ namespace Compressarr.Presets
             }
         }
 
-        private async Task<Dictionary<CodecType, SortedSet<Encoder>>> GetAvailableEncodersAsync()
+        private void Job_StatusUpdate(object sender, EventArgs e)
         {
-            logger.LogDebug($"Get available encoders.");
-
-            var encoders = new Dictionary<CodecType, SortedSet<Encoder>>();
-
-            var result = await fFmpegProcessor.GetAvailableEncodersAsync(applicationService.AppStoppingCancellationToken);
-
-            if (result.Success)
-            {
-                encoders.Add(CodecType.Audio, new());
-                encoders.Add(CodecType.Subtitle, new());
-                encoders.Add(CodecType.Video, new());
-
-                foreach (var e in result.Results)
-                {
-                    encoders[e.Type].Add(new(e.Name, e.Description, await GetOptionsAsync(e.Name)));
-                }
-
-                return encoders;
-            }
-
-            return null;
+            applicationService.Progress = (double)100 * jobManager.Jobs.Sum(j => j.WorkLoad?.Count(x => x.Arguments != null) ?? 0) / jobManager.Jobs.Sum(j => j.WorkLoad?.Count ?? 1);
+            applicationService.Broadcast("");
         }
 
-        private async Task<SortedSet<string>> GetAvailableHardwareDecodersAsync()
+        private void Progress(string message)
         {
-            logger.LogDebug($"Get available hardware decoders.");
-
-            var result = await fFmpegProcessor.GetAvailableHardwareDecodersAsync(applicationService.AppStoppingCancellationToken);
-
-            if (result.Success)
-            {
-                return new(result.Results);
-            }
-
-            return null;
-
+            applicationService.StateHistory.Enqueue(message);
+            applicationService.State = message;
+            logger.LogInformation(message);
+            applicationService.Broadcast(message);
         }
-
-        private async Task<Dictionary<CodecType, SortedSet<Codec>>> GetAvailableCodecsAsync()
-        {
-            logger.LogDebug($"Get available codecs.");
-
-            var codecs = new Dictionary<CodecType, SortedSet<Codec>>
-            {
-                { CodecType.Audio, new() },
-                { CodecType.Subtitle, new() },
-                { CodecType.Video, new() }
-            };
-
-            var result = await fFmpegProcessor.GetAvailableCodecsAsync(applicationService.AppStoppingCancellationToken);
-
-            if (result.Success)
-            {
-                foreach (var c in result.Results)
-                {
-                    codecs[c.Type].Add(new(c.Name, c.Description, c.IsDecoder, c.IsEncoder));
-                }
-                return codecs;
-            }
-            return null;
-        }
-
-        private async Task<SortedSet<ContainerResponse>> GetAvailableContainersAsync()
-        {
-            logger.LogDebug($"Get Available Containers.");
-
-            var result = await fFmpegProcessor.GetAvailableContainersAsync(applicationService.AppStoppingCancellationToken);
-
-            if (result.Success)
-            {
-                return new(result.Results);
-            }
-
-            return null;
-        }
-
-        private async Task<string> GetFFmpegVersionAsync()
-        {
-            using (logger.BeginScope("Get FFmpeg Version."))
-            {
-                var result = await fFmpegProcessor.GetFFmpegVersionAsync(applicationService.AppStoppingCancellationToken);
-
-                if (result.Success)
-                    return result.Result;
-
-                return null;
-            }
-        }
-
-        private async Task<HashSet<EncoderOption>> GetOptionsAsync(string codec)
-        {
-            using (logger.BeginScope("Get Codec Options"))
-            {
-                var optionsFile = fileService.GetFilePath(AppDir.CodecOptions, $"{codec}.json");
-
-                if (fileService.HasFile(optionsFile))
-                {
-                    return await fileService.ReadJsonFileAsync<HashSet<EncoderOption>>(optionsFile);
-                }
-                else
-                {
-                    logger.LogTrace($"Codec Options file not found.");
-                }
-                return null;
-            }
-        }
-
         private void ReportFFmpegProgress(ProgressInfo info)
         {
             applicationService.Progress = 100 * info.DownloadedBytes / info.TotalBytes;

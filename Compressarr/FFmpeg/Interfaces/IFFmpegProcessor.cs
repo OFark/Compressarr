@@ -1,6 +1,7 @@
 ﻿using Compressarr.FFmpeg.Events;
 using Compressarr.FFmpeg.Models;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -11,7 +12,7 @@ namespace Compressarr.FFmpeg
         Task<SSIMResult> CalculateSSIM(FFmpegProgressEvent ffmpegProgress, string sourceFile, string destinationFile, string hardwareDecoder, CancellationToken token);
         Task<FFResult<string>> ConvertContainerToExtension(string container, CancellationToken token);
         Task<FFResult<CodecResponse>> GetAvailableCodecsAsync(CancellationToken token);
-        Task<FFResult<ContainerResponse>> GetAvailableContainersAsync(CancellationToken token);
+        Task<FFResult<FFmpegFormat>> GetAvailableFormatsAsync(CancellationToken token);
         Task<FFResult<EncoderResponse>> GetAvailableEncodersAsync(CancellationToken token);
         Task<FFResult<string>> GetAvailableHardwareDecodersAsync(CancellationToken token);
         Task<FFResult<string>> GetFFmpegVersionAsync(CancellationToken token);
@@ -19,5 +20,6 @@ namespace Compressarr.FFmpeg
         Task<FFResult<string>> GetFFProbeJSON(string filePath, CancellationToken token);
         Task<ProcessResponse> RunProcess(string filePath, string arguments, CancellationToken token, FFmpegProgressEvent OnProgress = null, FFmpegSSIMReportEvent OnSSIM = null);
         Task<ProcessResponse> RunProcess(FFProcess process, string arguments, CancellationToken token, FFmpegProgressEvent OnProgress = null, FFmpegSSIMReportEvent OnSSIM = null);
+        Task<FFResult<string>> GetFFmpegExtensionsAsync(IEnumerable<FFmpegFormat> formats, CancellationToken token);
     }
 }

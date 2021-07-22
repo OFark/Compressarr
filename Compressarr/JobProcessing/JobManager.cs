@@ -30,6 +30,7 @@ namespace Compressarr.JobProcessing
         private readonly IFFmpegProcessor fFmpegProcessor;
         private readonly IFileService fileService;
         private readonly IFilterManager filterManager;
+        private readonly IFolderService folderService;
         private readonly IHistoryService historyService;
         private readonly IOptionsMonitor<HashSet<Job>> jobsMonitor;
         private readonly ILogger<JobManager> logger;
@@ -39,13 +40,14 @@ namespace Compressarr.JobProcessing
         private readonly ISonarrService sonarrService;
 
 
-        public JobManager(IApplicationService applicationService, IArgumentService argumentService, IFFmpegProcessor fFmpegProcessor, IFileService fileService, IFilterManager filterManager, IHistoryService historyService, ILogger<JobManager> logger, IOptionsMonitor<HashSet<Job>> jobsMonitor, IPresetManager presetManager, IProcessManager processManager, IRadarrService radarrService, ISonarrService sonarrService)
+        public JobManager(IApplicationService applicationService, IArgumentService argumentService, IFFmpegProcessor fFmpegProcessor, IFileService fileService, IFilterManager filterManager, IFolderService folderService, IHistoryService historyService, ILogger<JobManager> logger, IOptionsMonitor<HashSet<Job>> jobsMonitor, IPresetManager presetManager, IProcessManager processManager, IRadarrService radarrService, ISonarrService sonarrService)
         {
             this.applicationService = applicationService;
             this.argumentService = argumentService;
             this.fFmpegProcessor = fFmpegProcessor;
             this.fileService = fileService;
             this.filterManager = filterManager;
+            this.folderService = folderService;
             this.historyService = historyService;
             this.jobsMonitor = jobsMonitor;
             this.logger = logger;
@@ -224,7 +226,7 @@ namespace Compressarr.JobProcessing
                     {
                         job.Filter = filterManager.GetFilter(job.FilterID);
                         job.Preset = presetManager.GetPreset(job.PresetName);
-                        logger.LogDebug($"Job using filter: {job.FilterID} ({job.Filter.Name}) and preset: {job.PresetName}.");
+                        logger.LogDebug($"Job using source: {(job.FilterID != default ? job.FilterID.ToString() : "folder")} ({(job.Filter != null ? job.Filter.Name : job.SourceFolder)}) and preset: {job.PresetName}.");
 
                         if (job.Preset != null)
                         {
@@ -242,11 +244,12 @@ namespace Compressarr.JobProcessing
                                     {
                                         Log(job, Update.Debug("Begin Testing"));
 
-                                        var sourceName = job.Filter.MediaSource.ToString();
+                                        var sourceName = job.MediaSource.ToString();
                                         Log(job, Update.Debug($"Job is for {sourceName}, Connecting..."));
 
-                                        var systemStatus = job.Filter.MediaSource switch
+                                        var systemStatus = job.MediaSource switch
                                         {
+                                            MediaSource.Folder => await folderService.TestConnectionAsync(job.SourceFolder),
                                             MediaSource.Radarr => await radarrService.TestConnectionAsync(applicationService.RadarrSettings),
                                             MediaSource.Sonarr => await sonarrService.TestConnectionAsync(applicationService.SonarrSettings),
                                             _ => new()
@@ -254,18 +257,18 @@ namespace Compressarr.JobProcessing
 
                                         if (!systemStatus.Success)
                                         {
-                                            Log(job, Update.Warning($"Failed to connect to {sourceName}."));
+                                            Log(job, Update.Warning($"Failed to connect to {sourceName}. {systemStatus.ErrorMessage}"));
                                             Fail(job);
                                             return;
                                         }
 
                                         Log(job, Update.Debug($"Connected to {sourceName}."), Update.Debug("Fetching List of files."));
 
-                                        var getFilesResults = await GetMedia(job.Filter);
+                                        var getFilesResults = await GetMedia(job);
 
                                         if (!getFilesResults.Success)
                                         {
-                                            Log(job, Update.Warning("Failed to list files from Sonarr."));
+                                            Log(job, Update.Warning($"Failed to list files from {sourceName}."));
                                             Fail(job);
                                             return;
                                         }
@@ -310,9 +313,10 @@ namespace Compressarr.JobProcessing
                                                             }
                                                             else
                                                             {
-                                                                destinationpath = job.Filter.MediaSource switch
+                                                                destinationpath = job.MediaSource switch
                                                                 {
                                                                     MediaSource.Sonarr => Path.Combine(destinationpath, file.Directory.Parent.Name, file.Directory.Name),
+                                                                    MediaSource.Folder => Path.Combine(destinationpath, Path.GetRelativePath(job.SourceFolder, file.DirectoryName)),
                                                                     _ => Path.Combine(destinationpath, file.Directory.Name)
                                                                 };
                                                             }
@@ -412,7 +416,7 @@ namespace Compressarr.JobProcessing
 
         public void InitialiseJobs(MediaSource source, CancellationToken token)
         {
-            foreach (var job in Jobs.Where(j => j.Condition.SafeToInitialise && j.Filter.MediaSource == source))
+            foreach (var job in Jobs.Where(j => j.Condition.SafeToInitialise && j.MediaSource == source))
             {
                 _ = InitialiseJob(job, token);
             }
@@ -601,7 +605,7 @@ namespace Compressarr.JobProcessing
                                                 if (wi.Condition.ReadyForImport && job.AutoImport)
                                                 {
                                                     Log(job, Update.Information("Importing"));
-                                                    var importReport = await ImportVideo(wi, job.Filter.MediaSource);
+                                                    var importReport = await ImportVideo(wi, job.MediaSource);
                                                     if (importReport != null)
                                                     {
                                                         Log(job, Update.Warning(importReport));
@@ -643,63 +647,45 @@ namespace Compressarr.JobProcessing
 
             using (logger.BeginScope("Checking Results."))
             {
-                using (var outputChecker = new JobWorker(workItem.Condition.OutputCheck, workItem.Update))
+                using var outputChecker = new JobWorker(workItem.Condition.OutputCheck, workItem.Update);
+                var result = new WorkItemCheckResult(workItem);
+
+                if (workItem == null)
                 {
-                    var result = new WorkItemCheckResult(workItem);
+                    outputChecker.Succeed(false);
+                    var msg = "WorkItem is NULL";
+                    workItem.Update(new Update(msg, LogLevel.Error));
+                    return msg;
+                }
 
-                    if (workItem == null)
-                    {
-                        outputChecker.Succeed(false);
-                        var msg = "WorkItem is NULL";
-                        workItem.Update(new Update(msg, LogLevel.Error));
-                        return msg;
-                    }
+                if (workItem.Job.SSIMCheck && workItem.Job.MinSSIM > workItem.SSIM)
+                {
+                    outputChecker.Succeed(false);
+                    var msg = $"File similarity below threshold ({workItem.SSIM.ToPercent(2).Adorn("%")})";
+                    workItem.Update(new Update(msg, LogLevel.Warning));
+                    return msg;
+                }
 
-                    if (workItem.Job.SSIMCheck && workItem.Job.MinSSIM > workItem.SSIM)
-                    {
-                        outputChecker.Succeed(false);
-                        var msg = $"File similarity below threshold ({workItem.SSIM.ToPercent(2).Adorn("%")})";
-                        workItem.Update(new Update(msg, LogLevel.Warning));
-                        return msg;
-                    }
+                if (workItem.Job.SizeCheck && workItem.Job.MaxCompression < workItem.Compression)
+                {
+                    outputChecker.Succeed(false);
+                    var msg = $"File size above threshold ({workItem.Compression.ToPercent(2).Adorn("%")})";
+                    workItem.Update(new Update(msg, LogLevel.Warning));
+                    return msg;
+                }
 
-                    if (workItem.Job.SizeCheck && workItem.Job.MaxCompression < workItem.Compression)
-                    {
-                        outputChecker.Succeed(false);
-                        var msg = $"File size above threshold ({workItem.Compression.ToPercent(2).Adorn("%")})";
-                        workItem.Update(new Update(msg, LogLevel.Warning));
-                        return msg;
-                    }
+                var ffProbeResponse = await fFmpegProcessor.GetFFProbeInfo(workItem.DestinationFile, token);
+                if (ffProbeResponse.Success)
+                {
+                    var mediaInfo = ffProbeResponse.Result;
 
-                    var ffProbeResponse = await fFmpegProcessor.GetFFProbeInfo(workItem.DestinationFile, token);
-                    if (ffProbeResponse.Success)
-                    {
-                        var mediaInfo = ffProbeResponse.Result;
+                    //Workitem.Duration refers to the processing time frame.
+                    logger.LogDebug($"Original Duration: {workItem.TotalLength}");
+                    logger.LogDebug($"New Duration: {mediaInfo?.format?.Duration}");
+                    workItem.Output(new($"Original Duration: {workItem.TotalLength}"));
+                    workItem.Output(new($"New Duration: {mediaInfo?.format?.Duration}"));
 
-                        //Workitem.Duration refers to the processing time frame.
-                        logger.LogDebug($"Original Duration: {workItem.TotalLength}");
-                        logger.LogDebug($"New Duration: {mediaInfo?.format?.Duration}");
-                        workItem.Output(new($"Original Duration: {workItem.TotalLength}"));
-                        workItem.Output(new($"New Duration: {mediaInfo?.format?.Duration}"));
-
-                        if (mediaInfo?.format?.Duration == default)
-                        {
-                            outputChecker.Succeed(false);
-                            var msg = "FFprobe failed to analyse the output";
-                            workItem.Update(new Update(msg, LogLevel.Warning));
-                            return msg;
-                        }
-
-                        if (workItem.TotalLength.HasValue &&
-                            Math.Abs(mediaInfo.format.Duration.TotalSeconds - workItem.TotalLength.Value.TotalSeconds) > 2) //Check to the nearest second.
-                        {
-                            outputChecker.Succeed(false);
-                            var msg = $"Video duration mismatch by {TimeSpan.FromSeconds(Math.Abs(mediaInfo.format.Duration.TotalSeconds - workItem.TotalLength.Value.TotalSeconds)).Humanize(minUnit: Humanizer.Localisation.TimeUnit.Second)}";
-                            workItem.Update(new Update(msg, LogLevel.Warning));
-                            return msg;
-                        }
-                    }
-                    else
+                    if (mediaInfo?.format?.Duration == default)
                     {
                         outputChecker.Succeed(false);
                         var msg = "FFprobe failed to analyse the output";
@@ -707,9 +693,25 @@ namespace Compressarr.JobProcessing
                         return msg;
                     }
 
-                    outputChecker.Succeed();
-                    return null;
+                    if (workItem.TotalLength.HasValue &&
+                        Math.Abs(mediaInfo.format.Duration.TotalSeconds - workItem.TotalLength.Value.TotalSeconds) > 2) //Check to the nearest second.
+                    {
+                        outputChecker.Succeed(false);
+                        var msg = $"Video duration mismatch by {TimeSpan.FromSeconds(Math.Abs(mediaInfo.format.Duration.TotalSeconds - workItem.TotalLength.Value.TotalSeconds)).Humanize(minUnit: Humanizer.Localisation.TimeUnit.Second)}";
+                        workItem.Update(new Update(msg, LogLevel.Warning));
+                        return msg;
+                    }
                 }
+                else
+                {
+                    outputChecker.Succeed(false);
+                    var msg = "FFprobe failed to analyse the output";
+                    workItem.Update(new Update(msg, LogLevel.Warning));
+                    return msg;
+                }
+
+                outputChecker.Succeed();
+                return null;
             }
         }
         private void Fail(Job job)
@@ -717,15 +719,16 @@ namespace Compressarr.JobProcessing
             Log(job, Update.Warning("Test failed"));
         }
 
-        private async Task<ServiceResult<HashSet<WorkItem>>> GetMedia(Filter jobFilter)
+        private async Task<ServiceResult<HashSet<WorkItem>>> GetMedia(Job job)
         {
             using (logger.BeginScope("Get Files"))
             {
-                var filter = filterManager.ConstructFilterQuery(jobFilter.Filters, out var filterVals);
 
-                if (jobFilter.MediaSource == MediaSource.Radarr)
+                if (job.MediaSource == MediaSource.Radarr)
                 {
                     logger.LogInformation("From Radarr");
+
+                    var filter = filterManager.ConstructFilterQuery(job.Filter.Filters, out var filterVals);
 
                     var getMoviesResponse = await radarrService.RequestMoviesFilteredAsync(filter, filterVals);
 
@@ -738,9 +741,11 @@ namespace Compressarr.JobProcessing
                     return new(true, movies.Select(x => new WorkItem(x, applicationService.RadarrSettings.BasePath)).ToHashSet());
                 }
 
-                if (jobFilter.MediaSource == MediaSource.Sonarr)
+                if (job.MediaSource == MediaSource.Sonarr)
                 {
                     logger.LogInformation("From Sonarr");
+
+                    var filter = filterManager.ConstructFilterQuery(job.Filter.Filters, out var filterVals);
 
                     var getSeriesResponse = await sonarrService.RequestSeriesFilteredAsync(filter, filterVals);
 
@@ -753,8 +758,24 @@ namespace Compressarr.JobProcessing
                     return new(true, series.SelectMany(s => s.Seasons).SelectMany(s => s.EpisodeFiles).Select(x => new WorkItem(x, applicationService.SonarrSettings.BasePath)).ToHashSet());
                 }
 
-                logger.LogWarning($"Source ({jobFilter.MediaSource}) is not supported");
-                return new(false, "404", "Not Implemented");
+                if (job.MediaSource == MediaSource.Folder)
+                {
+                    logger.LogInformation($"From a Folder: {job.SourceFolder}");
+
+                    var getFilesResponse = await folderService.RequestFilesAsync(job.SourceFolder);
+
+                    if(!getFilesResponse.Success)
+                    {
+                        return new(false, getFilesResponse.ErrorCode, getFilesResponse.ErrorMessage);
+                    }
+
+                    var files = getFilesResponse.Results;
+                    return new(true, files.Select(x => new WorkItem(x)).ToHashSet());
+                }
+
+
+                logger.LogWarning($"Source ({job.MediaSource}) is not supported");
+                return new(false, "", "Not Implemented");
             }
         }
 

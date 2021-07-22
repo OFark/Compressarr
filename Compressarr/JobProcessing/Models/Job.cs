@@ -16,6 +16,10 @@ namespace Compressarr.JobProcessing.Models
 {
     public class Job
     {
+
+        [JsonIgnore]
+        public MediaSource MediaSource => Filter != null ? Filter.MediaSource : MediaSource.Folder;
+
         [JsonIgnore]
         public JobCondition Condition = new();
 
@@ -38,6 +42,8 @@ namespace Compressarr.JobProcessing.Models
 
         [JsonIgnore]
         public Filter Filter { get; internal set; }
+
+        public string SourceFolder { get; set; }
 
         public Guid FilterID { get; set; }
         [Obsolete("Depreciated in favour of FilterID")]

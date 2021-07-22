@@ -1,13 +1,14 @@
 ﻿using Compressarr.FFmpeg.Models;
 using Compressarr.Filtering;
 using Compressarr.Helpers;
+using Compressarr.Services.Interfaces;
 using Compressarr.Shared.Models;
 using Newtonsoft.Json;
 using System.Collections.Generic;
 
 namespace Compressarr.Services.Models
 {
-    public class Media
+    public class Media : IMedia
     {
         public string BasePath { get; set; }
 
@@ -25,5 +26,11 @@ namespace Compressarr.Services.Models
         private HashSet<TreeItemData> ffProbeTreeView;
 
         public MediaSource Source { get; set; }
+        public string FilePath { get; internal set; }
+
+        public int GetStableHash()
+        {
+            return JsonConvert.SerializeObject(this).GetStableHashCode();
+        }
     }
 }

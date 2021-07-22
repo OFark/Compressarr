@@ -73,12 +73,7 @@ namespace Compressarr.Services.Models
         public bool QualityCutoffNotMet { get; set; }
 
         [JsonIgnore]
-        public string FilePath => $"{BasePath}{Path}";
-
-        public int GetStableHash()
-        {
-            return JsonConvert.SerializeObject(this).GetStableHashCode();
-        }
+        public new string FilePath => $"{BasePath}{Path}";
 
         public class FileQuality
         {

@@ -54,7 +54,7 @@ namespace Compressarr.Presets
         public SortedSet<Codec> AudioCodecs => Codecs[CodecType.Audio];
         public SortedSet<Encoder> AudioEncoders => Encoders[CodecType.Audio];
         private Dictionary<CodecType, SortedSet<Codec>> Codecs => applicationService.Codecs;
-        public SortedSet<ContainerResponse> Containers => applicationService.Containers;
+        public SortedSet<FFmpegFormat> Containers => new(applicationService.Formats.Where(f => f.Muxer));
         private Dictionary<CodecType, SortedSet<Encoder>> Encoders => applicationService.Encoders;
         public Dictionary<string, string> LanguageCodes
         {

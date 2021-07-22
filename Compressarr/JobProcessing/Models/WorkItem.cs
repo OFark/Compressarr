@@ -1,5 +1,6 @@
 ﻿using Compressarr.FFmpeg.Events;
 using Compressarr.Filtering;
+using Compressarr.Helpers;
 using Compressarr.Presets.Models;
 using Compressarr.Services.Interfaces;
 using Compressarr.Services.Models;
@@ -19,7 +20,7 @@ namespace Compressarr.JobProcessing.Models
     {
 
         internal CancellationTokenSource CancellationTokenSource = new();
-
+        
         public WorkItem(Movie movie, string basePath)
         {
             SourceID = movie.Id;
@@ -36,6 +37,14 @@ namespace Compressarr.JobProcessing.Models
             SourceFile = episodeFile.FilePath;
             Media = episodeFile;
             Media.Source = MediaSource.Sonarr;
+        }
+
+        public WorkItem(FileInfo x)
+        {
+            SourceID = -1;
+            MediaHash = x.FullName.GetStableHashCode();
+            SourceFile = x.FullName;
+            Media = new Media() { FilePath = x.FullName, Source = MediaSource.Folder };
         }
 
         public event EventHandler<Update> OnUpdate;

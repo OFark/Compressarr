@@ -258,12 +258,7 @@ namespace Compressarr.Services.Models
         public bool ShowHistory { get; set; }
 
         [JsonIgnore]
-        public string FilePath => $"{BasePath}{Path.Combine(path, movieFile?.relativePath)}";
-
-        public int GetStableHash()
-        {
-            return JsonConvert.SerializeObject(this).GetStableHashCode();
-        }
+        public new string FilePath => $"{BasePath}{Path.Combine(path, movieFile?.relativePath)}";
     }
 
     public class MovieFile

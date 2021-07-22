@@ -123,9 +123,9 @@ namespace Compressarr.FFmpeg
             }
         }
 
-        public async Task<FFResult<ContainerResponse>> GetAvailableContainersAsync(CancellationToken token)
+        public async Task<FFResult<FFmpegFormat>> GetAvailableFormatsAsync(CancellationToken token)
         {
-            using (logger.BeginScope($"Get Available Containers"))
+            using (logger.BeginScope($"Get Available Formats"))
             {
                 try
                 {
@@ -137,14 +137,54 @@ namespace Compressarr.FFmpeg
                         var reg = new Regex(regPattern, RegexOptions.IgnoreCase | RegexOptions.Multiline);
                         logger.LogDebug($"Regex matching pattern: \"{regPattern}\"");
 
-                        return new(true, reg.Matches(result.StdOut).Where(m => m.Groups[2].Value == "E").Select(m => new ContainerResponse()
+                        return new(true, reg.Matches(result.StdOut).Select(m => new FFmpegFormat()
                         {
+                            Demuxer = m.Groups[1].Value == "D",
+                            Muxer = m.Groups[2].Value == "E",
                             Name = m.Groups[3].Value,
                             Description = m.Groups[4].Value
                         }));
                     }
 
                     return new(result);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "An error occurred");
+                    return new(ex);
+                }
+            }
+        }
+
+        public async Task<FFResult<string>> GetFFmpegExtensionsAsync(IEnumerable<FFmpegFormat> formats, CancellationToken token)
+        {
+            using (logger.BeginScope($"Get FFmpeg Extensions"))
+            {
+                try
+                {
+                    var results = new List<string>();
+                    foreach (var format in formats.Where(x => x.Demuxer))
+                    {
+                        var result = await RunProcess(FFProcess.FFmpeg, $"-v 1 -h demuxer={format.Name}", token);
+
+                        if (result.Success)
+                        {
+                            //This regex version captures multiple extensions
+                            var reg = new Regex(@"^ *Common extensions: ((\w+)[,\.])*", RegexOptions.IgnoreCase | RegexOptions.Multiline);
+                            var match = reg.Match(result.StdOut);
+                            if (match != null)
+                            {
+                                results.AddRange(match.Groups[2].Captures.Select(c => c.Value).ToList());
+                            }
+                        }
+                    }
+
+                    if(results.Any())
+                    {
+                        return new(true, results.Distinct());
+                    }
+
+                    return new(false, (string)null);
                 }
                 catch (Exception ex)
                 {

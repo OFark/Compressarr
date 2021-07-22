@@ -44,10 +44,37 @@ namespace Compressarr.Shared
         [Inject] IFFmpegProcessor FFmpegProcessor { get; set; }
         private string FilterImageSrc => $"https://raw.githubusercontent.com/{FilterType.Capitalise()}/{FilterType.Capitalise()}/develop/Logo/{FilterType.Capitalise()}.svg";
         [Inject] IFilterManager FilterManager { get; set; }
-        private string FilterType => Job?.Filter?.MediaSource.ToString().ToLower();
+        private string FilterType => Job?.MediaSource.ToString().ToLower();
         [Inject] IHistoryService HistoryService { get; set; }
         [Inject] IJobManager JobManager { get; set; }
         [Inject] ILayoutService LayoutService { get; set; }
+
+        private bool showFolderSource; 
+        public string JobFilterID
+        {
+            get
+            {
+                return Job.FilterID != default ? Job.FilterID.ToString() : showFolderSource ? "folder" : default;
+            }
+            set
+            {
+                if(Guid.TryParse(value, out var id))
+                {
+                    Job.FilterID = id;
+                    showFolderSource = false;
+                    Job.SourceFolder = default;
+                }
+                else
+                {
+                    if(value == "folder")
+                    {
+                        Job.FilterID = default;
+                        Job.Filter = null;
+                        showFolderSource = true;
+                    }
+                }
+            }
+        }
         private int? MaxComp
         {
             get
@@ -170,7 +197,7 @@ namespace Compressarr.Shared
 
         protected async Task ImportVideo(WorkItem wi)
         {
-            var importReport = await JobManager.ImportVideo(wi, wi.Job.Filter.MediaSource);
+            var importReport = await JobManager.ImportVideo(wi, wi.Job.MediaSource);
             if (importReport != null)
             {
                 wi.Update(Update.Warning(importReport));
