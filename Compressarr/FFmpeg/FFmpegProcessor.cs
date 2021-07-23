@@ -17,10 +17,18 @@ namespace Compressarr.FFmpeg
 {
     public partial class FFmpegProcessor : IFFmpegProcessor
     {
+        private readonly static Regex RegexAvailableCodec = new(@"^\s([D\.])([E\.])([VAS])[I.][L\.][S\.]\s(?!=)([^\s]*).*$", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
+        private readonly static Regex RegexAvailableEncoders = new(@"^\s([VAS])[F\.][S\.][X\.][B\.][D\.]\s(?!=)([^\s]*)\s*(.*)$", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
+        private readonly static Regex RegexAvailableFormats = new(@"^ ?([D ])([E ]) (?!=)([^ ]*) *(.*)$", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
+        private readonly static Regex RegexAvailableHardwareAccels = new(@"^(?!Hardware).*", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
+        private readonly static Regex RegexMultipleExtensions = new Regex(@"^ *Common extensions: ((\w+)[,\.])*", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
+        private readonly static Regex RegexSingleExtension = new(@"^ *Common extensions: (\w*)(?:,\w*)*\.", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
+        private readonly static Regex RegexVersion = new Regex(@"(?<=version\s)(.*)(?=\sCopy)", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
         private static SemaphoreSlim semLock = new(1, 1);
         private readonly IApplicationService applicationService;
         private readonly IFileService fileService;
         private readonly ILogger<FFmpegProcessor> logger;
+
         public FFmpegProcessor(IApplicationService applicationService, IFileService fileService, ILogger<FFmpegProcessor> logger)
         {
             this.applicationService = applicationService;
@@ -74,8 +82,7 @@ namespace Compressarr.FFmpeg
 
                 if (result.Success)
                 {
-                    var reg = new Regex(@"^ *Common extensions: (\w*)(?:,\w*)*\.", RegexOptions.IgnoreCase | RegexOptions.Multiline);
-                    var match = reg.Match(result.StdOut);
+                    var match = RegexSingleExtension.Match(result.StdOut);
                     if (match != null)
                     {
                         return new(true, match.Groups[1].Value);
@@ -97,13 +104,9 @@ namespace Compressarr.FFmpeg
 
                     if (result.Success)
                     {
-                        var regPattern = @"^\s([D\.])([E\.])([VAS])[I.][L\.][S\.]\s(?!=)([^\s]*).*$";
-                        var reg = new Regex(regPattern, RegexOptions.IgnoreCase | RegexOptions.Multiline);
-                        logger.LogDebug($"Regex matching pattern: \"{regPattern}\"");
-
                         var results = new HashSet<CodecResponse>();
 
-                        return new(true, reg.Matches(result.StdOut).Select(m => new CodecResponse()
+                        return new(true, RegexAvailableCodec.Matches(result.StdOut).Select(m => new CodecResponse()
                         {
                             IsDecoder = m.Groups[1].Value == "D",
                             IsEncoder = m.Groups[2].Value == "E",
@@ -123,6 +126,33 @@ namespace Compressarr.FFmpeg
             }
         }
 
+        public async Task<FFResult<EncoderResponse>> GetAvailableEncodersAsync(CancellationToken token)
+        {
+            using (logger.BeginScope("Get Available Encoders"))
+            {
+
+                var result = await RunProcess(FFProcess.FFmpeg, "-encoders -v 1", token);
+
+                if (result.Success)
+                {
+                    var results = new HashSet<EncoderResponse>();
+                    foreach (Match m in RegexAvailableEncoders.Matches(result.StdOut))
+                    {
+                        results.Add(new()
+                        {
+                            Type = m.Groups[1].Value switch { "A" => CodecType.Audio, "S" => CodecType.Subtitle, "V" => CodecType.Video, _ => throw new NotImplementedException() },
+                            Name = m.Groups[2].Value,
+                            Description = m.Groups[3].Value
+                        });
+                    }
+
+                    return new(true, results);
+                }
+
+                return new(result);
+            }
+        }
+
         public async Task<FFResult<FFmpegFormat>> GetAvailableFormatsAsync(CancellationToken token)
         {
             using (logger.BeginScope($"Get Available Formats"))
@@ -133,11 +163,7 @@ namespace Compressarr.FFmpeg
 
                     if (result.Success)
                     {
-                        var regPattern = @"^ ?([D ])([E ]) (?!=)([^ ]*) *(.*)$";
-                        var reg = new Regex(regPattern, RegexOptions.IgnoreCase | RegexOptions.Multiline);
-                        logger.LogDebug($"Regex matching pattern: \"{regPattern}\"");
-
-                        return new(true, reg.Matches(result.StdOut).Select(m => new FFmpegFormat()
+                        return new(true, RegexAvailableFormats.Matches(result.StdOut).Select(m => new FFmpegFormat()
                         {
                             Demuxer = m.Groups[1].Value == "D",
                             Muxer = m.Groups[2].Value == "E",
@@ -156,6 +182,30 @@ namespace Compressarr.FFmpeg
             }
         }
 
+        public async Task<FFResult<string>> GetAvailableHardwareDecodersAsync(CancellationToken token)
+        {
+            using (logger.BeginScope("Get available hardware decoders"))
+            {
+                var hwdecoders = new SortedSet<string>();
+
+                var result = await RunProcess(FFProcess.FFmpeg, "-hwaccels -v 1", token);
+
+                if (result.Success)
+                {
+                    foreach (Match m in RegexAvailableHardwareAccels.Matches(result.StdOut))
+                    {
+                        if (!string.IsNullOrWhiteSpace(m.Value))
+                        {
+                            hwdecoders.Add(m.Value.Trim());
+                        }
+                    }
+                    return new(true, hwdecoders);
+                }
+
+                return new(result);
+            }
+        }
+
         public async Task<FFResult<string>> GetFFmpegExtensionsAsync(IEnumerable<FFmpegFormat> formats, CancellationToken token)
         {
             using (logger.BeginScope($"Get FFmpeg Extensions"))
@@ -169,9 +219,7 @@ namespace Compressarr.FFmpeg
 
                         if (result.Success)
                         {
-                            //This regex version captures multiple extensions
-                            var reg = new Regex(@"^ *Common extensions: ((\w+)[,\.])*", RegexOptions.IgnoreCase | RegexOptions.Multiline);
-                            var match = reg.Match(result.StdOut);
+                            var match = RegexMultipleExtensions.Match(result.StdOut);
                             if (match != null)
                             {
                                 results.AddRange(match.Groups[2].Captures.Select(c => c.Value).ToList());
@@ -179,7 +227,7 @@ namespace Compressarr.FFmpeg
                         }
                     }
 
-                    if(results.Any())
+                    if (results.Any())
                     {
                         return new(true, results.Distinct());
                     }
@@ -191,65 +239,6 @@ namespace Compressarr.FFmpeg
                     logger.LogError(ex, "An error occurred");
                     return new(ex);
                 }
-            }
-        }
-
-        public async Task<FFResult<EncoderResponse>> GetAvailableEncodersAsync(CancellationToken token)
-        {
-            using (logger.BeginScope("Get Available Encoders"))
-            {
-
-                var result = await RunProcess(FFProcess.FFmpeg, "-encoders -v 1", token);
-
-                if (result.Success)
-                {
-                    var regPattern = @"^\s([VAS])[F\.][S\.][X\.][B\.][D\.]\s(?!=)([^\s]*)\s*(.*)$";
-                    var reg = new Regex(regPattern, RegexOptions.IgnoreCase | RegexOptions.Multiline);
-                    logger.LogDebug($"Regex matching pattern: \"{regPattern}\"");
-
-                    var results = new HashSet<EncoderResponse>();
-                    foreach (Match m in reg.Matches(result.StdOut))
-                    {
-                        results.Add(new()
-                        {
-                            Type = m.Groups[1].Value switch { "A" => CodecType.Audio, "S" => CodecType.Subtitle, "V" => CodecType.Video, _ => throw new NotImplementedException() },
-                            Name = m.Groups[2].Value,
-                            Description = m.Groups[3].Value
-                        });
-                    }
-
-                    return new(true, results);
-                }
-
-                return new(result);
-            }
-        }
-
-        public async Task<FFResult<string>> GetAvailableHardwareDecodersAsync(CancellationToken token)
-        {
-            using (logger.BeginScope("Get available hardware decoders"))
-            {
-                var hwdecoders = new SortedSet<string>();
-
-                var result = await RunProcess(FFProcess.FFmpeg, "-hwaccels -v 1", token);
-
-                if (result.Success)
-                {
-                    var regPattern = @"^(?!Hardware).*";
-                    var reg = new Regex(regPattern, RegexOptions.IgnoreCase | RegexOptions.Multiline);
-                    logger.LogDebug($"Regex matching pattern: \"{regPattern}\"");
-
-                    foreach (Match m in reg.Matches(result.StdOut))
-                    {
-                        if (!string.IsNullOrWhiteSpace(m.Value))
-                        {
-                            hwdecoders.Add(m.Value.Trim());
-                        }
-                    }
-                    return new(true, hwdecoders);
-                }
-
-                return new(result);
             }
         }
         public async Task<FFResult<string>> GetFFmpegVersionAsync(CancellationToken token)
@@ -279,8 +268,7 @@ namespace Compressarr.FFmpeg
 
                     if (result.Success)
                     {
-                        var reg = new Regex(@"(?<=version\s)(.*)(?=\sCopy)");
-                        var match = reg.Match(result.StdOut);
+                        var match = RegexVersion.Match(result.StdOut);
                         if (match != null)
                         {
                             return new(true, match.Value);
