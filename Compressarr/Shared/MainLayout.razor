@@ -1,10 +1,5 @@
 ﻿@inherits LayoutComponentBase
 
-@inject IApplicationInitialiser applicationInitialiser
-@inject ILayoutService layoutService
-@inject IApplicationService ApplicationService
-@inject ISnackbar Snackbar
-
 <MudThemeProvider Theme="@MyCustomTheme" />
 <MudDialogProvider />
 <MudSnackbarProvider />
@@ -13,7 +8,8 @@
     <MudAppBar Elevation="2">
         <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
         <MudText Typo="Typo.h5" Class="ml-3">
-            <img src="\Logo\Compressarr.svg" style="vertical-align: middle; margin-right: 12px; width: 40px; height: auto;" />Compressarr</MudText>
+            <img src="\Logo\Compressarr.svg" style="vertical-align: middle; margin-right: 12px; width: 40px; height: auto;" />Compressarr
+        </MudText>
         <MudAppBarSpacer />
         <NavMenu />
     </MudAppBar>
@@ -31,16 +27,14 @@
         <LayoutEngine @ref="layoutEngine" OnStateChanged="LayoutEngineStateChanged">
             <MudContainer MaxWidth="MaxWidth.Large" Fixed="true" id="content">
                 <CascadingValue Value=layoutEngine>
-                    @if (ApplicationService.State != "Ready")
+                    @if (!IsReady)
                     {
-                        <MudContainer MaxWidth="MaxWidth.Small">
-                            <MudPaper Class="pa-3 mb-3">
-                                <MudText>@ApplicationService.State</MudText>
-                                <MudProgressLinear Color="Color.Primary" Value="ApplicationService.Progress" />
-                            </MudPaper>
-                        </MudContainer>
+                        <Initialising />
                     }
-                    @Body
+                    else
+                    {
+                        @Body
+                    }
                 </CascadingValue>
             </MudContainer>
         </LayoutEngine>
@@ -48,68 +42,5 @@
 </MudLayout>
 
 @code {
-    protected LayoutEngineBase layoutEngine = new();
-
-    protected void LayoutEngineStateChanged()
-    {
-        InvokeAsync(StateHasChanged);
-    }
-
-    bool _drawerOpen = false;
-
-    void DrawerToggle()
-    {
-        _drawerOpen = !_drawerOpen;
-    }
-
-    protected override void OnInitialized()
-    {
-        ApplicationService.OnBroadcast += (s, message) =>
-        {
-            InvokeAsync(() =>
-            {
-                Snackbar.Add(message);
-                InvokeAsync(StateHasChanged);
-            });
-        };
-
-        base.OnInitialized();
-}
-
-
-
-    protected override void OnAfterRender(bool firstRender)
-    {
-        if (firstRender)
-        {
-            while (ApplicationService.StateHistory.TryDequeue(out var state))
-            {
-                Snackbar.Add(state);
-            }
-        }
-
-        base.OnAfterRender(firstRender);
-    }
-
-    MudTheme MyCustomTheme = new MudTheme()
-    {
-        Palette = new Palette()
-        {
-            Primary = Colors.DeepPurple.Default,
-            Secondary = "#89b73a",
-            Tertiary = "#b7513a",
-            AppbarText = "#fff",
-            AppbarBackground = Colors.BlueGrey.Default
-        },
-
-        LayoutProperties = new LayoutProperties()
-        {
-            DrawerWidthLeft = "260px",
-            DrawerWidthRight = "300px"
-        },
-        Typography = new Typography()
-        {
-            H1 = new() { FontSize = "4rem", FontFamily = new string[] { "Roboto", "Helvetica", "Arial", "sans-serif" }, FontWeight = 300, LineHeight = 1.5 }
-        }
-    };
+    
 }

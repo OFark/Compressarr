@@ -1,17 +1,21 @@
 ﻿using Compressarr.Application;
 using Compressarr.FFmpeg.Events;
 using Compressarr.FFmpeg.Models;
+using Compressarr.Helpers;
 using Compressarr.Presets;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
 
 namespace Compressarr.FFmpeg
 {
@@ -24,7 +28,7 @@ namespace Compressarr.FFmpeg
         private readonly static Regex RegexMultipleExtensions = new Regex(@"^ *Common extensions: ((\w+)[,\.])*", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
         private readonly static Regex RegexSingleExtension = new(@"^ *Common extensions: (\w*)(?:,\w*)*\.", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
         private readonly static Regex RegexVersion = new Regex(@"(?<=version\s)(.*)(?=\sCopy)", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
-        private static SemaphoreSlim semLock = new(1, 1);
+        private static SemaphoreSlim semLock = new(1, 10);
         private readonly IApplicationService applicationService;
         private readonly IFileService fileService;
         private readonly ILogger<FFmpegProcessor> logger;
@@ -212,24 +216,38 @@ namespace Compressarr.FFmpeg
             {
                 try
                 {
-                    var results = new List<string>();
-                    foreach (var format in formats.Where(x => x.Demuxer))
-                    {
-                        var result = await RunProcess(FFProcess.FFmpeg, $"-v 1 -h demuxer={format.Name}", token);
+                    var results = new ConcurrentBag<string>();
+                    var extensions = new ConcurrentBag<string>();
 
+                    semLock = new(10, 10);
+
+
+                    await formats.Where(f => f.Demuxer).AsyncParallelForEach(async format =>
+                    {
+                        var result = await RunProcess(fileService.FFMPEGPath, $"-v 1 -h demuxer={format.Name}", token);
                         if (result.Success)
                         {
                             var match = RegexMultipleExtensions.Match(result.StdOut);
-                            if (match != null)
+                            if (match != null & match.Success)
                             {
-                                results.AddRange(match.Groups[2].Captures.Select(c => c.Value).ToList());
+                                foreach (var ext in match.Groups[2].Captures.Select(c => c.Value))
+                                {
+                                    extensions.Add(ext);
+                                }
+                            }
+                            else
+                            {
+                                logger.LogInformation($"No Match: {result}");
                             }
                         }
-                    }
+                    }).ConfigureAwait(false);
 
-                    if (results.Any())
+                    semLock = new(1, 1);
+
+                    if (extensions.Any())
                     {
-                        return new(true, results.Distinct());
+                        logger.LogInformation($"FFmpeg Demuxer extensions: {extensions.Count}");
+                        return new(true, extensions);
                     }
 
                     return new(false, (string)null);
@@ -241,6 +259,58 @@ namespace Compressarr.FFmpeg
                 }
             }
         }
+
+        public async Task<IEnumerable<string>> GetValues(IEnumerable<FFmpegFormat> formats, CancellationToken token)
+        {
+            using (logger.BeginScope($"Get FFmpeg Extensions"))
+            {
+                try
+                {
+                    var results = new ConcurrentBag<string>();
+                    var extensions = new List<string>();
+
+                    semLock = new(10, 10);
+
+
+                    await formats.Where(f => f.Demuxer).AsyncParallelForEach(async format =>
+                    {
+                        await Task.Delay(1000);
+                        extensions.Add(format.Name);
+                    }).ConfigureAwait(false);
+
+                    logger.LogInformation($"Output count: {extensions.Count}");
+
+                    return extensions;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "An error occurred");
+                    return null;
+                }
+            }
+        }
+
+        public Task AsyncParallelForEach<T>(IEnumerable<T> source, Func<T, Task> body, int maxDegreeOfParallelism = DataflowBlockOptions.Unbounded, TaskScheduler scheduler = null)
+        {
+            var options = new ExecutionDataflowBlockOptions
+            {
+                MaxDegreeOfParallelism = maxDegreeOfParallelism
+            };
+            if (scheduler != null)
+                options.TaskScheduler = scheduler;
+
+            var block = new ActionBlock<T>(body, options);
+
+            foreach (var item in source)
+                block.Post(item);
+
+            block.Complete();
+            return block.Completion;
+        }
+
+
+
+
         public async Task<FFResult<string>> GetFFmpegVersionAsync(CancellationToken token)
         {
             using (logger.BeginScope("Get FFmpeg Version."))
@@ -343,6 +413,104 @@ namespace Compressarr.FFmpeg
             return await RunProcess(filePath, arguments, token, OnProgress, OnSSIM);
         }
 
+        //public async Task<ProcessResponse> RunProcess(string filePath, string arguments, CancellationToken token, FFmpegProgressEvent OnProgress = null, FFmpegSSIMReportEvent OnSSIM = null)
+        //{
+        //    using (logger.BeginScope("Run Process: {filePath}", filePath))
+        //    {
+        //        var response = new ProcessResponse();
+
+        //        using var p = new Process();
+        //        p.StartInfo = new ProcessStartInfo()
+        //        {
+        //            Arguments = arguments,
+        //            CreateNoWindow = true,
+        //            FileName = filePath,
+        //            RedirectStandardError = true,
+        //            RedirectStandardOutput = true,
+        //            UseShellExecute = false,
+        //            WindowStyle = ProcessWindowStyle.Hidden,
+        //        };
+
+        //        var stdOut = string.Empty;
+        //        var stdErr = string.Empty;
+        //        TimeSpan duration = default;
+        //        FFmpegProgress progressReport = null;
+
+        //        p.OutputDataReceived += new DataReceivedEventHandler((s, e) =>
+        //        {
+        //            if (!string.IsNullOrWhiteSpace(e?.Data))
+        //            {
+        //                if (OnProgress != null && FFmpegProgress.TryParse(e.Data, out var result))
+        //                {
+        //                    progressReport = result.CalculatePercentage(duration);
+        //                    OnProgress.Invoke(progressReport);
+        //                }
+        //                else if (OnSSIM != null && FFmpegSSIMReport.TryParse(e.Data, out var ssimreport)) OnSSIM.Invoke(ssimreport);
+        //                else if (FFmpegDurationReport.TryParse(e.Data, out var durationreport)) duration = duration != default && duration > durationreport.Duration ? duration : durationreport.Duration;
+        //                else { stdOut += $"{e.Data}\r\n"; }
+        //            }
+        //        });
+        //        p.ErrorDataReceived += new DataReceivedEventHandler((s, e) =>
+        //        {
+        //            if (!string.IsNullOrWhiteSpace(e?.Data))
+        //            {
+        //                if (OnProgress != null && FFmpegProgress.TryParse(e.Data, out var result))
+        //                {
+        //                    progressReport = result.CalculatePercentage(duration);
+        //                    OnProgress.Invoke(progressReport);
+        //                }
+        //                else if (OnSSIM != null && FFmpegSSIMReport.TryParse(e.Data, out var ssimreport)) OnSSIM.Invoke(ssimreport);
+        //                else if (FFmpegDurationReport.TryParse(e.Data, out var durationreport)) duration = duration != default && duration > durationreport.Duration ? duration : durationreport.Duration;
+        //                else
+        //                {
+        //                    logger.LogError(e.Data);
+        //                    stdErr += $"{e.Data}\r\n";
+        //                }
+        //            }
+        //        });
+
+        //        await semLock.WaitAsync(token);
+        //        try
+        //        {
+        //            logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
+        //            p.Start();
+
+        //            p.BeginOutputReadLine();
+        //            p.BeginErrorReadLine();
+
+        //            await p.WaitForExitAsync(token);
+        //            p.WaitForExit(1000); //This waits for any handles to finish as well. 
+        //        }
+        //        finally
+        //        {
+        //            semLock.Release();
+        //        }
+
+
+        //        response.StdOut = stdOut;
+        //        response.StdErr = stdErr;
+
+        //        if (progressReport != null)
+        //        {
+        //            progressReport.Percentage = 100;
+        //            OnProgress.Invoke(progressReport);
+        //        }
+
+        //        response.ExitCode = p.ExitCode;
+
+        //        if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(response.StdErr))
+        //        {
+        //            logger.LogError($"Process Error: ({p.ExitCode}) {response.StdErr} <End Of Error>");
+        //        }
+        //        else
+        //        {
+        //            response.Success = true;
+        //        }
+
+        //        return response;
+        //    }
+        //}
+
         public async Task<ProcessResponse> RunProcess(string filePath, string arguments, CancellationToken token, FFmpegProgressEvent OnProgress = null, FFmpegSSIMReportEvent OnSSIM = null)
         {
             using (logger.BeginScope("Run Process: {filePath}", filePath))
@@ -361,43 +529,10 @@ namespace Compressarr.FFmpeg
                     WindowStyle = ProcessWindowStyle.Hidden,
                 };
 
-                var stdOut = new StringBuilder();
-                var stdErr = new StringBuilder();
+                var stdOut = string.Empty;
+                var stdErr = string.Empty;
                 TimeSpan duration = default;
                 FFmpegProgress progressReport = null;
-
-                p.OutputDataReceived += new DataReceivedEventHandler((s, e) =>
-                {
-                    if (!string.IsNullOrWhiteSpace(e?.Data))
-                    {
-                        if (OnProgress != null && FFmpegProgress.TryParse(e.Data, out var result))
-                        {
-                            progressReport = result.CalculatePercentage(duration);
-                            OnProgress.Invoke(progressReport);
-                        }
-                        else if (OnSSIM != null && FFmpegSSIMReport.TryParse(e.Data, out var ssimreport)) OnSSIM.Invoke(ssimreport);
-                        else if (FFmpegDurationReport.TryParse(e.Data, out var durationreport)) duration = duration != default && duration > durationreport.Duration ? duration : durationreport.Duration;
-                        else { stdOut.AppendLine(e.Data); }
-                    }
-                });
-                p.ErrorDataReceived += new DataReceivedEventHandler((s, e) =>
-                {
-                    if (!string.IsNullOrWhiteSpace(e?.Data))
-                    {
-                        if (OnProgress != null && FFmpegProgress.TryParse(e.Data, out var result))
-                        {
-                            progressReport = result.CalculatePercentage(duration);
-                            OnProgress.Invoke(progressReport);
-                        }
-                        else if (OnSSIM != null && FFmpegSSIMReport.TryParse(e.Data, out var ssimreport)) OnSSIM.Invoke(ssimreport);
-                        else if (FFmpegDurationReport.TryParse(e.Data, out var durationreport)) duration = duration != default && duration > durationreport.Duration ? duration : durationreport.Duration;
-                        else
-                        {
-                            logger.LogError(e.Data);
-                            stdErr.AppendLine(e.Data);
-                        }
-                    }
-                });
 
                 await semLock.WaitAsync(token);
                 try
@@ -405,8 +540,42 @@ namespace Compressarr.FFmpeg
                     logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
                     p.Start();
 
-                    p.BeginOutputReadLine();
-                    p.BeginErrorReadLine();
+
+                    while (!p.StandardOutput.EndOfStream)
+                    {
+                        var outputLine = p.StandardOutput.ReadLine();
+                        if (!string.IsNullOrWhiteSpace(outputLine))
+                        {
+                            if (OnProgress != null && FFmpegProgress.TryParse(outputLine, out var result))
+                            {
+                                progressReport = result.CalculatePercentage(duration);
+                                OnProgress.Invoke(progressReport);
+                            }
+                            else if (OnSSIM != null && FFmpegSSIMReport.TryParse(outputLine, out var ssimreport)) OnSSIM.Invoke(ssimreport);
+                            else if (FFmpegDurationReport.TryParse(outputLine, out var durationreport)) duration = duration != default && duration > durationreport.Duration ? duration : durationreport.Duration;
+                            else { stdOut += $"{outputLine}\r\n"; }
+                        }
+                    }
+
+                    while (!p.StandardError.EndOfStream)
+                    {
+                        var outputLine = p.StandardError.ReadLine();
+                        if (!string.IsNullOrWhiteSpace(outputLine))
+                        {
+                            if (OnProgress != null && FFmpegProgress.TryParse(outputLine, out var result))
+                            {
+                                progressReport = result.CalculatePercentage(duration);
+                                OnProgress.Invoke(progressReport);
+                            }
+                            else if (OnSSIM != null && FFmpegSSIMReport.TryParse(outputLine, out var ssimreport)) OnSSIM.Invoke(ssimreport);
+                            else if (FFmpegDurationReport.TryParse(outputLine, out var durationreport)) duration = duration != default && duration > durationreport.Duration ? duration : durationreport.Duration;
+                            else
+                            {
+                                logger.LogError(outputLine);
+                                stdErr += $"{outputLine}\r\n";
+                            }
+                        }
+                    }
 
                     await p.WaitForExitAsync(token);
                     p.WaitForExit(1000); //This waits for any handles to finish as well. 
@@ -417,8 +586,8 @@ namespace Compressarr.FFmpeg
                 }
 
 
-                response.StdOut = stdOut.ToString();
-                response.StdErr = stdErr.ToString();
+                response.StdOut = stdOut;
+                response.StdErr = stdErr;
 
                 if (progressReport != null)
                 {

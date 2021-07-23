@@ -1,0 +1,25 @@
+﻿<MudGrid>
+    <MudItem sm="0" md="3" lg="4"></MudItem>
+    <MudItem sm="12" md="6" lg="4">
+        <MudCard>
+            <MudCardMedia Image="/images/initialise.png" Height="375" />
+            <MudCardContent>
+                <MudList Dense="true" DisableGutters="true" DisablePadding="true">
+                    @foreach (var item in ApplicationService.InitialisationSteps)
+                    {
+                        <MudListItem>
+                            <MudCardActions Class="pa-0">
+                                <MudSpacer />
+                                <MudPaper Style="text-align: right;" Elevation="0">
+                                    <MudText>@item.Name</MudText>
+                                    <MudText Typo="Typo.caption">@item.State</MudText>
+                                </MudPaper>
+                                <MudIcon Icon="@item.Icon" Color="@item.IconColour" Class="ml-3" />
+                            </MudCardActions>
+                        </MudListItem>
+                    }
+                </MudList>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>

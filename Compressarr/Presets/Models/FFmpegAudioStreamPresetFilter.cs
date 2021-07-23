@@ -1,4 +1,4 @@
-﻿using Compressarr.Application.Interfaces;
+﻿using Compressarr.Application;
 using Compressarr.Filtering.Models;
 using Compressarr.Settings.FFmpegFactory;
 using System;

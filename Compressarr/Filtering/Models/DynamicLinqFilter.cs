@@ -1,4 +1,4 @@
-﻿using Compressarr.Application.Interfaces;
+﻿using Compressarr.Application;
 using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Linq;

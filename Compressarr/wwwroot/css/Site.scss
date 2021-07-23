@@ -117,8 +117,6 @@ body {
             }
         }
 
-
-
         #content {
             padding-top: 1.1rem;
 
@@ -135,9 +133,6 @@ body {
 
                         thead {
                             th:not(.hide) {
-
-
-
                                 option {
                                     /*                    background-color: $overBackground*/
                                 }
@@ -170,7 +165,6 @@ body {
                         margin-bottom: 1em;
 
                         .jobEvents {
-
                             .event {
                                 display: block;
                                 font-family: SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
@@ -276,7 +270,6 @@ body {
         }
     }
 }
-
 
 .valid.modified:not([type=checkbox]) {
     outline: 1px solid #26b050;

@@ -1,4 +1,4 @@
-﻿using Compressarr.Application.Interfaces;
+﻿using Compressarr.Application;
 using Compressarr.Settings.Filtering;
 using Newtonsoft.Json;
 using System;

@@ -43,7 +43,6 @@ namespace Compressarr
             services.Configure<HashSet<FFmpegPresetBase>>(options => Configuration.GetSection("Presets").Bind(options));
             services.Configure<HashSet<Job>>(options => Configuration.GetSection("Jobs").Bind(options));
 
-
             services.AddSingleton<IApplicationInitialiser, ApplicationInitialiser>();
             services.AddSingleton<IApplicationService, ApplicationService>();
             services.AddSingleton<IProcessManager, ProcessManager>();

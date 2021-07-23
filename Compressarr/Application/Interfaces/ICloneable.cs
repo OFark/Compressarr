@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Compressarr.Application.Interfaces
+namespace Compressarr.Application
 {
     public interface ICloneable<T>
     {

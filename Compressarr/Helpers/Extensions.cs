@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Components;
 using Newtonsoft.Json;
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -21,7 +22,7 @@ namespace Compressarr.Helpers
         public static string Adorn(this object text, string adornment)
         {
             return string.IsNullOrWhiteSpace(text?.ToString()) ? string.Empty : $"{text}{adornment}";
-        }
+        }        
 
         public static Task AsyncParallelForEach<T>(this IEnumerable<T> source, Func<T, Task> body, int maxDegreeOfParallelism = DataflowBlockOptions.Unbounded, TaskScheduler scheduler = null)
         {
@@ -41,23 +42,23 @@ namespace Compressarr.Helpers
             return block.Completion;
         }
 
-        public static async Task AsyncParallelForEach<T>(this IAsyncEnumerable<T> source, Func<T, Task> body, int maxDegreeOfParallelism = DataflowBlockOptions.Unbounded, TaskScheduler scheduler = null)
-        {
-            var options = new ExecutionDataflowBlockOptions
-            {
-                MaxDegreeOfParallelism = maxDegreeOfParallelism
-            };
-            if (scheduler != null)
-                options.TaskScheduler = scheduler;
+        //public static async Task AsyncParallelForEach<T>(this IAsyncEnumerable<T> source, Func<T, Task> body, int maxDegreeOfParallelism = DataflowBlockOptions.Unbounded, TaskScheduler scheduler = null)
+        //{
+        //    var options = new ExecutionDataflowBlockOptions
+        //    {
+        //        MaxDegreeOfParallelism = maxDegreeOfParallelism
+        //    };
+        //    if (scheduler != null)
+        //        options.TaskScheduler = scheduler;
 
-            var block = new ActionBlock<T>(body, options);
+        //    var block = new ActionBlock<T>(body, options);
 
-            await foreach (var item in source)
-                block.Post(item);
+        //    await foreach (var item in source)
+        //        block.Post(item);
 
-            block.Complete();
-            await block.Completion;
-        }
+        //    block.Complete();
+        //    await block.Completion;
+        //}
 
         public static string Capitalise(this string text)
         {

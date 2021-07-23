@@ -1,4 +1,5 @@
-﻿using Compressarr.FFmpeg.Models;
+﻿using Compressarr.Application.Models;
+using Compressarr.FFmpeg.Models;
 using Compressarr.Filtering.Models;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Presets;
@@ -49,7 +50,7 @@ namespace Compressarr.Application
                 job.ArgumentCalculationSettings = new();
                 job.ArgumentCalculationSettings.ArgCalcSampleSeconds = 10;
 
-                if(appSettings?.Value != null)
+                if (appSettings?.Value != null)
                 {
                     job.ArgumentCalculationSettings.AlwaysCalculateSSIM = appSettings.Value.AlwaysCalculateSSIM;
                     job.ArgumentCalculationSettings.ArgCalcSampleSeconds = appSettings.Value.ArgCalcSampleSeconds;
@@ -58,7 +59,7 @@ namespace Compressarr.Application
                 }
             }
 
-                foreach (var job in Jobs.Where(j => j.FilterID == default))
+            foreach (var job in Jobs.Where(j => j.FilterID == default))
             {
 #pragma warning disable CS0618 // Type or member is obsolete this is to upgrade old databases
                 var filter = Filters.FirstOrDefault(x => x.Name == job.FilterName);
@@ -79,36 +80,49 @@ namespace Compressarr.Application
 
             AppStoppingCancellationToken = lifetime.ApplicationStopping;
 
-            InitialiseFFmpeg = new(() => { });
-            InitialisePresets = new(() => { });
-
         }
 
         public event EventHandler<string> OnBroadcast;
 
         //App Settings
         public CancellationToken AppStoppingCancellationToken { get; set; }
-        
+
         public Dictionary<CodecType, SortedSet<Codec>> Codecs { get; set; }
-        public SortedSet<FFmpegFormat> Formats { get; set; }
+
         public SortedSet<string> DemuxerExtensions { get; set; }
+
         public Dictionary<CodecType, SortedSet<Encoder>> Encoders { get; set; }
+
         public string FFmpegVersion { get; set; }
+
         public HashSet<Filter> Filters { get; set; }
+
+        public SortedSet<FFmpegFormat> Formats { get; set; }
+
         public SortedSet<string> HardwareDecoders { get; set; }
 
+        public List<InitialisationTask> InitialisationSteps { get; set; }
+
         public Task InitialiseFFmpeg { get; set; }
+
         public Task InitialisePresets { get; set; }
+
         public HashSet<Job> Jobs { get; set; }
+
         public IEnumerable<Movie> Movies { get; set; }
+
         public HashSet<FFmpegPreset> Presets { get; set; }
+
         public double Progress { get; set; }
+
         public APISettings RadarrSettings { get; set; }
+
         public IEnumerable<Series> Series { get; set; }
+
         public APISettings SonarrSettings { get; set; }
-        public string State { get; set; }
-        public Queue<string> StateHistory { get; set; } = new();
+
         public void Broadcast(string message) => OnBroadcast?.Invoke(this, message);
+
         public LogLevel GetLogLevel()
         {
             var logSettings = configuration.GetSection("Logging");

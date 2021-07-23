@@ -62,7 +62,7 @@ namespace Compressarr.JobProcessing.Models
         public decimal? MaxCompression { get; set; }
         public decimal? MinSSIM { get; set; }
         [JsonIgnore]
-        public string Name => $"{Filter?.Name}|{PresetName}";
+        public string Name => $"{(Filter?.Name ?? FilterName)}|{PresetName}";
 
         [JsonIgnore]
         public FFmpegPreset Preset { get; internal set; }
@@ -75,7 +75,7 @@ namespace Compressarr.JobProcessing.Models
         [JsonIgnore]
         public JobState State => Condition.Initialise.State switch
         {
-            ConditionState.NotStarted => JobState.New,
+            ConditionState.NotStarted => JobState.Uninitialised,
             ConditionState.Processing => Condition.Test.State switch
             {
                 ConditionState.NotStarted => JobState.Initialising,

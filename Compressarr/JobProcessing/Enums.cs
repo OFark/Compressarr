@@ -8,7 +8,7 @@
         Finished,
         Initialising,
         LoadingMediaInfo,
-        New,
+        Uninitialised,
         Ready,
         Running,
         TestedFail,

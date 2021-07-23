@@ -1,12 +1,13 @@
-﻿using Compressarr.Application;
+﻿using Compressarr.Application.Models;
 using Compressarr.FFmpeg;
-using Compressarr.FFmpeg.Models;
+using Compressarr.Helpers;
 using Compressarr.JobProcessing;
+using Compressarr.JobProcessing.Models;
+using Compressarr.Presets;
 using Compressarr.Presets.Models;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -14,7 +15,7 @@ using System.Threading.Tasks;
 using Xabe.FFmpeg;
 using Xabe.FFmpeg.Downloader;
 
-namespace Compressarr.Presets
+namespace Compressarr.Application
 {
     public class ApplicationInitialiser : IApplicationInitialiser
     {
@@ -27,7 +28,9 @@ namespace Compressarr.Presets
 
         private readonly IJobManager jobManager;
         private readonly ILogger<ApplicationInitialiser> logger;
-        public ApplicationInitialiser(IApplicationService applicationService, IFileService fileService, IJobManager jobManager, ILogger<ApplicationInitialiser> logger, IFFmpegProcessor fFmpegProcessor)
+
+
+        public ApplicationInitialiser(IApplicationService applicationService, IFFmpegProcessor fFmpegProcessor, IFileService fileService, IJobManager jobManager, ILogger<ApplicationInitialiser> logger)
         {
             this.applicationService = applicationService;
             this.fFmpegProcessor = fFmpegProcessor;
@@ -35,8 +38,13 @@ namespace Compressarr.Presets
             this.jobManager = jobManager;
             this.logger = logger;
 
+            applicationService.InitialisationSteps = new();
+
             InitialisationTask = Task.Run(() => InitialiseAsync());
         }
+
+        public event EventHandler<Update> OnUpdate;
+        public event EventHandler OnComplete;
 
         public async Task InitialiseAsync()
         {
@@ -46,123 +54,35 @@ namespace Compressarr.Presets
                 {
                     applicationService.InitialiseFFmpeg = InitialiseFFmpeg();
 
+                    await applicationService.InitialiseFFmpeg;
+
                     applicationService.InitialisePresets = InitialisePresets();
 
-                    Progress("Application Initialisation complete");
+                    await applicationService.InitialisePresets;
+
+                    OnComplete?.Invoke(this, null);
+
+                    logger.LogInformation("Application Initialisation complete");
 
                     if (applicationService.Jobs != null)
                     {
-                        Progress("Initialising Jobs");
+                        logger.LogInformation("Initialising Jobs");
 
                         foreach (var job in applicationService.Jobs.Where(j => !j.Initialised))
                         {
-                            job.StatusUpdate += Job_StatusUpdate;
                             await jobManager.InitialiseJob(job, applicationService.AppStoppingCancellationToken);
-                            job.StatusUpdate -= Job_StatusUpdate;
                         }
-                        Progress("Job Initialisation complete");
+                        logger.LogInformation("Job Initialisation complete");
                     }
 
 
-                    Progress("Ready");
+                    logger.LogInformation("Ready");
                 }
                 catch (Exception ex)
                 {
                     logger.LogError(ex, "Initialisation Error");
                 }
             }
-        }
-
-        private async Task<Dictionary<CodecType, SortedSet<Codec>>> GetAvailableCodecsAsync()
-        {
-            logger.LogDebug($"Get available codecs.");
-
-            var codecs = new Dictionary<CodecType, SortedSet<Codec>>
-            {
-                { CodecType.Audio, new() },
-                { CodecType.Subtitle, new() },
-                { CodecType.Video, new() }
-            };
-
-            var result = await fFmpegProcessor.GetAvailableCodecsAsync(applicationService.AppStoppingCancellationToken);
-
-            if (result.Success)
-            {
-                foreach (var c in result.Results)
-                {
-                    codecs[c.Type].Add(new(c.Name, c.Description, c.IsDecoder, c.IsEncoder));
-                }
-                return codecs;
-            }
-            return null;
-        }
-
-        private async Task<SortedSet<FFmpegFormat>> GetAvailableContainersAsync()
-        {
-            logger.LogDebug($"Get Available Containers.");
-
-            var result = await fFmpegProcessor.GetAvailableFormatsAsync(applicationService.AppStoppingCancellationToken);
-
-            if (result.Success)
-            {
-                return new(result.Results);
-            }
-
-            return null;
-        }
-
-        private async Task<Dictionary<CodecType, SortedSet<Encoder>>> GetAvailableEncodersAsync()
-        {
-            logger.LogDebug($"Get available encoders.");
-
-            var encoders = new Dictionary<CodecType, SortedSet<Encoder>>();
-
-            var result = await fFmpegProcessor.GetAvailableEncodersAsync(applicationService.AppStoppingCancellationToken);
-
-            if (result.Success)
-            {
-                encoders.Add(CodecType.Audio, new());
-                encoders.Add(CodecType.Subtitle, new());
-                encoders.Add(CodecType.Video, new());
-
-                foreach (var e in result.Results)
-                {
-                    encoders[e.Type].Add(new(e.Name, e.Description, await GetOptionsAsync(e.Name)));
-                }
-
-                return encoders;
-            }
-
-            return null;
-        }
-
-        private async Task<SortedSet<string>> GetAvailableHardwareDecodersAsync()
-        {
-            logger.LogDebug($"Get available hardware decoders.");
-
-            var result = await fFmpegProcessor.GetAvailableHardwareDecodersAsync(applicationService.AppStoppingCancellationToken);
-
-            if (result.Success)
-            {
-                return new(result.Results);
-            }
-
-            return null;
-
-        }
-
-        private async Task<SortedSet<string>> GetFFmpegDemuxerExtensions()
-        {
-            logger.LogDebug($"Get FFmpeg demuxer extensions.");
-
-            var result = await fFmpegProcessor.GetFFmpegExtensionsAsync(applicationService.Formats, applicationService.AppStoppingCancellationToken);
-
-            if (result.Success)
-            {
-                return new(result.Results);
-            }
-
-            return null;
         }
 
         private async Task<string> GetFFmpegVersionAsync()
@@ -198,126 +118,244 @@ namespace Compressarr.Presets
 
         private async Task InitialiseFFmpeg()
         {
-            string existingVersion = null;
-
-            Progress("Initialising FFmpeg");
-
-            if (!AppEnvironment.InNvidiaDocker)
+            using (logger.BeginScope("Initialising FFmpeg"))
             {
-                var ffmpegAlreadyExists = fileService.HasFile(fileService.FFMPEGPath);
-                if (!ffmpegAlreadyExists)
-                {
-                    Progress("Downloading FFmpeg");
-                }
-                else
-                {
-                    existingVersion = await GetFFmpegVersionAsync();
-                    Progress("Checking for FFmpeg update");
-                }
+                string existingVersion = null;
 
-                await FFmpegDownloader.GetLatestVersion(FFmpegVersion.Official, fileService.GetAppDirPath(AppDir.FFmpeg), new Progress<ProgressInfo>(ReportFFmpegProgress));
-                logger.LogDebug("FFmpeg latest version check finished.");
+                var downloadStep = new InitialisationTask("Download FFmpeg");
+                applicationService.InitialisationSteps.Add(downloadStep);
 
-                if (!fileService.HasFile(fileService.FFMPEGPath))
+                using (var downloadWorker = new JobWorker(downloadStep.Condition, OnUpdate))
                 {
-                    throw new FileNotFoundException("FFmpeg not found, download must have failed.");
-                }
-
-
-                if (!ffmpegAlreadyExists)
-                {
-                    Progress("FFmpeg finished Downloading ");
-                }
-                else
-                {
-                    if (existingVersion != applicationService.FFmpegVersion && applicationService.FFmpegVersion != null)
+                    if (!AppEnvironment.InNvidiaDocker)
                     {
-                        Progress($"FFmpeg updated to: {applicationService.FFmpegVersion}");
+                        logger.LogDebug("Not Nvidia Docker, checking for existing FFmpeg.");
+
+                        var ffmpegAlreadyExists = fileService.HasFile(fileService.FFMPEGPath);
+                        if (ffmpegAlreadyExists)
+                        {
+                            downloadStep.Name = "Updating FFmpeg";
+                            existingVersion = await GetFFmpegVersionAsync();
+                        }
+
+                        await FFmpegDownloader.GetLatestVersion(FFmpegVersion.Official, fileService.GetAppDirPath(AppDir.FFmpeg),
+                            new Progress<ProgressInfo>((info) =>
+                            {
+                                downloadStep.State = $"Downloading: {((decimal)info.DownloadedBytes / info.TotalBytes).ToPercent().Adorn("%")}";
+                                OnUpdate?.Invoke(this, new());
+                            }
+                        ));
+
+                        logger.LogDebug("FFmpeg latest version check finished.");
+
+                        if (!fileService.HasFile(fileService.FFMPEGPath))
+                        {
+                            downloadWorker.Succeed(false);
+                            SetState(downloadStep, "FFmpeg not found, download must have failed.");
+
+                            return;
+                        }
+
+                        downloadWorker.Succeed();
+
+                        if (!ffmpegAlreadyExists)
+                        {
+                            SetState(downloadStep, "FFmpeg finished Downloading");
+                        }
+                        else
+                        {
+                            applicationService.FFmpegVersion = await GetFFmpegVersionAsync();
+
+                            if (existingVersion != applicationService.FFmpegVersion && applicationService.FFmpegVersion != null)
+                            {
+                                SetState(downloadStep, $"FFmpeg updated to: {applicationService.FFmpegVersion}");
+                            }
+                            else
+                            {
+                                SetState(downloadStep, "FFmpeg already up to date");
+                            }
+                        }
+
+                        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                        {
+                            var chmodStep = new InitialisationTask("CHMOD FFmpeg");
+                            applicationService.InitialisationSteps.Add(chmodStep);
+                            using (var chmodWorker = new JobWorker(chmodStep.Condition, OnUpdate))
+                            {
+                                logger.LogDebug("Running on Linux, CHMOD required");
+                                foreach (var exe in new string[] { fileService.FFMPEGPath, fileService.FFPROBEPath })
+                                {
+                                    await fFmpegProcessor.RunProcess("/bin/bash", $"-c \"chmod +x {exe}\"", applicationService.AppStoppingCancellationToken);
+                                }
+                                chmodWorker.Succeed();
+                            }
+                        }
+                    }
+                    else
+                    {
+                        applicationService.FFmpegVersion = await GetFFmpegVersionAsync();
+                        SetState(downloadStep, $"Nvidia Docker, download not required. Existing Version: {applicationService.FFmpegVersion}");
                     }
                 }
 
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                var codecStep = new InitialisationTask("Get available codecs");
+                applicationService.InitialisationSteps.Add(codecStep);
+                using (var codecWorker = new JobWorker(codecStep.Condition, OnUpdate))
                 {
-                    logger.LogDebug("Running on Linux, CHMOD required");
-                    foreach (var exe in new string[] { fileService.FFMPEGPath, fileService.FFPROBEPath })
+                    logger.LogDebug($"Get available codecs.");
+
+                    var codecs = new Dictionary<CodecType, SortedSet<Codec>>
+                        {
+                            { CodecType.Audio, new() },
+                            { CodecType.Subtitle, new() },
+                            { CodecType.Video, new() }
+                        };
+
+                    var result = await fFmpegProcessor.GetAvailableCodecsAsync(applicationService.AppStoppingCancellationToken);
+
+                    if (result.Success)
                     {
-                        await fFmpegProcessor.RunProcess("/bin/bash", $"-c \"chmod +x {exe}\"", applicationService.AppStoppingCancellationToken);
+                        foreach (var c in result.Results)
+                        {
+                            codecs[c.Type].Add(new(c.Name, c.Description, c.IsDecoder, c.IsEncoder));
+                        }
+                        applicationService.Codecs = codecs;
+                        codecWorker.Succeed();
+                        SetState(codecStep, $"Codecs loaded: {applicationService.Codecs.Sum(x => x.Value.Count)}");
+                    }
+                }
+
+                var formatStep = new InitialisationTask("Get available formats");
+                applicationService.InitialisationSteps.Add(formatStep);
+                using (var formatWorker = new JobWorker(formatStep.Condition, OnUpdate))
+                {
+                    logger.LogDebug($"Get available formats.");
+
+                    var result = await fFmpegProcessor.GetAvailableFormatsAsync(applicationService.AppStoppingCancellationToken);
+
+                    if (result.Success)
+                    {
+                        applicationService.Formats = new(result.Results);
+                        formatWorker.Succeed();
+                        SetState(formatStep, $"Containers loaded: {applicationService.Formats.Count}");
+                    }
+                }
+
+                var decoderStep = new InitialisationTask("Get available hardware decoders");
+                applicationService.InitialisationSteps.Add(decoderStep);
+                using (var decoderWorker = new JobWorker(decoderStep.Condition, OnUpdate))
+                {
+                    logger.LogDebug($"Get available hardware decoders.");
+
+                    var result = await fFmpegProcessor.GetAvailableHardwareDecodersAsync(applicationService.AppStoppingCancellationToken);
+
+                    if (result.Success)
+                    {
+                        applicationService.HardwareDecoders = new(result.Results);
+                        decoderWorker.Succeed();
+                        SetState(decoderStep, $"Hardware decoders loaded: {applicationService.HardwareDecoders.Count}");
+                    }
+                }
+
+                var encoderStep = new InitialisationTask("Get available encoders");
+                applicationService.InitialisationSteps.Add(encoderStep);
+                using (var encoderWorker = new JobWorker(encoderStep.Condition, OnUpdate))
+                {
+                    logger.LogDebug($"Get available encoders.");
+
+                    var encoders = new Dictionary<CodecType, SortedSet<Encoder>>();
+
+                    var result = await fFmpegProcessor.GetAvailableEncodersAsync(applicationService.AppStoppingCancellationToken);
+
+                    if (result.Success)
+                    {
+                        encoders.Add(CodecType.Audio, new());
+                        encoders.Add(CodecType.Subtitle, new());
+                        encoders.Add(CodecType.Video, new());
+
+                        foreach (var e in result.Results)
+                        {
+                            encoders[e.Type].Add(new(e.Name, e.Description, await GetOptionsAsync(e.Name)));
+                        }
+                        applicationService.Encoders = encoders;
+                        encoderWorker.Succeed();
+                        SetState(encoderStep, $"Encoders loaded: {applicationService.Encoders.Sum(x => x.Value.Count)}");
+                    }
+
+                }
+
+                var demuxerStep = new InitialisationTask("Get available demuxer extensions");
+                applicationService.InitialisationSteps.Add(demuxerStep);
+                using (var demuxerWorker = new JobWorker(demuxerStep.Condition, OnUpdate))
+                {
+                    logger.LogDebug($"Get FFmpeg demuxer extensions.");
+
+                    var result = await fFmpegProcessor.GetFFmpegExtensionsAsync(applicationService.Formats, applicationService.AppStoppingCancellationToken);
+                    if (result.Success)
+                    {
+                        applicationService.DemuxerExtensions = new(result.Results);
+
+                        demuxerWorker.Succeed();
+                        SetState(demuxerStep, $"Demuxer extensions loaded: {applicationService.DemuxerExtensions.Count}");
                     }
                 }
             }
-            else
-            {
-                Progress("Nvidia Docker, skipping FFMpeg download");
-            }
-
-            var versionLoader = GetFFmpegVersionAsync();
-            var codecLoader = GetAvailableCodecsAsync();
-            var formatLoader = GetAvailableContainersAsync();
-            var decoderLoader = GetAvailableHardwareDecodersAsync();
-            var encoderLoader = GetAvailableEncodersAsync();
-
-            applicationService.FFmpegVersion = await versionLoader;
-            applicationService.Codecs = await codecLoader;
-            applicationService.Formats = await formatLoader;
-            applicationService.Encoders = await encoderLoader;
-            applicationService.HardwareDecoders = await decoderLoader;
-
-            applicationService.DemuxerExtensions = await GetFFmpegDemuxerExtensions();
-
-            Progress("FFmpeg Initialisation complete");
         }
 
         private async Task InitialisePresets()
         {
-            await applicationService.InitialiseFFmpeg;
             using (logger.BeginScope("Initialising Presets"))
             {
-                Progress("Initialising Presets");
+                logger.LogInformation("Initialising Presets");
                 if (applicationService.Presets != null)
                 {
-                    foreach (var preset in applicationService.Presets.Where(p => !p.Initialised))
+                    var presetStep = new InitialisationTask("Initialise presets");
+                    applicationService.InitialisationSteps.Add(presetStep);
+                    using (var presetsWorker = new JobWorker(presetStep.Condition, OnUpdate))
                     {
-                        var encoder = applicationService.Encoders[CodecType.Video].FirstOrDefault(c => c.Name == preset.VideoEncoder.Name);
-                        if (encoder != null)
-                        {
-                            preset.VideoEncoder = encoder;
-                        }
+                        logger.LogDebug($"Initialise presets");
 
-                        foreach (var audioPreset in preset.AudioStreamPresets)
+
+
+                        await applicationService.Presets.Where(p => !p.Initialised).AsyncParallelForEach(preset =>
                         {
-                            if (audioPreset?.Encoder != null)
+                            return Task.Run(() =>
                             {
-                                var audioEncoder = applicationService.Encoders[CodecType.Audio].FirstOrDefault(c => c.Name == audioPreset.Encoder.Name);
-                                if (audioEncoder != null)
+                                var encoder = applicationService.Encoders[CodecType.Video].FirstOrDefault(c => c.Name == preset.VideoEncoder.Name);
+                                if (encoder != null)
                                 {
-                                    audioPreset.Encoder = audioEncoder;
+                                    preset.VideoEncoder = encoder;
                                 }
-                            }
-                        }
 
-                        preset.Initialised = true;
+                                foreach (var audioPreset in preset.AudioStreamPresets)
+                                {
+                                    if (audioPreset?.Encoder != null)
+                                    {
+                                        var audioEncoder = applicationService.Encoders[CodecType.Audio].FirstOrDefault(c => c.Name == audioPreset.Encoder.Name);
+                                        if (audioEncoder != null)
+                                        {
+                                            audioPreset.Encoder = audioEncoder;
+                                        }
+                                    }
+                                }
+
+                                preset.Initialised = true;
+                                SetState(presetStep, $"Presets initialised: {applicationService.Presets.Count(p => p.Initialised)}/{applicationService.Presets.Count()}");
+                                OnUpdate?.Invoke(this, null);
+                            });
+                        });
+
+
+                        presetsWorker.Succeed();
                     }
                 }
             }
         }
 
-        private void Job_StatusUpdate(object sender, EventArgs e)
+        private void SetState(InitialisationTask task, string state)
         {
-            applicationService.Progress = (double)100 * jobManager.Jobs.Sum(j => j.WorkLoad?.Count(x => x.Arguments != null) ?? 0) / jobManager.Jobs.Sum(j => j.WorkLoad?.Count ?? 1);
-            applicationService.Broadcast("");
-        }
-
-        private void Progress(string message)
-        {
-            applicationService.StateHistory.Enqueue(message);
-            applicationService.State = message;
-            logger.LogInformation(message);
-            applicationService.Broadcast(message);
-        }
-        private void ReportFFmpegProgress(ProgressInfo info)
-        {
-            applicationService.Progress = 100 * info.DownloadedBytes / info.TotalBytes;
-            applicationService.Broadcast("");
+            task.State = state;
+            logger.LogInformation(state);
         }
     }
 }

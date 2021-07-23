@@ -21,5 +21,6 @@ namespace Compressarr.FFmpeg
         Task<ProcessResponse> RunProcess(string filePath, string arguments, CancellationToken token, FFmpegProgressEvent OnProgress = null, FFmpegSSIMReportEvent OnSSIM = null);
         Task<ProcessResponse> RunProcess(FFProcess process, string arguments, CancellationToken token, FFmpegProgressEvent OnProgress = null, FFmpegSSIMReportEvent OnSSIM = null);
         Task<FFResult<string>> GetFFmpegExtensionsAsync(IEnumerable<FFmpegFormat> formats, CancellationToken token);
+        Task<IEnumerable<string>> GetValues(IEnumerable<FFmpegFormat> values, CancellationToken token);
     }
 }

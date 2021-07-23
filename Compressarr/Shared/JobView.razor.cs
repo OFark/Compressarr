@@ -6,6 +6,7 @@ using Compressarr.JobProcessing;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Pages.Services;
 using Compressarr.Presets;
+using Humanizer;
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
 using System;
@@ -38,7 +39,7 @@ namespace Compressarr.Shared
         private Color ButtonColour =>
             Job.Condition.SafeToRun ? Color.Primary : Job.Condition.SafeToInitialise ? Color.Secondary : Job.State == JobState.Error ? Color.Error : Color.Warning;
 
-        private string ButtonText => (mouseOnButton ? Job.Condition.SafeToRun ? "Go!" : Job.Condition.SafeToInitialise ? "Initialise" : Job.Condition.CanCancel ? "Cancel" : null : null) ?? Job.State.ToString().ToCamelCaseSplit();
+        private string ButtonText => (mouseOnButton ? Job.Condition.SafeToRun ? "Go!" : Job.Condition.SafeToInitialise ? "Initialise" : Job.Condition.CanCancel ? "Cancel" : null : null) ?? Job.State.ToString().Humanize(LetterCasing.Title);
         [Inject] IDialogService DialogService { get; set; }
         private bool Editing => editJob || NewJob;
         [Inject] IFFmpegProcessor FFmpegProcessor { get; set; }
