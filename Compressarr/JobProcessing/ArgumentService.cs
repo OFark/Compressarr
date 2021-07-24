@@ -200,7 +200,7 @@ namespace Compressarr.JobProcessing
             var hardwareDecoder = preset.HardwareDecoder.Wrap("-hwaccel {0} ");
 
             var opArgsStr = firstPass ?
-               $" -an -f null {(RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "NUL" : @"/dev/null")}" :
+               "" :
                string.IsNullOrWhiteSpace(preset.OptionalArguments) ? "" : $" {preset.OptionalArguments.Trim()}";
 
             var bitrate = (argCalc.Preset.VideoBitRateAutoCalc ? (argCalc.VideoBitRateCalculator.CurrentBitrate / 1000) : preset.VideoBitRate).Wrap(" -b:v {0}k");
@@ -211,11 +211,11 @@ namespace Compressarr.JobProcessing
             var colorPrimaries = argCalc.ColorPrimaries.Wrap(" -color_primaries {0}");
             var colorTransfer = argCalc.ColorTransfer.Wrap(" -color_trc {0}");
 
-            var globalVideoArgs = firstPass ? "" : $"{bitrate}{frameRate}{bframes}{colorPrimaries}{colorTransfer}{passStr}";
+            var globalVideoArgs = firstPass ? passStr : $"{bitrate}{frameRate}{bframes}{colorPrimaries}{colorTransfer}{passStr}";
 
             var mapAllElse = firstPass ? "" : " -map 0:s? -c:s copy -map 0:t? -map 0:d? -movflags use_metadata_tags";
 
-            var outputFile = firstPass ? "" : " \"{1}\"";
+            var outputFile = firstPass ? $" -an -f null {(RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "NUL" : @"/dev/null")}" : " \"{1}\"";
 
             return $"{hardwareDecoder}-y -i \"{{0}}\" {videoArguments}{opArgsStr}{globalVideoArgs}{audioArguments}{mapAllElse}{outputFile}";
         }
