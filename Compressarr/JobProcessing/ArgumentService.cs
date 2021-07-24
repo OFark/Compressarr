@@ -526,89 +526,109 @@ namespace Compressarr.JobProcessing
             List<decimal> speeds = new();
             List<decimal> ssims = new();
 
-            foreach (var sampleFile in sampleFiles)
+            try
             {
-                var sampleFileIndex = sampleFiles.IndexOf(sampleFile);
 
-                var tempEncFile = Path.Combine(fileService.TempDir, $"encFile.{preset.ContainerExtension}");
-
-                if (token.IsCancellationRequested) return;
-
-                wi.Update();
-
-                var args = GetArguments(wi, sampleFile, tempEncFile);
-
-                logger.LogInformation($"Trying: {string.Join("\r\n", args)}");
-
-                var storedResult = await historyService.GetAutoCalcResult(wi.Media.FFProbeMediaInfo.GetStableHash(), string.Join("|", args), wi.Job.ArgumentCalculationSettings.ArgCalcSampleSeconds);
-
-                if (storedResult != null && (!(wi.Job.ArgumentCalculationSettings.AutoCalculationType is AutoCalcType.BySpeed or AutoCalcType.Balanced or AutoCalcType.WeightedForCompression or AutoCalcType.WeightedForSpeed or AutoCalcType.WeightedForSSIM) || storedResult.Speed > 0))
+                foreach (var sampleFile in sampleFiles)
                 {
-                    compressions.Add((decimal)storedResult.Size / storedResult.OriginalSize);
-                    speeds.Add(storedResult.Speed);
-                    ssims.Add(storedResult.SSIM);
+                    var sampleFileIndex = sampleFiles.IndexOf(sampleFile);
 
-                    logger.LogDebug($"SSIM: {storedResult.SSIM}, Size: {storedResult.Size.ToFileSize()} {Math.Round((decimal)storedResult.Size / storedResult.OriginalSize * 100M, 2).Adorn("%")}");
-                }
-                else
-                {
-                    wi.ArgumentCalculator.GenSamplesTask ??= processManager.GenerateSamples(sampleFiles, wi, token);
-                    await wi.ArgumentCalculator.GenSamplesTask;
-
-                    var origSize = new FileInfo(sampleFile).Length;
-
-                    logger.LogInformation($"Testing sample encode with: {string.Join("\r\n", args)}");
-
-                    decimal tSpeed = 0;
-                    foreach (var arg in args)
-                    {
-                        await processManager.EncodeAVideo((sender, args) =>
-                        {
-                            if (FFmpegProgress.TryParse(args.Data, out var progress)) test.Speed = tSpeed = progress.Speed;
-                        }
-                        , (sender, args) =>
-                        {
-                            test.EncodingProgress = (args.Percent / sampleFiles.Count) + (100D / sampleFiles.Count * sampleFileIndex);
-                            wi.Update();
-                        }, arg, token);
-                    }
-
-                    test.EncodingProgress = 100D / sampleFiles.Count * (sampleFileIndex + 1);
-
-                    speeds.Add(tSpeed);
+                    var tempEncFile = Path.Combine(fileService.TempDir, $"encFile.{preset.ContainerExtension}");
 
                     if (token.IsCancellationRequested) return;
 
-                    var size = new FileInfo(tempEncFile).Length;
-                    compressions.Add((decimal)size / origSize);
                     wi.Update();
 
-                    var hardwareDecoder = preset.HardwareDecoder.Wrap("-hwaccel {0} ");
+                    var args = GetArguments(wi, sampleFile, tempEncFile);
 
-                    var ssimResult = await fFmpegProcessor.CalculateSSIM((args) =>
+                    logger.LogInformation($"Trying: {string.Join("\r\n", args)}");
+
+                    var storedResult = await historyService.GetAutoCalcResult(wi.Media.FFProbeMediaInfo.GetStableHash(), string.Join("|", args), wi.Job.ArgumentCalculationSettings.ArgCalcSampleSeconds);
+
+                    if (storedResult != null && (!(wi.Job.ArgumentCalculationSettings.AutoCalculationType is AutoCalcType.BySpeed or AutoCalcType.Balanced or AutoCalcType.WeightedForCompression or AutoCalcType.WeightedForSpeed or AutoCalcType.WeightedForSSIM) || storedResult.Speed > 0))
                     {
-                        test.SSIMProgress = (args.Percentage / sampleFiles.Count) + (100D / sampleFiles.Count * sampleFileIndex);
-                        wi.Update();
-                    }, sampleFile, tempEncFile, hardwareDecoder, token);
+                        compressions.Add((decimal)storedResult.Size / storedResult.OriginalSize);
+                        speeds.Add(storedResult.Speed);
+                        ssims.Add(storedResult.SSIM);
 
-                    test.SSIMProgress = 100D / sampleFiles.Count * (sampleFileIndex + 1);
-
-                    if (ssimResult.Success)
-                    {
-                        ssims.Add(ssimResult.SSIM);
-                        logger.LogDebug($"SSIM: {ssimResult.SSIM}, Size: {size.ToFileSize()} {Math.Round((decimal)size / origSize * 100M, 2).Adorn("%")}");
-                        StoreAutoCalcResults(wi.Media.UniqueID, wi.Media.FFProbeMediaInfo.GetStableHash(), string.Join("|", args), ssimResult.SSIM, size, origSize, tSpeed, wi.Job.ArgumentCalculationSettings.ArgCalcSampleSeconds);
+                        logger.LogDebug($"SSIM: {storedResult.SSIM}, Size: {storedResult.Size.ToFileSize()} {Math.Round((decimal)storedResult.Size / storedResult.OriginalSize * 100M, 2).Adorn("%")}");
                     }
+                    else
+                    {
+                        wi.ArgumentCalculator.GenSamplesTask ??= processManager.GenerateSamples(sampleFiles, wi, token);
+                        await wi.ArgumentCalculator.GenSamplesTask;
+
+                        var origSize = new FileInfo(sampleFile).Length;
+
+                        logger.LogInformation($"Testing sample encode with: {string.Join("\r\n", args)}");
+
+                        decimal tSpeed = 0;
+                        foreach (var arg in args)
+                        {
+                            var result = await processManager.EncodeAVideo((sender, args) =>
+                            {
+                                if (FFmpegProgress.TryParse(args.Data, out var progress)) test.Speed = tSpeed = progress.Speed;
+                            }
+                            , (sender, args) =>
+                            {
+                                test.EncodingProgress = (args.Percent / sampleFiles.Count) + (100D / sampleFiles.Count * sampleFileIndex);
+                                wi.Update();
+                            }, arg, token);
+
+                            if (!result.Success)
+                            {
+                                wi.Update(Update.FromException(result.Exception));
+                                return;
+                            }
+                        }
+
+                        test.EncodingProgress = 100D / sampleFiles.Count * (sampleFileIndex + 1);
+
+                        speeds.Add(tSpeed);
+
+                        if (token.IsCancellationRequested) return;
+
+                        if (File.Exists(tempEncFile))
+                        {
+                            var size = new FileInfo(tempEncFile).Length;
+                            compressions.Add((decimal)size / origSize);
+
+                            wi.Update();
+
+                            var hardwareDecoder = preset.HardwareDecoder.Wrap("-hwaccel {0} ");
+
+                            var ssimResult = await fFmpegProcessor.CalculateSSIM((args) =>
+                            {
+                                test.SSIMProgress = (args.Percentage / sampleFiles.Count) + (100D / sampleFiles.Count * sampleFileIndex);
+                                wi.Update();
+                            }, sampleFile, tempEncFile, hardwareDecoder, token);
+
+                            test.SSIMProgress = 100D / sampleFiles.Count * (sampleFileIndex + 1);
+
+                            if (ssimResult.Success)
+                            {
+                                ssims.Add(ssimResult.SSIM);
+                                logger.LogDebug($"SSIM: {ssimResult.SSIM}, Size: {size.ToFileSize()} {Math.Round((decimal)size / origSize * 100M, 2).Adorn("%")}");
+                                StoreAutoCalcResults(wi.Media.UniqueID, wi.Media.FFProbeMediaInfo.GetStableHash(), string.Join("|", args), ssimResult.SSIM, size, origSize, tSpeed, wi.Job.ArgumentCalculationSettings.ArgCalcSampleSeconds);
+                            }
+                        }
+                        else
+                        {
+                            wi.Update(Update.Error("FFmpeg test output file not found. Best guess - FFmpeg failed to encode the sample, check the log for FFmpeg errors"));
+                        }
+                    }
+
+                    if (File.Exists(tempEncFile)) File.Delete(tempEncFile);
                 }
 
-                if (File.Exists(tempEncFile)) File.Delete(tempEncFile);
+                test.Compression = compressions.Any() ? compressions.Average() : default;
+                test.Speed = speeds.Any() ? speeds.Max() : default;
+                test.SSIM = ssims.Any() ? ssims.Average() : default;
             }
-
-            test.Compression = compressions.Any() ? compressions.Average() : default;
-            test.Speed = speeds.Any() ? speeds.Max() : default;
-            test.SSIM = ssims.Any() ? ssims.Average() : default;
-
-            test.Processing = false;
+            finally
+            {
+                test.Processing = false;
+            }
         }
     }
 }
