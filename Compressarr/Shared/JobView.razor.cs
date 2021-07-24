@@ -55,7 +55,7 @@ namespace Compressarr.Shared
         {
             get
             {
-                return Job.FilterID != default ? Job.FilterID.ToString() : showFolderSource ? "folder" : default;
+                return Job.FilterID != default ? Job.FilterID.ToString() : "folder";
             }
             set
             {
@@ -210,6 +210,8 @@ namespace Compressarr.Shared
             if (NewJob) Job.ArgumentCalculationSettings ??= new();
             Job.StatusUpdate += JobStatusUpdate;
             Job.InitialisationProgress = new Progress<double>(JobProgress);
+
+            showFolderSource = JobFilterID == "folder";
         }
         private void CancelProcessing(WorkItem wi)
         {
