@@ -10,10 +10,10 @@
 
         @foreach (var preset in PresetManager.Presets)
         {
-            <PresetView preset="preset" />
+            <PresetView Preset="preset" />
 
         }
-        <PresetView preset="@newPreset" NewPreset="true" OnAdd="addPreset"></PresetView>
+        <PresetView Preset="@newPreset" NewPreset="true" OnAdd="addPreset"></PresetView>
     </MudExpansionPanels>
 }
 else

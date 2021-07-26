@@ -1,8 +1,4 @@
-﻿@inject IApplicationService ApplicationService
-@inject IPresetManager PresetManager
-@inject IDialogService DialogService
-@inject ILayoutService LayoutService
-@inject IJobManager JobManager
+﻿
 
 <MudExpansionPanel Class="job">
     <TitleContent>
@@ -18,7 +14,7 @@
             {
                 <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/76/FFmpeg_icon.svg/1024px-FFmpeg_icon.svg.png" style="width: 40px; height: auto; vertical-align: middle; margin-right: 12px;" />
                 @*<MudAvatar Rounded="true" Image="https://upload.wikimedia.org/wikipedia/commons/thumb/7/76/FFmpeg_icon.svg/1024px-FFmpeg_icon.svg.png" Style="vertical-align: middle;" Class="mr-3" />*@
-                @:@preset.ToString()
+                @:@Preset.ToString()
             }
         </MudText>
     </TitleContent>
@@ -26,8 +22,8 @@
         <MudCard Class="mb-3">
             <CardHeader Title="Preset" HelpURL="https://github.com/OFark/Compressarr/wiki/FFmpeg"></CardHeader>
             <MudCardContent>
-                <MudTextField @bind-Value="preset.Name" Label="Name" Class="mb-2" />
-                <MudSelect @bind-Value="preset.Container" Label="Container" OffsetY="true" T="string" Strict="true" Class="mb-2">
+                <MudTextField @bind-Value="Preset.Name" Label="Name" Class="mb-2" />
+                <MudSelect @bind-Value="Preset.Container" Label="Container" OffsetY="true" T="string" Strict="true" Class="mb-2">
                     <MudSelectItem Value="@("copy")">copy - No change</MudSelectItem>
                     <MudDivider />
                     @foreach (var c in PresetManager.Containers)
@@ -42,7 +38,7 @@
                 <MudCard Class="my-2">
                     <CardHeader Title="Video" HelpURL="https://github.com/OFark/Compressarr/wiki/FFmpeg#video"></CardHeader>
                     <MudCardContent>
-                        <MudSelect @bind-Value="preset.VideoEncoder" Label="Video Encoder" OffsetY="true" T="Encoder" Immediate="true" Class="">
+                        <MudSelect @bind-Value="Preset.VideoEncoder" Label="Video Encoder" OffsetY="true" T="Encoder" Immediate="true" Class="">
                             <MudSelectItem T="Encoder" Value="@(new ())" />
                             <MudDivider />
                             @foreach (var c in PresetManager.VideoEncoders.Where(x => x.Options != null))
@@ -60,18 +56,18 @@
                                 <MudSelectItem Value="@c" />
                             }
                         </MudSelect>
-                        <MudSelect @bind-Value="preset.HardwareDecoder" Clearable="true" Label="Hardware Decoder" OffsetY="true" T="string" Immediate="true" Class="mt-3">
+                        <MudSelect @bind-Value="Preset.HardwareDecoder" Clearable="true" Label="Hardware Decoder" OffsetY="true" T="string" Immediate="true" Class="mt-3">
                             @foreach (var hwd in ApplicationService.HardwareDecoders)
                             {
                                 <MudSelectItem Value="@hwd" />
                             }
                         </MudSelect>
                         <MudToolBar DisableGutters="true" Dense="true" Class="mt-3">
-                            <MudNumericField @bind-Value="preset.VideoBitRate" Label="Video Bitrate" Disabled="@(disabledNoVideo || preset.VideoBitRateAutoCalc)" />
-                            <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" Disabled="@disabledNoVideo" ToggledColor="Color.Secondary" Toggled="preset.VideoBitRateAutoCalc" ToggledChanged="@((toggled) => { preset.VideoBitRate = null; preset.VideoBitRateAutoCalc = toggled; })" />
+                            <MudNumericField @bind-Value="Preset.VideoBitRate" Label="Video Bitrate" Disabled="@(DisabledNoVideo || Preset.VideoBitRateAutoCalc)" />
+                            <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" Disabled="@DisabledNoVideo" ToggledColor="Color.Secondary" Toggled="Preset.VideoBitRateAutoCalc" ToggledChanged="@((toggled) => { Preset.VideoBitRate = null; Preset.VideoBitRateAutoCalc = toggled; })" />
                         </MudToolBar>
-                        <MudNumericField @bind-Value="preset.FrameRate" Label="Framerate" Placeholder="Same as source" Disabled="@disabledNoVideo" Class="mt-3" />
-                        <MudSelect @bind-Value="preset.B_Frames" Label="B Frames" Disabled="@disabledNoVideo" Class="mt-3">
+                        <MudNumericField @bind-Value="Preset.FrameRate" Label="Framerate" Placeholder="Same as source" Disabled="@DisabledNoVideo" Class="mt-3" />
+                        <MudSelect @bind-Value="Preset.B_Frames" Label="B Frames" Disabled="@DisabledNoVideo" Class="mt-3">
                             <MudSelectItem Value="-1">Auto</MudSelectItem>
                             <MudSelectItem Value="0">Disabled</MudSelectItem>
                             <MudSelectItem Value="1"></MudSelectItem>
@@ -93,12 +89,12 @@
                         </MudSelect>
                     </MudCardContent>
                 </MudCard>
-                @if (preset.VideoEncoder != null && !preset.VideoEncoder.IsCopy && preset.VideoEncoderOptions != null)
+                @if (Preset.VideoEncoder != null && !Preset.VideoEncoder.IsCopy && Preset.VideoEncoderOptions != null)
                 {
                     <MudCard Class="my-2">
                         <CardHeader Title="Additional codec based options" HelpURL="https://github.com/OFark/Compressarr/wiki/FFmpeg#additional-codec-based-options"></CardHeader>
                         <MudCardContent>
-                            @foreach (var option in preset.VideoEncoderOptions)
+                            @foreach (var option in Preset.VideoEncoderOptions)
                             {
                                 @if (option?.EncoderOption == null)
 
@@ -117,19 +113,19 @@
 
                                                     @if (option.EncoderOption.AutoTune != null)
                                                     {
-                                                        <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" Disabled="option.EncoderOption.DisabledByVideoBitRate && disabledVideoBitrate" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.IntValue = null; option.AutoCalculate = toggled; })" />
+                                                        <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" Disabled="option.EncoderOption.DisabledByVideoBitRate && DisabledVideoBitrate" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.IntValue = null; option.AutoCalculate = toggled; })" />
                                                     }
                                                 </MudToolBar>
                                             }
                                             break;
                                         case Presets.CodecOptionType.Range:
                                             {
-                                                <MudSlider @bind-Value="@option.IntValue" T="int?" Max="@option.EncoderOption.Max" Min="option.EncoderOption.Min" Immediate="true" Disabled="@(option.AutoCalculate || (option.EncoderOption.DisabledByVideoBitRate && disabledVideoBitrate))">
+                                                <MudSlider @bind-Value="@option.IntValue" T="int?" Max="@option.EncoderOption.Max" Min="option.EncoderOption.Min" Immediate="true" Disabled="@(option.AutoCalculate || (option.EncoderOption.DisabledByVideoBitRate && DisabledVideoBitrate))">
                                                     @option.Name: @option.Value
                                                     <MudIconButton Size="Size.Small" Icon="@Icons.Outlined.Clear" OnClick="@(() => { option.IntValue = null; })" Disabled="@(option.AutoCalculate)" />
                                                     @if (option.EncoderOption.AutoTune != null)
                                                     {
-                                                        <MudToggleIconButton Size="Size.Small" Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" Disabled="option.EncoderOption.DisabledByVideoBitRate && disabledVideoBitrate" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.Value = null; option.AutoCalculate = toggled; })" />
+                                                        <MudToggleIconButton Size="Size.Small" Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" Disabled="option.EncoderOption.DisabledByVideoBitRate && DisabledVideoBitrate" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.Value = null; option.AutoCalculate = toggled; })" />
                                                     }
                                                 </MudSlider>
 
@@ -146,7 +142,7 @@
                                                     </MudSelect>
                                                     @if (option.EncoderOption.AutoTune != null)
                                                     {
-                                                        <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" Disabled="option.EncoderOption.DisabledByVideoBitRate && disabledVideoBitrate" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.Value = null; option.AutoCalculate = toggled; })" />
+                                                        <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" Disabled="option.EncoderOption.DisabledByVideoBitRate && DisabledVideoBitrate" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.Value = null; option.AutoCalculate = toggled; })" />
                                                     }
                                                 </MudToolBar>
                                             }
@@ -158,7 +154,7 @@
 
                                                     @if (option.EncoderOption.AutoTune != null)
                                                     {
-                                                        <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" Disabled="option.EncoderOption.DisabledByVideoBitRate && disabledVideoBitrate" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.Value = null; option.AutoCalculate = toggled; })" />
+                                                        <MudToggleIconButton Icon="@Icons.Outlined.Calculate" ToggledIcon="@Icons.Outlined.Calculate" Color="Color.Default" Disabled="option.EncoderOption.DisabledByVideoBitRate && DisabledVideoBitrate" ToggledColor="Color.Secondary" Toggled="option.AutoCalculate" ToggledChanged="@((toggled) => { option.Value = null; option.AutoCalculate = toggled; })" />
                                                     }
                                                 </MudToolBar>
                                             }
@@ -174,113 +170,44 @@
                 <MudCard>
                     <CardHeader Title="Audio" HelpURL="https://github.com/OFark/Compressarr/wiki/FFmpeg#audio" />
                     <MudCardContent>
-                        @foreach (var fasp in preset.AudioStreamPresets)
+                        @foreach (var fasp in Preset.AudioStreamPresets)
                         {
                             <AudioPreset AudioStreamPreset="@fasp" OnUpdate="AudioPresetUpdate" OnCopy="CopyAudioStreamPreset" />
                         }
                     </MudCardContent>
                 </MudCard>
             </MudItem>
+            <MudItem md="6">
+                <MudCard>
+                    <CardHeader Title="Other" HelpURL="https://github.com/OFark/Compressarr/wiki/FFmpeg#other" />
+                    <MudCardContent>
+                        <MudSwitch @bind-Checked="@Preset.CopySubtitles" Color="Color.Secondary" Label="Copy Subtitles" />
+                        <MudSwitch @bind-Checked="@Preset.CopyAttachments" Color="Color.Secondary" Label="Copy Attachments" />
+                        <MudSwitch @bind-Checked="@Preset.CopyData" Color="Color.Secondary" Label="Copy Data" />
+                        <MudSwitch @bind-Checked="@Preset.CopyMetadata" Color="Color.Secondary" Label="Copy Metadata" />
+
+                        <MudSelect @bind-Value="Preset.SubtitleEncoder" Label="Subtitle Encoder" OffsetY="true" T="Encoder" Immediate="true" Class="" Disabled="@(!Preset.CopySubtitles)">
+                            <MudSelectItem T="Encoder" Value="@(new ())" />
+                            <MudDivider />
+                            @foreach (var c in PresetManager.SubtitleEncoders)
+                            {
+                                <MudSelectItem Value="@c">@c.ToString()</MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        <MudTextField @bind-Value="Preset.OptionalArguments" Label="Additional arguments" Class="mb-2" />
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
         </MudGrid>
 
-        <MudTextField @bind-Value="preset.OptionalArguments" Label="Additional arguments" Class="mb-2" />
-
         <MudCardActions>
-            <MudButton OnClick="savePreset" Color="Color.Primary" StartIcon="@Icons.Outlined.Save" Class="mr-3">Save</MudButton>
+            <MudButton OnClick="SavePreset" Color="Color.Primary" StartIcon="@Icons.Outlined.Save" Class="mr-3">Save</MudButton>
             @if (!NewPreset)
             {
                 <MudSpacer />
-                <MudButton OnClick="deletePreset" Color="Color.Error" StartIcon="@Icons.Outlined.Delete" Disabled="@JobManager.PresetInUse(preset)">Delete</MudButton>
+                <MudButton OnClick="DeletePreset" Color="Color.Error" StartIcon="@Icons.Outlined.Delete" Disabled="@JobManager.PresetInUse(Preset)">Delete</MudButton>
             }
         </MudCardActions>
     </ChildContent>
 </MudExpansionPanel>
-
-@code {
-    [Parameter]
-    public FFmpegPreset preset { get; set; }
-
-    [Parameter]
-    public bool NewPreset { get; set; }
-
-    [Parameter]
-    public EventCallback OnAdd { get; set; }
-
-    private bool disabledNoVideo => preset.VideoEncoder?.IsCopy ?? true;
-    private bool disabledVideoBitrate => preset.VideoBitRate.HasValue || preset.VideoBitRateAutoCalc;
-
-    protected override void OnInitialized()
-    {
-        LayoutService.OnStateChanged += (o, e) => InvokeAsync(StateHasChanged);
-        base.OnInitialized();
-    }
-
-    private void AudioPresetUpdate()
-    {
-        var firstCoverAny = preset.AudioStreamPresets.FirstOrDefault(f => f.CoversAny);
-
-        if (firstCoverAny == null)
-        {
-            preset.AudioStreamPresets.Add(new());
-        }
-        else
-        {
-            if (firstCoverAny != preset.AudioStreamPresets.Last())
-            {
-                var indexofRemoval = preset.AudioStreamPresets.IndexOf(firstCoverAny) + 1;
-                preset.AudioStreamPresets.RemoveRange(indexofRemoval, preset.AudioStreamPresets.Count() - indexofRemoval);
-            }
-        }
-        InvokeAsync(StateHasChanged);
-    }
-
-    private void CopyAudioStreamPreset(FFmpegAudioStreamPreset asPreset)
-    {
-        var index = preset.AudioStreamPresets.IndexOf(asPreset);
-
-        if (index >= 0)
-        {
-            var clone = asPreset.Clone();
-            preset.AudioStreamPresets.Insert(index, clone);
-            InvokeAsync(StateHasChanged);
-        }
-    }
-
-    private async void savePreset()
-    {
-        using (LayoutService.Working("Saving..."))
-        {
-
-            await PresetManager.AddPresetAsync(preset);
-
-            JobManager.InitialiseJobs(preset, ApplicationService.AppStoppingCancellationToken);
-
-            if (OnAdd.HasDelegate)
-            {
-                await OnAdd.InvokeAsync();
-            }
-
-            LayoutService.RaiseChange();
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-
-    private async void deletePreset()
-    {
-        using (LayoutService.Working("Deleting..."))
-        {
-
-            bool? result = await DialogService.ShowMessageBox(
-            "Warning",
-            "Deleting can not be undone!",
-            yesText: "Delete!", cancelText: "Cancel");
-
-            if (result ?? false)
-            {
-                await PresetManager.DeletePresetAsync(preset);
-                LayoutService.RaiseChange();
-            }
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-}

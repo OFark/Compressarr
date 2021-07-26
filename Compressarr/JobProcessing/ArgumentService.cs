@@ -213,7 +213,11 @@ namespace Compressarr.JobProcessing
 
             var globalVideoArgs = $"{bitrate}{frameRate}{bframes}{colorPrimaries}{colorTransfer}{passStr}";
 
-            var mapAllElse = firstPass ? "" : " -map 0:s? -c:s copy -map 0:t? -map 0:d? -movflags use_metadata_tags";
+            var mapAllElse = firstPass ? "" : 
+                (preset.CopySubtitles ?  $" -map 0:s? -c:s {preset.SubtitleEncoder.Name}" : "") +
+                (preset.CopyAttachments ? " -map 0:t?" : "") +
+                (preset.CopyData ? " -map 0:d?" : "") + 
+                (preset.CopyMetadata ? " -movflags use_metadata_tags" : "");
 
             var outputFile = firstPass ? $" -an -f null {(RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "NUL" : @"/dev/null")}" : " \"{1}\"";
 
