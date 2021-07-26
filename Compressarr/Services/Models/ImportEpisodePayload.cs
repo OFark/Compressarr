@@ -30,7 +30,7 @@ namespace Compressarr.Services.Models
             public List<int> EpisodeIds { get; set; }
 
             [JsonProperty("quality")]
-            public EpisodeFile.Quality Quality { get; set; }
+            public EpisodeFile.EpisodeQuality Quality { get; set; }
 
             [JsonProperty("language")]
             public Language Language { get; set; }

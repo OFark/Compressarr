@@ -56,8 +56,7 @@ namespace Compressarr.Presets.Models
         public override bool Equals(object obj)
         {
             if (obj == null) return false;
-            Encoder objAsCodec = obj as Encoder;
-            if (objAsCodec == null) return false;
+            if (obj is not Encoder objAsCodec) return false;
             else return Equals(objAsCodec);
         }
 

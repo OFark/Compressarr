@@ -47,7 +47,7 @@ namespace Compressarr.Shared
             base.OnInitialized();
         }
 
-        MudTheme MyCustomTheme = new MudTheme()
+        readonly MudTheme MyCustomTheme = new ()
         {
             Palette = new Palette()
             {

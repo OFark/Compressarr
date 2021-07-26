@@ -4,6 +4,17 @@ using System.Linq;
 
 namespace Compressarr.FFmpeg.Models
 {
+    public class FFResult : FFResult<object>
+    {
+        public FFResult(bool success) : base(success, null)
+        {
+            Success = success;
+            ReceivedAt = DateTime.Now;
+        }
+
+        public FFResult(Exception ex) : base(ex)
+        {}
+    }
     public class FFResult<T>
     {
         public bool Success { get; set; }
@@ -11,7 +22,9 @@ namespace Compressarr.FFmpeg.Models
 
         public int ErrorCode { get; set; }
         public string ErrorMessage { get; set; }
-        public DateTime ReceivedAt { get; }
+        public DateTime ReceivedAt { get; init; }
+
+        public Exception Exception { get; set; }
 
         public string ErrorString => string.Join(" - ", new List<string>() { ErrorCode.ToString(), ErrorMessage }.Where(x => !string.IsNullOrWhiteSpace(x)));
 
@@ -47,6 +60,7 @@ namespace Compressarr.FFmpeg.Models
             Results = default;
             ErrorCode = ex.HResult;
             ErrorMessage = ex.ToString();
+            Exception = ex;
         }
 
         public FFResult(bool success, int errorCode, string errorMessage = null, T result = default, IEnumerable<T> results = default)

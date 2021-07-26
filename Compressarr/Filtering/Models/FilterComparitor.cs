@@ -1,4 +1,5 @@
 ﻿using Compressarr.Application;
+using Compressarr.Helpers;
 using Compressarr.Settings.Filtering;
 using Newtonsoft.Json;
 using System;
@@ -10,7 +11,7 @@ namespace Compressarr.Filtering.Models
 {
     public class FilterComparitor : FilterComparitorBase, IEquatable<FilterComparitor>, ICloneable<FilterComparitor>
     {
-        public static Dictionary<string, string> valueNames = new Dictionary<string, string>()
+        static readonly Dictionary<string, string> valueNames = new()
         {
             {"is", "==" },
             {"isn't", "!=" },
@@ -70,6 +71,16 @@ namespace Compressarr.Filtering.Models
         public override string ToString()
         {
             return Key;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return Equals(obj as FilterComparitor);
+        }
+
+        public override int GetHashCode()
+        {
+            return Value.GetHashCode();
         }
     }
 }

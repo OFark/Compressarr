@@ -20,8 +20,10 @@ namespace Compressarr.JobProcessing.Models
     {
 
         internal CancellationTokenSource CancellationTokenSource = new();
-        
-        public WorkItem(Movie movie, string basePath)
+
+        private TimeSpan? eta = null;
+
+        public WorkItem(Movie movie)
         {
             SourceID = movie.Id;
             MediaHash = movie.GetStableHash();
@@ -30,7 +32,7 @@ namespace Compressarr.JobProcessing.Models
             Media.Source = MediaSource.Radarr;
         }
 
-        public WorkItem(EpisodeFile episodeFile, string basePath)
+        public WorkItem(EpisodeFile episodeFile)
         {
             SourceID = episodeFile.Id;
             MediaHash = episodeFile.GetStableHash();
@@ -100,7 +102,19 @@ namespace Compressarr.JobProcessing.Models
         public decimal? SSIM { get; set; }
         public TimeSpan? TotalLength => Media.FFProbeMediaInfo?.format?.Duration;
         internal CancellationToken CancellationToken => CancellationTokenSource.Token;
-        private TimeSpan? eta { get; set; }
+        public void EncoderOnProgress(FFmpegProgress progress)
+        {
+            Frame = progress.Frame;
+            FPS = progress.FPS;
+            Q = progress.Q;
+            Size = progress.Size.Bytes().Humanize("0.00");
+            Bitrate = progress.Bitrate;
+            Speed = progress.Speed;
+            Percent = progress.Percentage;
+            EncodingDuration = progress.Time;
+            Update();
+        }
+
         public void Output(string message) => Output(new(message), false);
         public void Output(Update update, bool isFFmpegProgress = false)
         {
@@ -120,6 +134,11 @@ namespace Compressarr.JobProcessing.Models
             Update();
         }
 
+        public void ProcessStdOut(string data)
+        {
+            Output(new(data, LogLevel.Debug), false);
+        }
+
         public void Update()
         {
             OnUpdate?.Invoke(this, new());
@@ -133,7 +152,6 @@ namespace Compressarr.JobProcessing.Models
             OnUpdate?.Invoke(this, update);
             Output(update);
         }
-
         public void Update(FFmpegProgress progress)
         {
             Frame = progress.Frame;

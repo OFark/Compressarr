@@ -14,7 +14,7 @@ namespace Compressarr.Services.Models
         public string name { get; set; }
         public long size { get; set; }
         public Movie movie { get; set; }
-        public MovieFile.Quality quality { get; set; }
+        public MovieFile.MovieQuality quality { get; set; }
         public int qualityWeight { get; set; }
         public HashSet<Rejection> rejections { get; set; }
         public long id { get; set; }

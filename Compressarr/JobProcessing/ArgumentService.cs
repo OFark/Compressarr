@@ -27,15 +27,15 @@ namespace Compressarr.JobProcessing
         private readonly IFileService fileService;
         private readonly IHistoryService historyService;
         private readonly ILogger<ArgumentService> logger;
-        private readonly IProcessManager processManager;
-        public ArgumentService(IApplicationService applicationService, IFFmpegProcessor fFmpegProcessor, IFileService fileService, IHistoryService historyService, ILogger<ArgumentService> logger, IProcessManager processManager)
+        //private readonly IProcessManager processManager;
+        public ArgumentService(IApplicationService applicationService, IFFmpegProcessor fFmpegProcessor, IFileService fileService, IHistoryService historyService, ILogger<ArgumentService> logger) //, IProcessManager processManager)
         {
             this.applicationService = applicationService;
             this.fFmpegProcessor = fFmpegProcessor;
             this.fileService = fileService;
             this.historyService = historyService;
             this.logger = logger;
-            this.processManager = processManager;
+            //this.processManager = processManager;
         }
 
         public List<string> GetArguments(WorkItem wi) => GetArguments(wi, wi.SourceFile, wi.DestinationFile);
@@ -213,10 +213,10 @@ namespace Compressarr.JobProcessing
 
             var globalVideoArgs = $"{bitrate}{frameRate}{bframes}{colorPrimaries}{colorTransfer}{passStr}";
 
-            var mapAllElse = firstPass ? "" : 
-                (preset.CopySubtitles ?  $" -map 0:s? -c:s {preset.SubtitleEncoder.Name}" : "") +
+            var mapAllElse = firstPass ? "" :
+                (preset.CopySubtitles ? $" -map 0:s? -c:s {preset.SubtitleEncoder.Name}" : "") +
                 (preset.CopyAttachments ? " -map 0:t?" : "") +
-                (preset.CopyData ? " -map 0:d?" : "") + 
+                (preset.CopyData ? " -map 0:d?" : "") +
                 (preset.CopyMetadata ? " -movflags use_metadata_tags" : "");
 
             var outputFile = firstPass ? $" -an -f null {(RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "NUL" : @"/dev/null")}" : " \"{1}\"";
@@ -559,7 +559,7 @@ namespace Compressarr.JobProcessing
                     }
                     else
                     {
-                        wi.ArgumentCalculator.GenSamplesTask ??= processManager.GenerateSamples(sampleFiles, wi, token);
+                        wi.ArgumentCalculator.GenSamplesTask ??= GenerateSamples(sampleFiles, wi, token);
                         await wi.ArgumentCalculator.GenSamplesTask;
 
                         var origSize = new FileInfo(sampleFile).Length;
@@ -569,19 +569,17 @@ namespace Compressarr.JobProcessing
                         decimal tSpeed = 0;
                         foreach (var arg in args)
                         {
-                            var result = await processManager.EncodeAVideo((sender, args) =>
+                            var result = await fFmpegProcessor.EncodeAVideo(arg, (progress) =>
                             {
-                                if (FFmpegProgress.TryParse(args.Data, out var progress)) test.Speed = tSpeed = progress.Speed;
-                            }
-                            , (sender, args) =>
-                            {
-                                test.EncodingProgress = (args.Percent / sampleFiles.Count) + (100D / sampleFiles.Count * sampleFileIndex);
+                                test.Speed = tSpeed = progress.Speed;
+                                test.EncodingProgress = (progress.Percentage / sampleFiles.Count) + (100D / sampleFiles.Count * sampleFileIndex);
                                 wi.Update();
-                            }, arg, token);
+                            }, 
+                            wi.ProcessStdOut, token);
 
                             if (!result.Success)
                             {
-                                wi.Update(Update.FromException(result.Exception));
+                                wi.Update(Update.Error(result.ErrorMessage));
                                 return;
                             }
                         }
@@ -632,6 +630,34 @@ namespace Compressarr.JobProcessing
             finally
             {
                 test.Processing = false;
+            }
+        }
+
+        private async Task GenerateSamples(List<string> sampleFiles, WorkItem wi, CancellationToken token)
+        {
+            using (logger.BeginScope("Generating Sample"))
+            {
+                var sampleTime = wi.Job.ArgumentCalculationSettings.ArgCalcSampleSeconds;
+                var videoLength = wi.Media?.FFProbeMediaInfo?.format?.Duration.TotalSeconds ?? 3600;
+
+                var samplePitch = videoLength / (sampleFiles.Count + 1);
+
+                for (int i = 0; i < sampleFiles.Count; i++)
+                {
+                    var sampleFile = Path.GetFileName(sampleFiles[i]);
+                    var partialSampleFileName = Path.Combine(fileService.TempDir, sampleFile);
+
+                    var temparg = $"-y -ss {samplePitch * (i + 1)} -t {sampleTime} -i \"{wi.SourceFile}\" -map 0 -codec copy \"{partialSampleFileName}\"";
+
+                    logger.LogInformation($"Generating Sample {i}  with: {temparg}");
+
+                    var sampleEncodeResult = await fFmpegProcessor.EncodeAVideo(temparg, null, wi.ProcessStdOut, token);
+                    if (!sampleEncodeResult.Success)
+                    {
+                        throw sampleEncodeResult.Exception ?? new("Not sure - something went wrong with encoding. Check the logs");
+                    }
+
+                }
             }
         }
     }

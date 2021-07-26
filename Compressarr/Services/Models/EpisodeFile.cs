@@ -56,7 +56,7 @@ namespace Compressarr.Services.Models
         public string SceneName { get; set; }
 
         [Filter("Quality", true)]
-        public Quality quality { get; set; }
+        public EpisodeQuality Quality { get; set; }
 
         [JsonProperty("language")]
         public Language Language { get; set; }
@@ -77,7 +77,7 @@ namespace Compressarr.Services.Models
 
         public class FileQuality
         {
-            public int id { get; set; }
+            public int Id { get; set; }
 
             [Filter("Modifier", FilterPropertyType.Enum)]
             [JsonProperty("modifier")]
@@ -96,7 +96,7 @@ namespace Compressarr.Services.Models
             public string Source { get; set; }
         }
 
-        public class Quality
+        public class EpisodeQuality
         {
             [JsonProperty("customFormats")]
             public List<object> CustomFormats { get; set; }

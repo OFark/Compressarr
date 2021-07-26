@@ -412,22 +412,21 @@ namespace Compressarr.Services
                 try
                 {
                     logger.LogDebug($"Creating new HTTP client.");
-                    using (var hc = new HttpClient())
+                    using var hc = new HttpClient();
+
+                    logger.LogDebug($"Downloading Series List.");
+                    episodeJSON = await hc.GetStringAsync(link);
+
+                    var fileArr = JsonConvert.DeserializeObject<EpisodeFile[]>(episodeJSON);
+
+                    episodeFiles = fileArr.Where(f => !string.IsNullOrWhiteSpace(f.Path)).OrderBy(s => s.RelativePath).ToHashSet();
+
+                    foreach (var epsf in episodeFiles)
                     {
-                        logger.LogDebug($"Downloading Series List.");
-                        episodeJSON = await hc.GetStringAsync(link);
-
-                        var fileArr = JsonConvert.DeserializeObject<EpisodeFile[]>(episodeJSON);
-
-                        episodeFiles = fileArr.Where(f => !string.IsNullOrWhiteSpace(f.Path)).OrderBy(s => s.RelativePath).ToHashSet();
-
-                        foreach (var epsf in episodeFiles)
-                        {
-                            epsf.BasePath = applicationService.SonarrSettings.BasePath;
-                        }
-
-                        logger.LogDebug($"Success.");
+                        epsf.BasePath = applicationService.SonarrSettings.BasePath;
                     }
+
+                    logger.LogDebug($"Success.");
                 }
                 catch (Exception ex)
                 {
@@ -506,36 +505,35 @@ namespace Compressarr.Services
                 try
                 {
                     logger.LogDebug($"Creating new HTTP client.");
-                    using (var hc = new HttpClient())
+                    using var hc = new HttpClient();
+
+                    logger.LogDebug($"Downloading Series List.");
+                    seriesJSON = await hc.GetStringAsync(link);
+
+                    if (AppEnvironment.IsDevelopment)
                     {
-                        logger.LogDebug($"Downloading Series List.");
-                        seriesJSON = await hc.GetStringAsync(link);
-
-                        if (AppEnvironment.IsDevelopment)
-                        {
-                            _ = fileService.DumpDebugFile("series.json", seriesJSON);
-                        }
-
-
-                        var seriesArr = JsonConvert.DeserializeObject<Series[]>(seriesJSON);
-
-                        var series = seriesArr.Where(s => s.EpisodeFileCount > 0).OrderBy(s => s.SortTitle).ToHashSet();
-
-                        SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
-
-                        await series.AsyncParallelForEach(async s =>
-                        {
-                            await foreach (var ef in GetEpisodeFiles(s.Id))
-                            {
-                                (s.Seasons.FirstOrDefault(x => x.SeasonNumber == ef.SeasonNumber).EpisodeFiles as HashSet<EpisodeFile>).Add(ef);
-                            }
-                        }, 20, TaskScheduler.FromCurrentSynchronizationContext());
-
-
-                        logger.LogDebug($"Success.");
-
-                        return new(true, series);
+                        _ = fileService.DumpDebugFile("series.json", seriesJSON);
                     }
+
+
+                    var seriesArr = JsonConvert.DeserializeObject<Series[]>(seriesJSON);
+
+                    var series = seriesArr.Where(s => s.EpisodeFileCount > 0).OrderBy(s => s.SortTitle).ToHashSet();
+
+                    SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
+
+                    await series.AsyncParallelForEach(async s =>
+                    {
+                        await foreach (var ef in GetEpisodeFiles(s.Id))
+                        {
+                            (s.Seasons.FirstOrDefault(x => x.SeasonNumber == ef.SeasonNumber).EpisodeFiles as HashSet<EpisodeFile>).Add(ef);
+                        }
+                    }, 20, TaskScheduler.FromCurrentSynchronizationContext());
+
+
+                    logger.LogDebug($"Success.");
+
+                    return new(true, series);
                 }
                 catch (Exception ex)
                 {

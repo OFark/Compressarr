@@ -45,7 +45,7 @@ namespace Compressarr
 
             services.AddSingleton<IApplicationInitialiser, ApplicationInitialiser>();
             services.AddSingleton<IApplicationService, ApplicationService>();
-            services.AddSingleton<IProcessManager, ProcessManager>();
+            //services.AddSingleton<IProcessManager, ProcessManager>();
 
             services.AddScoped<ILayoutService, LayoutService>();
 
@@ -68,7 +68,7 @@ namespace Compressarr
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, IHostApplicationLifetime appLifetime)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
             if (env.IsDevelopment())
             {

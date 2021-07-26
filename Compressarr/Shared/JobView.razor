@@ -193,7 +193,7 @@
                                         <MudTd DataLabel="FPS"><MudText Align="Align.Center">@context.FPS</MudText></MudTd>
                                         <MudTd DataLabel="Q"><MudText Align="Align.Center">@context.Q</MudText></MudTd>
                                         <MudTd DataLabel="Size"><MudText Align="Align.Center">@context.Size</MudText></MudTd>
-                                        <MudTd DataLabel="Time"><MudText Align="Align.Center">@context.EncodingDuration</MudText></MudTd>
+                                        <MudTd DataLabel="Time"><MudText Align="Align.Center">@context.EncodingDuration?.ToStringTimeSeconds()</MudText></MudTd>
                                         <MudTd DataLabel="Length"><MudText Align="Align.Center">@context.TotalLength?.ToStringTimeSeconds()</MudText></MudTd>
                                         <MudTd DataLabel="Bitrate"><MudText Align="Align.Center">@context.Bitrate</MudText></MudTd>
                                         <MudTd DataLabel="Speed"><MudText Align="Align.Center">@context.Speed</MudText></MudTd>

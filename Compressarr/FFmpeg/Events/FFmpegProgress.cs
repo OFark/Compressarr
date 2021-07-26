@@ -7,6 +7,8 @@ namespace Compressarr.FFmpeg.Events
 {
     public delegate void FFmpegProgressEvent(FFmpegProgress args);
 
+    public delegate void FFmpegStdOutEvent(string data);
+
     public class FFmpegProgress : EventArgs
     {
         //Conversion:
@@ -44,6 +46,8 @@ namespace Compressarr.FFmpeg.Events
         public double Size { get; init; }
         public decimal Speed { get; init; }
         public TimeSpan Time { get; init; }
+
+        public string StdOut { get; set; }
 
         public int Percentage { get; set; }
 

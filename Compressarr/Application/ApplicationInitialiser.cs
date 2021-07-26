@@ -180,15 +180,14 @@ namespace Compressarr.Application
                         {
                             var chmodStep = new InitialisationTask("CHMOD FFmpeg");
                             applicationService.InitialisationSteps.Add(chmodStep);
-                            using (var chmodWorker = new JobWorker(chmodStep.Condition, OnUpdate))
+                            using var chmodWorker = new JobWorker(chmodStep.Condition, OnUpdate);
+
+                            logger.LogDebug("Running on Linux, CHMOD required");
+                            foreach (var exe in new string[] { fileService.FFMPEGPath, fileService.FFPROBEPath })
                             {
-                                logger.LogDebug("Running on Linux, CHMOD required");
-                                foreach (var exe in new string[] { fileService.FFMPEGPath, fileService.FFPROBEPath })
-                                {
-                                    await fFmpegProcessor.RunProcess("/bin/bash", $"-c \"chmod +x {exe}\"", applicationService.AppStoppingCancellationToken);
-                                }
-                                chmodWorker.Succeed();
+                                await fFmpegProcessor.RunProcess("/bin/bash", $"-c \"chmod +x {exe}\"", applicationService.AppStoppingCancellationToken);
                             }
+                            chmodWorker.Succeed();
                         }
                     }
                     else
@@ -311,43 +310,39 @@ namespace Compressarr.Application
                 {
                     var presetStep = new InitialisationTask("Initialise presets");
                     applicationService.InitialisationSteps.Add(presetStep);
-                    using (var presetsWorker = new JobWorker(presetStep.Condition, OnUpdate))
+                    using var presetsWorker = new JobWorker(presetStep.Condition, OnUpdate);
+                    logger.LogDebug($"Initialise presets");
+
+                    await applicationService.Presets.Where(p => !p.Initialised).AsyncParallelForEach(preset =>
                     {
-                        logger.LogDebug($"Initialise presets");
-
-
-
-                        await applicationService.Presets.Where(p => !p.Initialised).AsyncParallelForEach(preset =>
+                        return Task.Run(() =>
                         {
-                            return Task.Run(() =>
+                            var encoder = applicationService.Encoders[CodecType.Video].FirstOrDefault(c => c.Name == preset.VideoEncoder.Name);
+                            if (encoder != null)
                             {
-                                var encoder = applicationService.Encoders[CodecType.Video].FirstOrDefault(c => c.Name == preset.VideoEncoder.Name);
-                                if (encoder != null)
-                                {
-                                    preset.VideoEncoder = encoder;
-                                }
+                                preset.VideoEncoder = encoder;
+                            }
 
-                                foreach (var audioPreset in preset.AudioStreamPresets)
+                            foreach (var audioPreset in preset.AudioStreamPresets)
+                            {
+                                if (audioPreset?.Encoder != null)
                                 {
-                                    if (audioPreset?.Encoder != null)
+                                    var audioEncoder = applicationService.Encoders[CodecType.Audio].FirstOrDefault(c => c.Name == audioPreset.Encoder.Name);
+                                    if (audioEncoder != null)
                                     {
-                                        var audioEncoder = applicationService.Encoders[CodecType.Audio].FirstOrDefault(c => c.Name == audioPreset.Encoder.Name);
-                                        if (audioEncoder != null)
-                                        {
-                                            audioPreset.Encoder = audioEncoder;
-                                        }
+                                        audioPreset.Encoder = audioEncoder;
                                     }
                                 }
+                            }
 
-                                preset.Initialised = true;
-                                SetState(presetStep, $"Presets initialised: {applicationService.Presets.Count(p => p.Initialised)}/{applicationService.Presets.Count()}");
-                                OnUpdate?.Invoke(this, null);
-                            });
+                            preset.Initialised = true;
+                            SetState(presetStep, $"Presets initialised: {applicationService.Presets.Count(p => p.Initialised)}/{applicationService.Presets.Count}");
+                            OnUpdate?.Invoke(this, null);
                         });
+                    });
 
 
-                        presetsWorker.Succeed();
-                    }
+                    presetsWorker.Succeed();
                 }
             }
         }

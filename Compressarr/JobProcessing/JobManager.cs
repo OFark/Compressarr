@@ -25,6 +25,8 @@ namespace Compressarr.JobProcessing
 {
     public class JobManager : IJobManager
     {
+        readonly static SemaphoreSlim processSemaphore = new(1, 1);
+
         private readonly IApplicationService applicationService;
         private readonly IArgumentService argumentService;
         private readonly IFFmpegProcessor fFmpegProcessor;
@@ -35,12 +37,12 @@ namespace Compressarr.JobProcessing
         private readonly IOptionsMonitor<HashSet<Job>> jobsMonitor;
         private readonly ILogger<JobManager> logger;
         private readonly IPresetManager presetManager;
-        private readonly IProcessManager processManager;
+        //private readonly IProcessManager processManager;
         private readonly IRadarrService radarrService;
         private readonly ISonarrService sonarrService;
 
 
-        public JobManager(IApplicationService applicationService, IArgumentService argumentService, IFFmpegProcessor fFmpegProcessor, IFileService fileService, IFilterManager filterManager, IFolderService folderService, IHistoryService historyService, ILogger<JobManager> logger, IOptionsMonitor<HashSet<Job>> jobsMonitor, IPresetManager presetManager, IProcessManager processManager, IRadarrService radarrService, ISonarrService sonarrService)
+        public JobManager(IApplicationService applicationService, IArgumentService argumentService, IFFmpegProcessor fFmpegProcessor, IFileService fileService, IFilterManager filterManager, IFolderService folderService, IHistoryService historyService, ILogger<JobManager> logger, IOptionsMonitor<HashSet<Job>> jobsMonitor, IPresetManager presetManager, IRadarrService radarrService, ISonarrService sonarrService)
         {
             this.applicationService = applicationService;
             this.argumentService = argumentService;
@@ -52,11 +54,10 @@ namespace Compressarr.JobProcessing
             this.jobsMonitor = jobsMonitor;
             this.logger = logger;
             this.presetManager = presetManager;
-            this.processManager = processManager;
+            //this.processManager = processManager;
             this.radarrService = radarrService;
             this.sonarrService = sonarrService;
         }
-
         public HashSet<Job> Jobs => applicationService.Jobs;
 
         public async Task<bool> AddJobAsync(Job newJob, CancellationToken token)
@@ -155,54 +156,53 @@ namespace Compressarr.JobProcessing
 
         public async Task<string> ImportVideo(WorkItem wi, MediaSource source)
         {
-            using (var wiImporter = new JobWorker(wi.Condition.Import, wi.Update))
+            using var wiImporter = new JobWorker(wi.Condition.Import, wi.Update);
+
+            switch (source)
             {
-                switch (source)
-                {
-                    case MediaSource.Radarr:
-                        {
-                            wi.Update(Update.Information("Importing into Radarr"));
+                case MediaSource.Radarr:
+                    {
+                        wi.Update(Update.Information("Importing into Radarr"));
 
-                            var response = await radarrService.ImportMovieAsync(wi);
-                            if (response.Success)
-                            {
-                                wiImporter.Succeed();
-                                wi.Update(Update.Information("Success"));
-                            }
-                            else
-                            {
-                                wi.Update(Update.Warning($"Import Failed [{response.ErrorCode}]: {response.ErrorMessage}"));
-                                return "Import Failed";
-                            }
-                        }
-                        break;
-                    case MediaSource.Sonarr:
+                        var response = await radarrService.ImportMovieAsync(wi);
+                        if (response.Success)
                         {
-                            wi.Update(Update.Information("Importing into Sonarr"));
-
-                            var response = await sonarrService.ImportEpisodeAsync(wi);
-                            if (response.Success)
-                            {
-                                wiImporter.Succeed();
-                                wi.Update(Update.Information("Success"));
-                            }
-                            else
-                            {
-                                wi.Update(Update.Warning($"Import Failed [{response.ErrorCode}]: {response.ErrorMessage}"));
-                                return "Import Failed";
-                            }
+                            wiImporter.Succeed();
+                            wi.Update(Update.Information("Success"));
                         }
-                        break;
-                    default:
+                        else
                         {
-                            wiImporter.Succeed(false);
-                            wi.Update(Update.Error("Source not supported"));
-                            return "Source not supported";
+                            wi.Update(Update.Warning($"Import Failed [{response.ErrorCode}]: {response.ErrorMessage}"));
+                            return "Import Failed";
                         }
-                }
+                    }
+                    break;
+                case MediaSource.Sonarr:
+                    {
+                        wi.Update(Update.Information("Importing into Sonarr"));
 
-                return null;
+                        var response = await sonarrService.ImportEpisodeAsync(wi);
+                        if (response.Success)
+                        {
+                            wiImporter.Succeed();
+                            wi.Update(Update.Information("Success"));
+                        }
+                        else
+                        {
+                            wi.Update(Update.Warning($"Import Failed [{response.ErrorCode}]: {response.ErrorMessage}"));
+                            return "Import Failed";
+                        }
+                    }
+                    break;
+                default:
+                    {
+                        wiImporter.Succeed(false);
+                        wi.Update(Update.Error("Source not supported"));
+                        return "Source not supported";
+                    }
             }
+
+            return null;
         }
 
         public async Task InitialiseJob(Job job, CancellationToken token)
@@ -233,186 +233,181 @@ namespace Compressarr.JobProcessing
                     job.UpdateCondition((c) => c.Clear());
 
                     logger.LogDebug($"Job will initialise.");
-                    using (var jobInit = new JobWorker(job.Condition.Initialise, job.UpdateStatus))
-                    {
-                        job.Filter = filterManager.GetFilter(job.FilterID);
-                        job.Preset = presetManager.GetPreset(job.PresetName);
-                        logger.LogDebug($"Job using source: {(job.FilterID != default ? job.FilterID.ToString() : "folder")} ({(job.Filter != null ? job.Filter.Name : job.SourceFolder)}) and preset: {job.PresetName}.");
+                    using var jobInit = new JobWorker(job.Condition.Initialise, job.UpdateStatus);
 
-                        if (job.Preset != null)
+                    job.Filter = filterManager.GetFilter(job.FilterID);
+                    job.Preset = presetManager.GetPreset(job.PresetName);
+                    logger.LogDebug($"Job using source: {(job.FilterID != default ? job.FilterID.ToString() : "folder")} ({(job.Filter != null ? job.Filter.Name : job.SourceFolder)}) and preset: {job.PresetName}.");
+
+                    if (job.Preset != null)
+                    {
+                        var getContainerExtension = await fFmpegProcessor.ConvertContainerToExtension(job.Preset.Container, token);
+                        job.Preset.ContainerExtension = getContainerExtension.Result;
+                        logger.LogDebug($"Container Extension set to {job.Preset.ContainerExtension}");
+                        using var jobTest = new JobWorker(job.Condition.Test, job.UpdateStatus);
+
+                        job.CancellationTokenSource = new();
+
+                        using var lnkCTS = CancellationTokenSource.CreateLinkedTokenSource(job.CancellationToken, applicationService.AppStoppingCancellationToken);
+                        try
                         {
-                            var getContainerExtension = await fFmpegProcessor.ConvertContainerToExtension(job.Preset.Container, token);
-                            job.Preset.ContainerExtension = getContainerExtension.Result;
-                            logger.LogDebug($"Container Extension set to {job.Preset.ContainerExtension}");
-                            using (var jobTest = new JobWorker(job.Condition.Test, job.UpdateStatus))
+                            Log(job, Update.Debug("Begin Testing"));
+
+                            var sourceName = job.MediaSource.ToString();
+                            Log(job, Update.Debug($"Job is for {sourceName}, Connecting..."));
+
+                            var systemStatus = job.MediaSource switch
+                            {
+                                MediaSource.Folder => await folderService.TestConnectionAsync(job.SourceFolder),
+                                MediaSource.Radarr => await radarrService.TestConnectionAsync(applicationService.RadarrSettings),
+                                MediaSource.Sonarr => await sonarrService.TestConnectionAsync(applicationService.SonarrSettings),
+                                _ => new()
+                            };
+
+                            if (!systemStatus.Success)
+                            {
+                                Log(job, Update.Warning($"Failed to connect to {sourceName}. {systemStatus.ErrorMessage}"));
+                                Fail(job);
+                                return;
+                            }
+
+                            Log(job, Update.Debug($"Connected to {sourceName}."), Update.Debug("Fetching List of files."));
+
+                            var getFilesResults = await GetMedia(job);
+
+                            if (!getFilesResults.Success)
+                            {
+                                Log(job, Update.Warning($"Failed to list files from {sourceName}."));
+                                Fail(job);
+                                return;
+                            }
+
+                            job.WorkLoad = getFilesResults.Results.ToHashSet();
+
+
+                            Log(job, Update.Debug("Files Returned"), Update.Debug("Building Workload"));
+
+                            using (var jobWorkLoad = new JobWorker(job.Condition.BuildWorkLoad, job.UpdateStatus))
                             {
 
-                                job.CancellationTokenSource = new();
-
-                                using (var lnkCTS = CancellationTokenSource.CreateLinkedTokenSource(job.CancellationToken, applicationService.AppStoppingCancellationToken))
+                                double i = 0;
+                                var dirCheck = new ConcurrentBag<string>();
+                                var semlock = new SemaphoreSlim(1, 1);
+                                try
                                 {
-                                    try
+                                    await job.WorkLoad.AsyncParallelForEach(wi =>
                                     {
-                                        Log(job, Update.Debug("Begin Testing"));
-
-                                        var sourceName = job.MediaSource.ToString();
-                                        Log(job, Update.Debug($"Job is for {sourceName}, Connecting..."));
-
-                                        var systemStatus = job.MediaSource switch
+                                        return Task.Run(async () =>
                                         {
-                                            MediaSource.Folder => await folderService.TestConnectionAsync(job.SourceFolder),
-                                            MediaSource.Radarr => await radarrService.TestConnectionAsync(applicationService.RadarrSettings),
-                                            MediaSource.Sonarr => await sonarrService.TestConnectionAsync(applicationService.SonarrSettings),
-                                            _ => new()
-                                        };
-
-                                        if (!systemStatus.Success)
-                                        {
-                                            Log(job, Update.Warning($"Failed to connect to {sourceName}. {systemStatus.ErrorMessage}"));
-                                            Fail(job);
-                                            return;
-                                        }
-
-                                        Log(job, Update.Debug($"Connected to {sourceName}."), Update.Debug("Fetching List of files."));
-
-                                        var getFilesResults = await GetMedia(job);
-
-                                        if (!getFilesResults.Success)
-                                        {
-                                            Log(job, Update.Warning($"Failed to list files from {sourceName}."));
-                                            Fail(job);
-                                            return;
-                                        }
-
-                                        job.WorkLoad = getFilesResults.Results.ToHashSet();
-
-
-                                        Log(job, Update.Debug("Files Returned"), Update.Debug("Building Workload"));
-
-                                        using (var jobWorkLoad = new JobWorker(job.Condition.BuildWorkLoad, job.UpdateStatus))
-                                        {
-
-                                            double i = 0;
-                                            var dirCheck = new ConcurrentBag<string>();
-                                            var semlock = new SemaphoreSlim(1, 1);
-                                            try
+                                            using (logger.BeginScope("Work Item {SourceFileName}", wi.SourceFileName))
                                             {
-                                                await job.WorkLoad.AsyncParallelForEach(wi =>
+                                                wi.Job = job;
+                                                wi.OnUpdate += job.UpdateStatus;
+                                                wi.CancellationTokenSource = new();
+
+                                                var file = new FileInfo(wi.SourceFile);
+
+                                                if (!file.Exists)
                                                 {
-                                                    return Task.Run(async () =>
+                                                    Log(job, Update.Warning($"This file was not found: {file.FullName}"));
+                                                    Fail(job);
+                                                    return;
+                                                }
+
+                                                var destinationpath = job.DestinationFolder;
+
+                                                if (string.IsNullOrWhiteSpace(destinationpath))
+                                                {
+                                                    destinationpath = file.Directory.FullName;
+                                                }
+                                                else
+                                                {
+                                                    destinationpath = job.MediaSource switch
                                                     {
-                                                        using (logger.BeginScope("Work Item {SourceFileName}", wi.SourceFileName))
+                                                        MediaSource.Sonarr => Path.Combine(destinationpath, file.Directory.Parent.Name, file.Directory.Name),
+                                                        MediaSource.Folder => Path.Combine(destinationpath, Path.GetRelativePath(job.SourceFolder, file.DirectoryName)),
+                                                        _ => Path.Combine(destinationpath, file.Directory.Name)
+                                                    };
+                                                }
+
+                                                var checkFolder = Path.Combine(job.DestinationFolder, file.Directory.Name);
+                                                await semlock.WaitAsync(token);
+                                                try
+                                                {
+                                                    if (!dirCheck.Contains(checkFolder))
+                                                    {
+                                                        if (!Directory.Exists(checkFolder))
                                                         {
-                                                            wi.Job = job;
-                                                            wi.OnUpdate += job.UpdateStatus;
-                                                            wi.CancellationTokenSource = new();
-
-                                                            var file = new FileInfo(wi.SourceFile);
-
-                                                            if (!file.Exists)
-                                                            {
-                                                                Log(job, Update.Warning($"This file was not found: {file.FullName}"));
-                                                                Fail(job);
-                                                                return;
-                                                            }
-
-                                                            var destinationpath = job.DestinationFolder;
-
-                                                            if (string.IsNullOrWhiteSpace(destinationpath))
-                                                            {
-                                                                destinationpath = file.Directory.FullName;
-                                                            }
-                                                            else
-                                                            {
-                                                                destinationpath = job.MediaSource switch
-                                                                {
-                                                                    MediaSource.Sonarr => Path.Combine(destinationpath, file.Directory.Parent.Name, file.Directory.Name),
-                                                                    MediaSource.Folder => Path.Combine(destinationpath, Path.GetRelativePath(job.SourceFolder, file.DirectoryName)),
-                                                                    _ => Path.Combine(destinationpath, file.Directory.Name)
-                                                                };
-                                                            }
-
-                                                            var checkFolder = Path.Combine(job.DestinationFolder, file.Directory.Name);
-                                                            await semlock.WaitAsync(token);
-                                                            try
-                                                            {
-                                                                if (!dirCheck.Contains(checkFolder))
-                                                                {
-                                                                    if (!Directory.Exists(checkFolder))
-                                                                    {
-                                                                        Directory.CreateDirectory(checkFolder);
-                                                                        Directory.Delete(checkFolder);
-                                                                        dirCheck.Add(checkFolder);
-                                                                    }
-                                                                }
-                                                            }
-                                                            finally
-                                                            {
-                                                                semlock.Release();
-                                                            }
-
-                                                            wi.DestinationFile = Path.Combine(destinationpath, file.Name);
-                                                            if (!string.IsNullOrWhiteSpace(job.Preset.ContainerExtension))
-                                                            {
-                                                                wi.DestinationFile = Path.ChangeExtension(wi.DestinationFile, job.Preset.ContainerExtension);
-                                                            }
-
-                                                            job.InitialisationProgress?.Report(++i / job.WorkLoad.Count() * 100);
-                                                            job.UpdateStatus(this);
+                                                            Directory.CreateDirectory(checkFolder);
+                                                            Directory.Delete(checkFolder);
+                                                            dirCheck.Add(checkFolder);
                                                         }
-                                                    });
-                                                });
+                                                    }
+                                                }
+                                                finally
+                                                {
+                                                    semlock.Release();
+                                                }
+
+                                                wi.DestinationFile = Path.Combine(destinationpath, file.Name);
+                                                if (!string.IsNullOrWhiteSpace(job.Preset.ContainerExtension))
+                                                {
+                                                    wi.DestinationFile = Path.ChangeExtension(wi.DestinationFile, job.Preset.ContainerExtension);
+                                                }
+
+                                                job.InitialisationProgress?.Report(++i / job.WorkLoad.Count * 100);
+                                                job.UpdateStatus(this);
                                             }
-                                            catch (Exception ex)
-                                            {
-                                                Log(job, Update.FromException(ex));
-                                                Fail(job);
-                                                return;
-                                            }
-
-                                            jobWorkLoad.Succeed();
-                                            Log(job, Update.Debug("Workload compiled"), Update.Debug("Checking Destination Folder"), Update.Debug("Writing Test.txt file"));
-                                        }
-
-                                        var testFilePath = Path.Combine(job.DestinationFolder, "Test.txt");
-
-                                        try
-                                        {
-                                            await fileService.WriteTextFileAsync(testFilePath, "This is a write test");
-
-                                            fileService.DeleteFile(testFilePath);
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            Log(job, Update.FromException(ex));
-                                            Fail(job);
-                                            return;
-                                        }
-
-                                        // Success - Job should be good.
-                                        jobTest.Succeed();
-                                        Log(job, Update.Information("Test succeeded"));
-
-                                        job.ID ??= Guid.NewGuid();
-                                        jobInit.Succeed();
-                                        Log(job, Update.Information("Initialisation succeeded"));
-
-                                        return;
-                                    }
-                                    catch (OperationCanceledException)
-                                    {
-                                        Log(job, Update.Warning("Initialisation cancelled"));
-                                    }
+                                        });
+                                    });
                                 }
-                            }
-                        }
-                        else
-                        {
-                            Log(job, Update.Debug($"Preset {job.PresetName} does not exist"));
-                        }
+                                catch (Exception ex)
+                                {
+                                    Log(job, Update.FromException(ex));
+                                    Fail(job);
+                                    return;
+                                }
 
-                        Fail(job);
+                                jobWorkLoad.Succeed();
+                                Log(job, Update.Debug("Workload compiled"), Update.Debug("Checking Destination Folder"), Update.Debug("Writing Test.txt file"));
+                            }
+
+                            var testFilePath = Path.Combine(job.DestinationFolder, "Test.txt");
+
+                            try
+                            {
+                                await fileService.WriteTextFileAsync(testFilePath, "This is a write test");
+
+                                fileService.DeleteFile(testFilePath);
+                            }
+                            catch (Exception ex)
+                            {
+                                Log(job, Update.FromException(ex));
+                                Fail(job);
+                                return;
+                            }
+
+                            // Success - Job should be good.
+                            jobTest.Succeed();
+                            Log(job, Update.Information("Test succeeded"));
+
+                            job.ID ??= Guid.NewGuid();
+                            jobInit.Succeed();
+                            Log(job, Update.Information("Initialisation succeeded"));
+
+                            return;
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            Log(job, Update.Warning("Initialisation cancelled"));
+                        }
                     }
+                    else
+                    {
+                        Log(job, Update.Debug($"Preset {job.PresetName} does not exist"));
+                    }
+
+                    Fail(job);
                 }
             }
         }
@@ -443,21 +438,20 @@ namespace Compressarr.JobProcessing
 
         public async Task PrepareWorkItem(WorkItem wi, FFmpegPreset preset, CancellationToken token)
         {
-            using (var jobPreparer = new JobWorker(wi.Condition.Prepare, wi.Update))
+            using var jobPreparer = new JobWorker(wi.Condition.Prepare, wi.Update);
+
+            var result = await argumentService.SetArguments(preset, wi, token);
+            if (!string.IsNullOrWhiteSpace(result))
             {
-                var result = await argumentService.SetArguments(preset, wi, token);
-                if (!string.IsNullOrWhiteSpace(result))
-                {
-                    wi.Update(Update.Error(result));
-                    return;
-                }
-
-                if (token.IsCancellationRequested) return;
-
-                await CheckHistory(wi);
-
-                jobPreparer.Succeed(wi.Arguments != null && wi.Arguments.Any());
+                wi.Update(Update.Error(result));
+                return;
             }
+
+            if (token.IsCancellationRequested) return;
+
+            await CheckHistory(wi);
+
+            jobPreparer.Succeed(wi.Arguments != null && wi.Arguments.Any());
         }
 
         public bool PresetInUse(FFmpegPreset preset)
@@ -485,53 +479,95 @@ namespace Compressarr.JobProcessing
 
             if (!wi.Condition.Encode.Processing && !wi.Condition.Encode.Finished)
             {
-                using (var jobRunner = new JobWorker(wi.Condition.Encode, wi.Update))
+                using var jobRunner = new JobWorker(wi.Condition.Encode, wi.Update);
+
+                var tokenGranted = false;
+                try
                 {
-                    var success = await processManager.Process(wi, token);
-                    jobRunner.Succeed(success);
+
+                    await processSemaphore.WaitAsync(token);
+                    tokenGranted = true;
+
+                    using (logger.BeginScope("FFmpeg Process"))
+                    {
+                        logger.LogInformation("Starting.");
+
+                        logger.LogDebug("FFmpeg process work item starting.");
+
+                        foreach (var arg in wi.Arguments)
+                        {
+
+                            logger.LogDebug($"FFmpeg Process arguments: \"{arg}\"");
+
+                            var result = await fFmpegProcessor.EncodeAVideo(arg, wi.EncoderOnProgress, wi.ProcessStdOut, token);
+
+                            if (!result.Success)
+                            {
+                                wi.Update(result.Exception);
+                                logger.LogInformation($"FFmpeg Process failed.", result.Exception);
+                                jobRunner.Succeed(false);
+                                return;
+                            }
+
+                        }
+
+                        logger.LogInformation($"FFmpeg Process finished."); ;
+                        jobRunner.Succeed();
+                    }
+
                 }
+                catch (OperationCanceledException)
+                {
+                    Log(wi.Job, Update.Warning("User cancelled job"));
+                }
+
+                finally
+                {
+                    if (tokenGranted)
+                        processSemaphore.Release();
+                }
+
+                jobRunner.Succeed(false);
             }
 
 
             if (wi.Condition.Encode.Succeeded && !wi.Condition.Analyse.Processing && !wi.Condition.Analyse.Finished)
             {
-                using (var jobAnalyser = new JobWorker(wi.Condition.Analyse, wi.Update))
+                using var jobAnalyser = new JobWorker(wi.Condition.Analyse, wi.Update);
+                try
                 {
-                    try
-                    {
-                        var originalFileSize = new FileInfo(wi.SourceFile).Length;
-                        var newFileSize = new FileInfo(wi.DestinationFile).Length;
+                    var originalFileSize = new FileInfo(wi.SourceFile).Length;
+                    var newFileSize = new FileInfo(wi.DestinationFile).Length;
 
-                        wi.Compression = newFileSize / (decimal)originalFileSize;
-                        wi.Update();
+                    wi.Compression = newFileSize / (decimal)originalFileSize;
+                    wi.Update();
 
-                    }
-                    catch (Exception ex) when (ex is FileNotFoundException || ex is IOException)
-                    {
-                        wi.Update(new Update(ex, LogLevel.Warning));
-                        logger.LogWarning(ex, "Error fetching file lengths");
-                        return;
-                    }
-
-                    if (wi.Job.SSIMCheck || wi.Job.ArgumentCalculationSettings.AlwaysCalculateSSIM)
-                    {
-                        wi.Update("Calculating SSIM");
-                        var hardwareDecoder = wi.Job.Preset.HardwareDecoder.Wrap("-hwaccel {0} ");
-
-                        var result = await fFmpegProcessor.CalculateSSIM((args) => wi.UpdateSSIM(args), wi.SourceFile, wi.DestinationFile, hardwareDecoder, token);
-
-                        if (result.Success)
-                        {
-                            wi.SSIM = result.SSIM;
-                        }
-                        else
-                        {
-                            wi.Update(result.Exception);
-                            jobAnalyser.Succeed(false);
-                        }
-                    }
-                    jobAnalyser.Succeed();
                 }
+                catch (Exception ex) when (ex is FileNotFoundException || ex is IOException)
+                {
+                    wi.Update(new Update(ex, LogLevel.Warning));
+                    logger.LogWarning(ex, "Error fetching file lengths");
+                    return;
+                }
+
+                if (wi.Job.SSIMCheck || wi.Job.ArgumentCalculationSettings.AlwaysCalculateSSIM)
+                {
+                    wi.Update("Calculating SSIM");
+                    var hardwareDecoder = wi.Job.Preset.HardwareDecoder.Wrap("-hwaccel {0} ");
+
+                    var result = await fFmpegProcessor.CalculateSSIM((args) => wi.UpdateSSIM(args), wi.SourceFile, wi.DestinationFile, hardwareDecoder, token);
+
+                    if (result.Success)
+                    {
+                        wi.SSIM = result.SSIM;
+                    }
+                    else
+                    {
+                        wi.Update(result.Exception);
+                        jobAnalyser.Succeed(false);
+                    }
+                }
+                jobAnalyser.Succeed();
             }
 
             historyService.EndProcessing(historyID, wi.Condition.HappyEncode, wi);
@@ -572,77 +608,72 @@ namespace Compressarr.JobProcessing
                 {
                     try
                     {
-                        using (var jobCompleter = new JobWorker(job.Condition.Process, job.UpdateStatus))
+                        using var jobCompleter = new JobWorker(job.Condition.Process, job.UpdateStatus);
+                        Log(job, Update.Information($"Started Job at: {DateTime.Now}"));
+
+
+                        foreach (var wi in job.WorkLoad.Where(wi => wi.Condition.ReadyToRun))
                         {
-                            Log(job, Update.Information($"Started Job at: {DateTime.Now}"));
-
-
-                            foreach (var wi in job.WorkLoad.Where(wi => wi.Condition.ReadyToRun))
+                            using var workItemWorker = new JobWorker(wi.Condition.Processing, wi.Update);
+                            try
                             {
-                                using (var workItemWorker = new JobWorker(wi.Condition.Processing, wi.Update))
+                                if (!job.Cancelled)
                                 {
-                                    try
+                                    wi.CancellationTokenSource = new();
+                                    using var lnkCTS = CancellationTokenSource.CreateLinkedTokenSource(wi.CancellationToken, job.CancellationToken, applicationService.AppStoppingCancellationToken);
+
+                                    using (logger.BeginScope("Work Item {SourceFileName}", wi.SourceFileName))
                                     {
-                                        if (!job.Cancelled)
+                                        Log(job, Update.Information($"Preparing"));
+
+                                        await PrepareWorkItem(wi, job.Preset, lnkCTS.Token);
+
+                                        if (lnkCTS.Token.IsCancellationRequested) return;
+
+                                        if (!wi.Condition.HappyEncode) //skipped if done previously
                                         {
-                                            wi.CancellationTokenSource = new();
-                                            using var lnkCTS = CancellationTokenSource.CreateLinkedTokenSource(wi.CancellationToken, job.CancellationToken, applicationService.AppStoppingCancellationToken);
+                                            Log(job, Update.Information("Processing"));
+                                            await ProcessWorkItem(wi, lnkCTS.Token);
+                                        }
 
-                                            using (logger.BeginScope("Work Item {SourceFileName}", wi.SourceFileName))
+                                        if (lnkCTS.Token.IsCancellationRequested) return;
+
+                                        Log(job, Update.Information("Checking Output"));
+                                        var checkResultReport = await CheckResult(wi, lnkCTS.Token);
+                                        if (checkResultReport != null)
+                                        {
+                                            Log(job, Update.Warning(checkResultReport));
+                                        }
+
+                                        if (lnkCTS.Token.IsCancellationRequested) return;
+
+                                        if (wi.Condition.ReadyForImport && job.AutoImport)
+                                        {
+                                            Log(job, Update.Information("Importing"));
+                                            var importReport = await ImportVideo(wi, job.MediaSource);
+                                            if (importReport != null)
                                             {
-                                                Log(job, Update.Information($"Preparing"));
-
-                                                await PrepareWorkItem(wi, job.Preset, lnkCTS.Token);
-
-                                                if (lnkCTS.Token.IsCancellationRequested) return;
-
-                                                if (!wi.Condition.HappyEncode) //skipped if done previously
-                                                {
-                                                    Log(job, Update.Information("Processing"));
-                                                    await ProcessWorkItem(wi, lnkCTS.Token);
-                                                }
-
-                                                if (lnkCTS.Token.IsCancellationRequested) return;
-
-                                                Log(job, Update.Information("Checking Output"));
-                                                var checkResultReport = await CheckResult(wi, lnkCTS.Token);
-                                                if (checkResultReport != null)
-                                                {
-                                                    Log(job, Update.Warning(checkResultReport));
-                                                }
-
-                                                if (lnkCTS.Token.IsCancellationRequested) return;
-
-                                                if (wi.Condition.ReadyForImport && job.AutoImport)
-                                                {
-                                                    Log(job, Update.Information("Importing"));
-                                                    var importReport = await ImportVideo(wi, job.MediaSource);
-                                                    if (importReport != null)
-                                                    {
-                                                        Log(job, Update.Warning(importReport));
-                                                    }
-                                                }
-
-                                                var ssimUpdate = Update.Information($"Sample Size: {wi.ArgumentCalculator.SampleSize} | SSIM Est. {wi.ArgumentCalculator?.VideoEncoderOptions?.FirstOrDefault()?.AutoPresetTests?.FirstOrDefault(t => t.Best)?.SSIM} | SSIM Act. {wi.SSIM}");
-                                                Log(job, ssimUpdate);
-                                                wi.Update(ssimUpdate);
-                                                workItemWorker.Succeed(wi.Condition.ReadyForImport && (!job.AutoImport || wi.Condition.Import.Succeeded));
+                                                Log(job, Update.Warning(importReport));
                                             }
                                         }
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        var update = Update.FromException(ex);
-                                        wi.Update(update);
-                                        Log(job, update);
-                                        workItemWorker.Succeed(false);
+
+                                        var ssimUpdate = Update.Information($"Sample Size: {wi.ArgumentCalculator.SampleSize} | SSIM Est. {wi.ArgumentCalculator?.VideoEncoderOptions?.FirstOrDefault()?.AutoPresetTests?.FirstOrDefault(t => t.Best)?.SSIM} | SSIM Act. {wi.SSIM}");
+                                        Log(job, ssimUpdate);
+                                        wi.Update(ssimUpdate);
+                                        workItemWorker.Succeed(wi.Condition.ReadyForImport && (!job.AutoImport || wi.Condition.Import.Succeeded));
                                     }
                                 }
                             }
-
-                            jobCompleter.Succeed(!job.Cancelled);
-
+                            catch (Exception ex)
+                            {
+                                var update = Update.FromException(ex);
+                                wi.Update(update);
+                                Log(job, update);
+                                workItemWorker.Succeed(false);
+                            }
                         }
+
+                        jobCompleter.Succeed(!job.Cancelled);
                     }
                     catch (OperationCanceledException)
                     {
@@ -749,7 +780,7 @@ namespace Compressarr.JobProcessing
                     }
 
                     var movies = getMoviesResponse.Results;
-                    return new(true, movies.Select(x => new WorkItem(x, applicationService.RadarrSettings.BasePath)).ToHashSet());
+                    return new(true, movies.Select(x => new WorkItem(x)).ToHashSet());
                 }
 
                 if (job.MediaSource == MediaSource.Sonarr)
@@ -766,7 +797,7 @@ namespace Compressarr.JobProcessing
                     }
 
                     var series = getSeriesResponse.Results;
-                    return new(true, series.SelectMany(s => s.Seasons).SelectMany(s => s.EpisodeFiles).Select(x => new WorkItem(x, applicationService.SonarrSettings.BasePath)).ToHashSet());
+                    return new(true, series.SelectMany(s => s.Seasons).SelectMany(s => s.EpisodeFiles).Select(x => new WorkItem(x)).ToHashSet());
                 }
 
                 if (job.MediaSource == MediaSource.Folder)
@@ -775,7 +806,7 @@ namespace Compressarr.JobProcessing
 
                     var getFilesResponse = await folderService.RequestFilesAsync(job.SourceFolder);
 
-                    if(!getFilesResponse.Success)
+                    if (!getFilesResponse.Success)
                     {
                         return new(false, getFilesResponse.ErrorCode, getFilesResponse.ErrorMessage);
                     }

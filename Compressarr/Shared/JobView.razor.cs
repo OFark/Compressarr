@@ -20,14 +20,42 @@ namespace Compressarr.Shared
     public partial class JobView : IDisposable
     {
         private bool canReload, editJob, mouseOnButton;
-        private CancellationTokenSource cts = new();
+        private readonly CancellationTokenSource cts = new();
         private bool DisableCancelMediaInfoButton = true;
-        private bool isExpanded;
         private bool disposedValue;
-        MudForm jobEditorForm;
         private double initialisationProgress;
+        private bool isExpanded;
+        MudForm jobEditorForm;
+        private bool showFolderSource;
+
         [Parameter]
         public Job Job { get; set; }
+
+        public string JobFilterID
+        {
+            get
+            {
+                return Job.FilterID != default ? Job.FilterID.ToString() : "folder";
+            }
+            set
+            {
+                if (Guid.TryParse(value, out var id))
+                {
+                    Job.FilterID = id;
+                    showFolderSource = false;
+                    Job.SourceFolder = default;
+                }
+                else
+                {
+                    if (value == "folder")
+                    {
+                        Job.FilterID = default;
+                        Job.Filter = null;
+                        showFolderSource = true;
+                    }
+                }
+            }
+        }
 
         [Parameter]
         public bool NewJob { get; set; }
@@ -49,33 +77,6 @@ namespace Compressarr.Shared
         [Inject] IHistoryService HistoryService { get; set; }
         [Inject] IJobManager JobManager { get; set; }
         [Inject] ILayoutService LayoutService { get; set; }
-
-        private bool showFolderSource; 
-        public string JobFilterID
-        {
-            get
-            {
-                return Job.FilterID != default ? Job.FilterID.ToString() : "folder";
-            }
-            set
-            {
-                if(Guid.TryParse(value, out var id))
-                {
-                    Job.FilterID = id;
-                    showFolderSource = false;
-                    Job.SourceFolder = default;
-                }
-                else
-                {
-                    if(value == "folder")
-                    {
-                        Job.FilterID = default;
-                        Job.Filter = null;
-                        showFolderSource = true;
-                    }
-                }
-            }
-        }
         private int? MaxComp
         {
             get
@@ -213,7 +214,7 @@ namespace Compressarr.Shared
 
             showFolderSource = JobFilterID == "folder";
         }
-        private void CancelProcessing(WorkItem wi)
+        private static void CancelProcessing(WorkItem wi)
         {
             if (wi.CancellationToken.CanBeCanceled)
             {

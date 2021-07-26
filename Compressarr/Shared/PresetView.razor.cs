@@ -52,7 +52,7 @@ namespace Compressarr.Shared
                 if (firstCoverAny != Preset.AudioStreamPresets.Last())
                 {
                     var indexofRemoval = Preset.AudioStreamPresets.IndexOf(firstCoverAny) + 1;
-                    Preset.AudioStreamPresets.RemoveRange(indexofRemoval, Preset.AudioStreamPresets.Count() - indexofRemoval);
+                    Preset.AudioStreamPresets.RemoveRange(indexofRemoval, Preset.AudioStreamPresets.Count - indexofRemoval);
                 }
             }
             InvokeAsync(StateHasChanged);

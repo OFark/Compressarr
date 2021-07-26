@@ -15,7 +15,7 @@ namespace Compressarr.Pages
     public partial class Index
     {
         [Inject]
-        IPresetManager presetManager { get; set; }
+        IPresetManager PresetManager { get; set; }
         [Inject]
         IFilterManager FilterManager { get; set; }
         [Inject]
@@ -27,8 +27,9 @@ namespace Compressarr.Pages
         [Inject]
         ISonarrService SonarrService { get; set; }
         [Inject]
-        IApplicationService applicationService { get; set; }
+        IApplicationService ApplicationService { get; set; }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0044:Add readonly modifier", Justification = "This isn't readonly, it's modified in a razor component")]
         private Job newJob = new();
 
         private StatusResult filterStatus = new();
@@ -46,12 +47,12 @@ namespace Compressarr.Pages
         {
             LayoutService.OnStateChanged += LayoutService_OnStateChanged;
 
-            await applicationService.InitialiseFFmpeg;
+            await ApplicationService.InitialiseFFmpeg;
 
             radarrStatus = await RadarrService.GetStatus();
             sonarrStatus = await SonarrService.GetStatus();
             filterStatus = await FilterManager.GetStatus();
-            presetStatus = await presetManager.GetStatus();
+            presetStatus = await PresetManager.GetStatus();
 
             await base.OnInitializedAsync();
         }

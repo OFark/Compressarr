@@ -2,6 +2,7 @@
 using Compressarr.FFmpeg.Events;
 using Compressarr.FFmpeg.Models;
 using Compressarr.Helpers;
+using Compressarr.JobProcessing.Models;
 using Compressarr.Presets;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -25,9 +26,9 @@ namespace Compressarr.FFmpeg
         private readonly static Regex RegexAvailableEncoders = new(@"^\s([VAS])[F\.][S\.][X\.][B\.][D\.]\s(?!=)([^\s]*)\s*(.*)$", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
         private readonly static Regex RegexAvailableFormats = new(@"^ ?([D ])([E ]) (?!=)([^ ]*) *(.*)$", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
         private readonly static Regex RegexAvailableHardwareAccels = new(@"^(?!Hardware).*", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
-        private readonly static Regex RegexMultipleExtensions = new Regex(@"^ *Common extensions: ((\w+)[,\.])*", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
+        private readonly static Regex RegexMultipleExtensions = new (@"^ *Common extensions: ((\w+)[,\.])*", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
         private readonly static Regex RegexSingleExtension = new(@"^ *Common extensions: (\w*)(?:,\w*)*\.", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
-        private readonly static Regex RegexVersion = new Regex(@"(?<=version\s)(.*)(?=\sCopy)", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
+        private readonly static Regex RegexVersion = new (@"(?<=version\s)(.*)(?=\sCopy)", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
         private static SemaphoreSlim semLock = new(1, 10);
         private readonly IApplicationService applicationService;
         private readonly IFileService fileService;
@@ -66,6 +67,29 @@ namespace Compressarr.FFmpeg
             catch (Exception ex)
             {
                 return new(ex);
+            }
+        }
+
+        public async Task<FFResult> EncodeAVideo(string arguments, FFmpegProgressEvent fFmpegProgressEvent, FFmpegStdOutEvent fFmpegStdOutEvent, CancellationToken token)
+        {
+            using (logger.BeginScope("Converting video"))
+            {
+                try
+                {
+                    logger.LogDebug("FFmpeg conversion started.");
+                    var result = await RunProcess(FFProcess.FFmpeg, arguments, token, fFmpegProgressEvent, null, fFmpegStdOutEvent);
+                    logger.LogDebug("FFmpeg conversion finished.");
+
+                    return new(true);
+                }
+                catch (OperationCanceledException)
+                {
+                    return new(new OperationCanceledException("User cancelled encoding"));
+                }
+                catch (Exception ex)
+                {
+                    return new(ex);
+                }
             }
         }
 
@@ -401,7 +425,7 @@ namespace Compressarr.FFmpeg
                 }
             }
         }
-        public async Task<ProcessResponse> RunProcess(FFProcess process, string arguments, CancellationToken token, FFmpegProgressEvent OnProgress = null, FFmpegSSIMReportEvent OnSSIM = null)
+        public async Task<ProcessResponse> RunProcess(FFProcess process, string arguments, CancellationToken token, FFmpegProgressEvent OnProgress = null, FFmpegSSIMReportEvent OnSSIM = null, FFmpegStdOutEvent OnStdOut = null)
         {
             var filePath = process switch
             {
@@ -410,115 +434,18 @@ namespace Compressarr.FFmpeg
                 _ => throw new NotImplementedException()
             };
 
-            return await RunProcess(filePath, arguments, token, OnProgress, OnSSIM);
+            return await RunProcess(filePath, arguments, token, OnProgress, OnSSIM, OnStdOut);
         }
 
-        //public async Task<ProcessResponse> RunProcess(string filePath, string arguments, CancellationToken token, FFmpegProgressEvent OnProgress = null, FFmpegSSIMReportEvent OnSSIM = null)
-        //{
-        //    using (logger.BeginScope("Run Process: {filePath}", filePath))
-        //    {
-        //        var response = new ProcessResponse();
-
-        //        using var p = new Process();
-        //        p.StartInfo = new ProcessStartInfo()
-        //        {
-        //            Arguments = arguments,
-        //            CreateNoWindow = true,
-        //            FileName = filePath,
-        //            RedirectStandardError = true,
-        //            RedirectStandardOutput = true,
-        //            UseShellExecute = false,
-        //            WindowStyle = ProcessWindowStyle.Hidden,
-        //        };
-
-        //        var stdOut = string.Empty;
-        //        var stdErr = string.Empty;
-        //        TimeSpan duration = default;
-        //        FFmpegProgress progressReport = null;
-
-        //        p.OutputDataReceived += new DataReceivedEventHandler((s, e) =>
-        //        {
-        //            if (!string.IsNullOrWhiteSpace(e?.Data))
-        //            {
-        //                if (OnProgress != null && FFmpegProgress.TryParse(e.Data, out var result))
-        //                {
-        //                    progressReport = result.CalculatePercentage(duration);
-        //                    OnProgress.Invoke(progressReport);
-        //                }
-        //                else if (OnSSIM != null && FFmpegSSIMReport.TryParse(e.Data, out var ssimreport)) OnSSIM.Invoke(ssimreport);
-        //                else if (FFmpegDurationReport.TryParse(e.Data, out var durationreport)) duration = duration != default && duration > durationreport.Duration ? duration : durationreport.Duration;
-        //                else { stdOut += $"{e.Data}\r\n"; }
-        //            }
-        //        });
-        //        p.ErrorDataReceived += new DataReceivedEventHandler((s, e) =>
-        //        {
-        //            if (!string.IsNullOrWhiteSpace(e?.Data))
-        //            {
-        //                if (OnProgress != null && FFmpegProgress.TryParse(e.Data, out var result))
-        //                {
-        //                    progressReport = result.CalculatePercentage(duration);
-        //                    OnProgress.Invoke(progressReport);
-        //                }
-        //                else if (OnSSIM != null && FFmpegSSIMReport.TryParse(e.Data, out var ssimreport)) OnSSIM.Invoke(ssimreport);
-        //                else if (FFmpegDurationReport.TryParse(e.Data, out var durationreport)) duration = duration != default && duration > durationreport.Duration ? duration : durationreport.Duration;
-        //                else
-        //                {
-        //                    logger.LogError(e.Data);
-        //                    stdErr += $"{e.Data}\r\n";
-        //                }
-        //            }
-        //        });
-
-        //        await semLock.WaitAsync(token);
-        //        try
-        //        {
-        //            logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
-        //            p.Start();
-
-        //            p.BeginOutputReadLine();
-        //            p.BeginErrorReadLine();
-
-        //            await p.WaitForExitAsync(token);
-        //            p.WaitForExit(1000); //This waits for any handles to finish as well. 
-        //        }
-        //        finally
-        //        {
-        //            semLock.Release();
-        //        }
-
-
-        //        response.StdOut = stdOut;
-        //        response.StdErr = stdErr;
-
-        //        if (progressReport != null)
-        //        {
-        //            progressReport.Percentage = 100;
-        //            OnProgress.Invoke(progressReport);
-        //        }
-
-        //        response.ExitCode = p.ExitCode;
-
-        //        if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(response.StdErr))
-        //        {
-        //            logger.LogError($"Process Error: ({p.ExitCode}) {response.StdErr} <End Of Error>");
-        //        }
-        //        else
-        //        {
-        //            response.Success = true;
-        //        }
-
-        //        return response;
-        //    }
-        //}
-
-        public async Task<ProcessResponse> RunProcess(string filePath, string arguments, CancellationToken token, FFmpegProgressEvent OnProgress = null, FFmpegSSIMReportEvent OnSSIM = null)
+        public async Task<ProcessResponse> RunProcess(string filePath, string arguments, CancellationToken token, FFmpegProgressEvent OnProgress = null, FFmpegSSIMReportEvent OnSSIM = null, FFmpegStdOutEvent OnStdOut = null)
         {
             using (logger.BeginScope("Run Process: {filePath}", filePath))
             {
                 var response = new ProcessResponse();
 
-                using var p = new Process();
-                p.StartInfo = new ProcessStartInfo()
+
+                using var process = new Process();
+                process.StartInfo = new ProcessStartInfo()
                 {
                     Arguments = arguments,
                     CreateNoWindow = true,
@@ -537,75 +464,138 @@ namespace Compressarr.FFmpeg
                 await semLock.WaitAsync(token);
                 try
                 {
-                    logger.LogDebug($"Starting process: {p.StartInfo.FileName} {p.StartInfo.Arguments}");
-                    p.Start();
+                    var outputCloseEvent = new TaskCompletionSource<bool>();
 
-
-                    while (!p.StandardOutput.EndOfStream)
+                    process.OutputDataReceived += (s, e) =>
                     {
-                        var outputLine = p.StandardOutput.ReadLine();
-                        if (!string.IsNullOrWhiteSpace(outputLine))
+                        // The output stream has been closed i.e. the process has terminated
+                        if (e.Data == null)
                         {
-                            if (OnProgress != null && FFmpegProgress.TryParse(outputLine, out var result))
-                            {
-                                progressReport = result.CalculatePercentage(duration);
-                                OnProgress.Invoke(progressReport);
-                            }
-                            else if (OnSSIM != null && FFmpegSSIMReport.TryParse(outputLine, out var ssimreport)) OnSSIM.Invoke(ssimreport);
-                            else if (FFmpegDurationReport.TryParse(outputLine, out var durationreport)) duration = duration != default && duration > durationreport.Duration ? duration : durationreport.Duration;
-                            else { stdOut += $"{outputLine}\r\n"; }
+                            outputCloseEvent.SetResult(true);
                         }
-                    }
-
-                    while (!p.StandardError.EndOfStream)
-                    {
-                        var outputLine = p.StandardError.ReadLine();
-                        if (!string.IsNullOrWhiteSpace(outputLine))
+                        else
                         {
-                            if (OnProgress != null && FFmpegProgress.TryParse(outputLine, out var result))
+                            if (!string.IsNullOrWhiteSpace(e.Data))
                             {
-                                progressReport = result.CalculatePercentage(duration);
-                                OnProgress.Invoke(progressReport);
-                            }
-                            else if (OnSSIM != null && FFmpegSSIMReport.TryParse(outputLine, out var ssimreport)) OnSSIM.Invoke(ssimreport);
-                            else if (FFmpegDurationReport.TryParse(outputLine, out var durationreport)) duration = duration != default && duration > durationreport.Duration ? duration : durationreport.Duration;
-                            else
-                            {
-                                logger.LogError(outputLine);
-                                stdErr += $"{outputLine}\r\n";
+
+                                if (OnProgress != null && FFmpegProgress.TryParse(e.Data, out var result))
+                                {
+                                    progressReport = result.CalculatePercentage(duration);
+                                    OnProgress.Invoke(progressReport);
+                                }
+                                else if (OnSSIM != null && FFmpegSSIMReport.TryParse(e.Data, out var ssimreport)) OnSSIM.Invoke(ssimreport);
+                                else if (FFmpegDurationReport.TryParse(e.Data, out var durationreport)) duration = duration != default && duration > durationreport.Duration ? duration : durationreport.Duration;
+                                else
+                                {
+                                    OnStdOut?.Invoke(e.Data);
+                                    stdOut += $"{e.Data}\r\n";
+                                }
                             }
                         }
-                    }
+                    };
 
-                    await p.WaitForExitAsync(token);
-                    p.WaitForExit(1000); //This waits for any handles to finish as well. 
+                    var errorCloseEvent = new TaskCompletionSource<bool>();
+
+                    process.ErrorDataReceived += (s, e) =>
+                    {
+                        // The error stream has been closed i.e. the process has terminated
+                        if (e.Data == null)
+                        {
+                            errorCloseEvent.SetResult(true);
+                        }
+                        else
+                        {
+                            if (!string.IsNullOrWhiteSpace(e.Data))
+                            {
+                                if (OnProgress != null && FFmpegProgress.TryParse(e.Data, out var result))
+                                {
+                                    progressReport = result.CalculatePercentage(duration);
+                                    OnProgress.Invoke(progressReport);
+                                }
+                                else if (OnSSIM != null && FFmpegSSIMReport.TryParse(e.Data, out var ssimreport)) OnSSIM.Invoke(ssimreport);
+                                else if (FFmpegDurationReport.TryParse(e.Data, out var durationreport)) duration = duration != default && duration > durationreport.Duration ? duration : durationreport.Duration;
+                                else
+                                {
+                                    OnStdOut?.Invoke(e.Data);
+                                    logger.LogWarning(e.Data);
+                                    stdErr += $"{e.Data}\r\n";
+                                }
+                            }
+                        }
+                    };
+
+                    using (token.Register(() =>
+                    {
+                        outputCloseEvent.TrySetCanceled(token);
+                        errorCloseEvent.TrySetCanceled(token);
+                    }))
+                    {
+
+                        bool isStarted;
+
+                        try
+                        {
+                            logger.LogDebug($"Starting process: {process.StartInfo.FileName} {process.StartInfo.Arguments}");
+                            isStarted = process.Start();
+                        }
+                        catch (Exception error)
+                        {
+                            // Usually it occurs when an executable file is not found or is not executable
+
+                            response.Success = false;
+                            response.ExitCode = -1;
+                            response.StdErr = error.Message;
+                            response.StdOut = error.Message;
+
+                            isStarted = false;
+                        }
+
+                        if (isStarted)
+                        {
+                            // Reads the output stream first and then waits because deadlocks are possible
+                            process.BeginOutputReadLine();
+                            process.BeginErrorReadLine();
+
+
+
+                            // Creates task to wait for process exit using timeout
+                            var waitForExit = process.WaitForExitAsync(token);
+
+
+                            // Create task to wait for process exit and closing all output streams
+                            var processTask = Task.WhenAll(waitForExit, outputCloseEvent.Task, errorCloseEvent.Task);
+
+                            await processTask;
+
+                            if (!token.IsCancellationRequested)
+                            {
+                                response.StdOut = stdOut;
+                                response.StdErr = stdErr;
+
+                                if (progressReport != null)
+                                {
+                                    progressReport.Percentage = 100;
+                                    OnProgress.Invoke(progressReport);
+                                }
+
+                                response.ExitCode = process.ExitCode;
+
+                                if (process.ExitCode != 0 && !string.IsNullOrWhiteSpace(response.StdErr))
+                                {
+                                    logger.LogError($"Process Error: ({process.ExitCode}) {response.StdErr} <End Of Error>");
+                                }
+                                else
+                                {
+                                    response.Success = true;
+                                }
+                            }
+                        }
+                    }
                 }
                 finally
                 {
                     semLock.Release();
                 }
-
-
-                response.StdOut = stdOut;
-                response.StdErr = stdErr;
-
-                if (progressReport != null)
-                {
-                    progressReport.Percentage = 100;
-                    OnProgress.Invoke(progressReport);
-                }
-
-                response.ExitCode = p.ExitCode;
-
-                if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(response.StdErr))
-                {
-                    logger.LogError($"Process Error: ({p.ExitCode}) {response.StdErr} <End Of Error>");
-                }
-                else
-                {
-                    response.Success = true;
-                }
-
                 return response;
             }
         }

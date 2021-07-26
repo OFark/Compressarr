@@ -37,10 +37,10 @@ namespace Compressarr.Services
 
         //public delegate Task AsyncEventHandler(object sender, EventArgs e);
 
-        public long MovieCount => movies?.Count() ?? 0;
+        public long MovieCount => Movies?.Count() ?? 0;
         public string MovieFilter { get; set; }
         public IEnumerable<string> MovieFilterValues { get; set; }
-        private IEnumerable<Movie> movies => applicationService.Movies;
+        private IEnumerable<Movie> Movies => applicationService.Movies;
         public void ClearCache()
         {
             applicationService.Movies = new HashSet<Movie>();
@@ -51,7 +51,7 @@ namespace Compressarr.Services
             {
                 logger.LogInformation($"Fetching Movies");
 
-                if (movies == null || !movies.Any() || force)
+                if (Movies == null || !Movies.Any() || force)
                 {
                     var moviesRequest = await RequestMovies();
                     if (moviesRequest.Success)
@@ -66,10 +66,10 @@ namespace Compressarr.Services
 
                 if (!string.IsNullOrWhiteSpace(MovieFilter))
                 {
-                    return new(true, FilterMovies(movies.JsonClone().AsQueryable(), MovieFilter, MovieFilterValues));
+                    return new(true, FilterMovies(Movies.JsonClone().AsQueryable(), MovieFilter, MovieFilterValues));
                 }
 
-                return new(true, movies);
+                return new(true, Movies);
             }
         }
 
@@ -123,10 +123,10 @@ namespace Compressarr.Services
                 logger.LogDebug($"Property name: {property}");
 
 
-                if (movies.Any())
+                if (Movies.Any())
                 {
                     var selectManySplit = property.Split("|");
-                    IQueryable movs = movies.AsQueryable();
+                    IQueryable movs = Movies.AsQueryable();
 
                     for (int i = 0; i < selectManySplit.Length - 1; i++)
                     {
@@ -442,44 +442,43 @@ namespace Compressarr.Services
                 try
                 {
                     logger.LogDebug($"Creating new HTTP client.");
-                    using (var hc = new HttpClient())
+                    using var hc = new HttpClient();
+
+                    logger.LogDebug($"Downloading Movie List.");
+                    movieJSON = await hc.GetStringAsync(link);
+
+                    if (AppEnvironment.IsDevelopment)
                     {
-                        logger.LogDebug($"Downloading Movie List.");
-                        movieJSON = await hc.GetStringAsync(link);
-
-                        if (AppEnvironment.IsDevelopment)
-                        {
-                            _ = fileService.DumpDebugFile("movies.json", movieJSON);
-                        }
-
-
-                        //This is here as part of a caching principle, I may use it later, I may not. 
-                        if (previousResultsHash != 0)
-                        {
-                            var newHash = movieJSON.GetHashCode();
-                            if (newHash != previousResultsHash)
-                            {
-                                previousResultsHash = newHash;
-                            }
-                        }
-                        else
-                        {
-                            previousResultsHash = movieJSON.GetHashCode();
-                        }
-
-                        var moviesArr = JsonConvert.DeserializeObject<Movie[]>(movieJSON);
-
-                        var movies = moviesArr.Where(m => m.downloaded && m.movieFile != null && m.movieFile.mediaInfo != null).OrderBy(m => m.title).ToHashSet();
-
-                        foreach (var m in movies)
-                        {
-                            m.BasePath = applicationService.RadarrSettings.BasePath;
-                        }
-
-                        logger.LogDebug($"Success.");
-
-                        return new(true, movies);
+                        _ = fileService.DumpDebugFile("movies.json", movieJSON);
                     }
+
+
+                    //This is here as part of a caching principle, I may use it later, I may not. 
+                    if (previousResultsHash != 0)
+                    {
+                        var newHash = movieJSON.GetHashCode();
+                        if (newHash != previousResultsHash)
+                        {
+                            previousResultsHash = newHash;
+                        }
+                    }
+                    else
+                    {
+                        previousResultsHash = movieJSON.GetHashCode();
+                    }
+
+                    var moviesArr = JsonConvert.DeserializeObject<Movie[]>(movieJSON);
+
+                    var movies = moviesArr.Where(m => m.Downloaded && m.MovieFile != null && m.MovieFile.MediaInfo != null).OrderBy(m => m.Title).ToHashSet();
+
+                    foreach (var m in movies)
+                    {
+                        m.BasePath = applicationService.RadarrSettings.BasePath;
+                    }
+
+                    logger.LogDebug($"Success.");
+
+                    return new(true, movies);
                 }
                 catch (Exception ex)
                 {
