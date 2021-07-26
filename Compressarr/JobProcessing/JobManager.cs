@@ -108,7 +108,7 @@ namespace Compressarr.JobProcessing
             if (history != null && history.Any())
             {
                 var lastEntry = history.Last();
-                if ((lastEntry?.Success ?? false) && (lastEntry?.Arguments?.SequenceEqual(wi.Arguments) ?? wi.Arguments == null) && File.Exists(wi.DestinationFile))
+                if ((lastEntry?.Success ?? false) && (lastEntry?.Arguments == wi.Arguments) && File.Exists(wi.DestinationFile))
                 {
                     wi.SSIM = lastEntry.SSIM;
                     wi.Compression = lastEntry.Compression;
@@ -215,6 +215,17 @@ namespace Compressarr.JobProcessing
                 {
                     logger.Log(update.Level, update.Message);
                 };
+
+                if (job.WorkLoad != null)
+                {
+                    foreach (var wi in job.WorkLoad.Where(w => w.Condition.Prepare.Processing || w.Condition.Processing.Processing))
+                    {
+                        if (wi.CancellationToken.CanBeCanceled)
+                        {
+                            wi.CancellationTokenSource.Cancel();
+                        }
+                    }
+                }
 
                 if (job.Condition.SafeToInitialise)
                 {

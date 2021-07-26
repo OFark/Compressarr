@@ -211,7 +211,7 @@ namespace Compressarr.JobProcessing
             var colorPrimaries = argCalc.ColorPrimaries.Wrap(" -color_primaries {0}");
             var colorTransfer = argCalc.ColorTransfer.Wrap(" -color_trc {0}");
 
-            var globalVideoArgs = firstPass ? passStr : $"{bitrate}{frameRate}{bframes}{colorPrimaries}{colorTransfer}{passStr}";
+            var globalVideoArgs = $"{bitrate}{frameRate}{bframes}{colorPrimaries}{colorTransfer}{passStr}";
 
             var mapAllElse = firstPass ? "" : " -map 0:s? -c:s copy -map 0:t? -map 0:d? -movflags use_metadata_tags";
 
