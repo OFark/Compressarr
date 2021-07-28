@@ -6,14 +6,10 @@ name: Docker Build and Publish
 # documentation.
 
 on:
-  # schedule:
-  #  - cron: '26 0 * * *'
-  push:
-    branches: [ master ]
-    # Publish semver tags as releases.
-    tags: [ 'v*.*.*' ]
-  pull_request:
-    branches: [ master ]
+  workflow_run:
+    workflows: [".NET"]
+    types:
+      - completed
 
 env:
   # Use docker.io for Docker Hub if empty
