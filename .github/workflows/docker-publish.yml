@@ -1,4 +1,4 @@
-name: Docker
+name: Docker Build and Publish
 
 # This workflow uses actions that are not certified by GitHub.
 # They are provided by a third-party and are governed by
@@ -58,5 +58,6 @@ jobs:
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
         with:
           context: .
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name != 'pull_request' }}          
+          tags: latest
           labels: ${{ steps.meta.outputs.labels }}
