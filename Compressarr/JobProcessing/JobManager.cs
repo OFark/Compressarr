@@ -109,7 +109,7 @@ namespace Compressarr.JobProcessing
             if (history != null && history.Any())
             {
                 var lastEntry = history.Last();
-                if ((lastEntry?.Success ?? false) && (lastEntry?.Arguments == wi.Arguments) && File.Exists(wi.DestinationFile))
+                if ((lastEntry?.Success ?? false) && (lastEntry?.Arguments?.SequenceEqual(wi.Arguments) ?? wi.Arguments == null) && File.Exists(wi.DestinationFile))
                 {
                     wi.SSIM = lastEntry.SSIM;
                     wi.Compression = lastEntry.Compression;
@@ -519,6 +519,7 @@ namespace Compressarr.JobProcessing
                 catch (OperationCanceledException)
                 {
                     Log(wi.Job, Update.Warning("User cancelled job"));
+                    jobRunner.Succeed(false);
                 }
 
                 finally
@@ -527,7 +528,6 @@ namespace Compressarr.JobProcessing
                         processSemaphore.Release();
                 }
 
-                jobRunner.Succeed(false);
             }
 
 
