@@ -61,4 +61,3 @@ jobs:
           file: Dockerfile.nvidia
           push: ${{ github.event_name != 'pull_request' }}
           tags: nvidia
-          labels: ${{ steps.meta.outputs.labels }}
