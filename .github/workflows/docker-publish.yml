@@ -59,4 +59,4 @@ jobs:
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}          
-          tags: latest
+          tags: ofark/compressarr:latest

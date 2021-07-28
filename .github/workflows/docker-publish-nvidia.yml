@@ -60,4 +60,4 @@ jobs:
           context: .
           file: Dockerfile.nvidia
           push: ${{ github.event_name != 'pull_request' }}
-          tags: nvidia
+          tags: ofark/compressarr:nvidia
