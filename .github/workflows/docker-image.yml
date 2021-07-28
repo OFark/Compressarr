@@ -1,0 +1,20 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build the Docker image
+      run: docker build -t -f .\Compressarr\DockerFile ofark/compressarr .; docker build -f .\Compressarr\Dockerfile.nvidia -t ofark/compressarr:nvidia .      
+    - name: Publish docker Images
+      run: docker image push ofark/compressarr; docker image push ofark/compressarr:nvidia
