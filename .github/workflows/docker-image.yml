@@ -15,6 +15,6 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Build the Docker image
-      run: docker build -t ofark/compressarr .; docker build -f .\Dockerfile.nvidia -t ofark/compressarr:nvidia .      
+      run: docker build -t -f .\Compressarr\DockerFile ofark/compressarr .; docker build -f .\Compressarr\Dockerfile.nvidia -t ofark/compressarr:nvidia .      
     - name: Publish docker Images
       run: docker image push ofark/compressarr; docker image push ofark/compressarr:nvidia
