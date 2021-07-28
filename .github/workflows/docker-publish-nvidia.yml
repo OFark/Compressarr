@@ -58,5 +58,7 @@ jobs:
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
         with:
           context: .
+          file: Dockerfile.nvidia
           push: ${{ github.event_name != 'pull_request' }}
+          tags: nvidia
           labels: ${{ steps.meta.outputs.labels }}
