@@ -5,6 +5,7 @@ using Compressarr.JobProcessing;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Presets;
 using Compressarr.Presets.Models;
+using LiteDB;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -52,6 +53,8 @@ namespace Compressarr.Application
             {
                 try
                 {
+                    ApplyDatabaseTransforms();
+
                     applicationService.InitialiseFFmpeg = InitialiseFFmpeg();
 
                     await applicationService.InitialiseFFmpeg;
@@ -83,6 +86,72 @@ namespace Compressarr.Application
                     logger.LogError(ex, "Initialisation Error");
                 }
             }
+        }
+
+        private void ApplyDatabaseTransforms()
+        {
+            using var db = new LiteDatabase(fileService.GetAppFilePath(AppFile.mediaInfo));
+
+            var oldHistories = db.GetCollection<JobProcessing.Models.History>();
+
+            var newHistories = db.GetCollection<History.Models.MediaHistory>();
+
+            if (oldHistories != null && oldHistories.Count() > 0)
+            {
+                foreach (var his in oldHistories.FindAll())
+                {
+                    if (his.Entries != null)
+                    {
+                        foreach (var ent in his.Entries.Where(x => !string.IsNullOrWhiteSpace(x.FilePath)))
+                        {
+                            var history = newHistories.Include(x => x.Entries).Query().Where(x => x.FilePath == ent.FilePath).FirstOrDefault();
+                            if (history == null)
+                            {
+                                history = new()
+                                {
+                                    FilePath = ent.FilePath
+                                };
+
+                                newHistories.Insert(history);
+                            }
+
+                            var entry = new History.Models.HistoryEntry()
+                            {
+                                Started = ent.Started,
+                                Finished = ent.Finished,
+                                HistoryID = ent.HistoryID,
+                                Type = ent.Type
+                            };
+
+                            var processingHistory = new History.Models.ProcessingHistory()
+                            {
+                                Arguments = ent.Arguments,
+                                Compression = ent.Compression,
+                                DestinationFilePath = ent.FilePath,
+                                FilterID = ent.FilterID,
+                                FPS = ent.FPS,
+                                Percentage = ent.Percentage,
+                                Preset = ent.Preset,
+                                Speed = ent.Speed,
+                                SSIM = ent.SSIM,
+                                Success = ent.Success
+                            };
+
+                            history.Entries ??= new();
+
+                            entry.ProcessingHistory = processingHistory;
+                            history.Entries.Add(entry);
+
+                            newHistories.Update(history);
+                        }
+                    }
+                }
+
+                newHistories.EnsureIndex(x => x.Id);
+
+                db.DropCollection("History");
+            }
+
         }
 
         private async Task<string> GetFFmpegVersionAsync()

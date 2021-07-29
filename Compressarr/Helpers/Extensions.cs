@@ -42,6 +42,16 @@ namespace Compressarr.Helpers
             return block.Completion;
         }
 
+        public static string ToWords(this bool? test, string ifTrue, string ifFalse)
+        {
+            if(test.HasValue)
+            {
+                return test.Value ? ifTrue : ifFalse;
+            }
+
+            return null;
+        }
+
         //public static async Task AsyncParallelForEach<T>(this IAsyncEnumerable<T> source, Func<T, Task> body, int maxDegreeOfParallelism = DataflowBlockOptions.Unbounded, TaskScheduler scheduler = null)
         //{
         //    var options = new ExecutionDataflowBlockOptions

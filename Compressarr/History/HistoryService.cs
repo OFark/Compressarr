@@ -1,4 +1,5 @@
 ﻿using Compressarr.Application;
+using Compressarr.History.Models;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Presets.Models;
 using LiteDB;
@@ -7,8 +8,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using HistoryEntry = Compressarr.History.Models.HistoryEntry;
 
-namespace Compressarr.JobProcessing
+namespace Compressarr.History
 {
     public class HistoryService : IHistoryService
     {
@@ -41,22 +43,20 @@ namespace Compressarr.JobProcessing
 
             try
             {
-                var histories = db.GetCollection<History>();
-                var history = histories.Query().Include(x => x.Entries).Where(x => x.MediaID == workItem.Media.UniqueID).FirstOrDefault();
+                var historyEntries = db.GetCollection<HistoryEntry>();
+                var entry = historyEntries.Query().Where(x => x.HistoryID == historyEntryID).FirstOrDefault();
 
-                if (history != null)
+                if (entry != null)
                 {
-                    var historyProcessing = history.Entries.FirstOrDefault(x => x.HistoryID == historyEntryID);
+                    entry.Finished = DateTime.Now;
+                    entry.ProcessingHistory.Success = succeeded;
+                    entry.ProcessingHistory.Compression = workItem.Compression;
+                    entry.ProcessingHistory.FPS = workItem.FPS;
+                    entry.ProcessingHistory.Percentage = workItem.Percent;
+                    entry.ProcessingHistory.Speed = workItem.Speed;
+                    entry.ProcessingHistory.SSIM = workItem.SSIM;
 
-                    historyProcessing.Finished = DateTime.Now;
-                    historyProcessing.Success = succeeded;
-                    historyProcessing.Compression = workItem.Compression;
-                    historyProcessing.FPS = workItem.FPS;
-                    historyProcessing.Percentage = workItem.Percent;
-                    historyProcessing.Speed = workItem.Speed;
-                    historyProcessing.SSIM = workItem.SSIM;
-
-                    histories.Update(history);
+                    historyEntries.Update(entry);
                 }
             }
             catch (InvalidCastException)
@@ -80,7 +80,7 @@ namespace Compressarr.JobProcessing
             });
         }
 
-        public async Task<SortedSet<HistoryProcessing>> GetProcessHistoryAsync(int mediaID)
+        public async Task<SortedSet<MediaHistory>> GetHistory()
         {
             using var db = new LiteDatabase(fileService.GetAppFilePath(AppFile.mediaInfo));
 
@@ -88,9 +88,8 @@ namespace Compressarr.JobProcessing
             {
                 try
                 {
-                    var histories = db.GetCollection<History>();
-                    var history = histories.Query().Where(x => x.MediaID == mediaID).FirstOrDefault();
-                    return new SortedSet<HistoryProcessing>(history?.Entries ?? new());
+                    var histories = db.GetCollection<MediaHistory>();
+                    return new SortedSet<MediaHistory>(histories.Include(x => x.Entries).FindAll());
                 }
                 catch (InvalidCastException)
                 {
@@ -100,55 +99,80 @@ namespace Compressarr.JobProcessing
             });
         }
 
-        public Guid StartProcessing(int mediaID, string filePath, Guid filterID, string preset, IEnumerable<string> arguments)
+        public async Task<SortedSet<HistoryEntry>> GetProcessHistoryAsync(string filePath)
         {
             using var db = new LiteDatabase(fileService.GetAppFilePath(AppFile.mediaInfo));
 
-            var history = new History();
-            ILiteCollection<History> histories = default;
+            return await Task.Run(() =>
+            {
+                try
+                {
+                    var histories = db.GetCollection<MediaHistory>();
+                    var history = histories.Query().Include(x => x.Entries).Where(x => x.FilePath == filePath).FirstOrDefault();
+                    return new SortedSet<HistoryEntry>(history?.Entries ?? new());
+                }
+                catch (InvalidCastException)
+                {
+                    db.DropCollection(HISTORYTABLE);
+                    return new();
+                }
+            });
+        }
+
+        public Guid StartProcessing(WorkItem wi)
+        {
+            using var db = new LiteDatabase(fileService.GetAppFilePath(AppFile.mediaInfo));
+
+            var history = new MediaHistory();
+            ILiteCollection<MediaHistory> histories = default;
 
             try
             {
-                histories = db.GetCollection<History>();
-                history = histories.Query().Include(x => x.Entries).Where(x => x.MediaID == mediaID).FirstOrDefault();
+                histories = db.GetCollection<MediaHistory>();
+                history = histories.Query().Include(x => x.Entries).Where(x => x.FilePath == wi.SourceFile).FirstOrDefault();
             }
             catch (InvalidCastException)
             {
                 db.DropCollection(HISTORYTABLE);
-                histories = db.GetCollection<History>();
+                histories = db.GetCollection<MediaHistory>();
                 //todo: report on screen
             }
 
             if (history == default)
             {
-                history = new History()
+                history = new MediaHistory()
                 {
-                    MediaID = mediaID
+                    FilePath = wi.SourceFile
                 };
                 histories.Insert(history);
             }
 
             history.Entries ??= new();
 
-            var historyProcessing = new HistoryProcessing()
+            var processingHistory = new ProcessingHistory()
             {
-                Arguments = arguments.ToList(),
-                FilePath = filePath,
-                FilterID = filterID,
-                HistoryID = Guid.NewGuid(),
-                Preset = preset,
-                Started = DateTime.Now,
-                Type = "Processed"
+                Arguments = wi.Arguments.ToList(),
+                DestinationFilePath = wi.DestinationFile,
+                FilterID = wi.Job.FilterID,
+                Preset = wi.Job.PresetName
             };
 
-            history.Entries.Add(historyProcessing);
+            var entry = new HistoryEntry()
+            {
+                HistoryID = Guid.NewGuid(),
+                Started = DateTime.Now,
+                Type = "Processed",
+                ProcessingHistory = processingHistory
+            };
+
+            history.Entries.Add(entry);
 
             histories.EnsureIndex(x => x.Id);
             histories.EnsureIndex(x => x.Entries);
 
             histories.Update(history);
 
-            return historyProcessing.HistoryID;
+            return entry.HistoryID;
         }
     }
 }

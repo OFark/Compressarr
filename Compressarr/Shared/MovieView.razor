@@ -91,7 +91,7 @@
 
         if (movie.ShowHistory)
         {
-            movie.MediaHistory = (await historyService.GetProcessHistoryAsync(movie.UniqueID)).Select(x => x.ToTreeView()).ToHashSet();
+            movie.MediaHistory = (await historyService.GetProcessHistoryAsync(movie.FilePath)).Select(x => x.ToTreeView()).ToHashSet();
         }
 
         await OnUpdate.InvokeAsync();

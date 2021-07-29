@@ -1,0 +1,58 @@
+﻿@page "/history"
+
+@if (JobHistory != null)
+{
+    <MudTable Items="JobHistory.Reverse()" Dense="true">
+        <HeaderContent>
+            <MudTh>Path</MudTh>
+            <MudTh>Activities</MudTh>
+            <MudTh>Last Activity</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="FilePath">@context.FilePath</MudTd>
+            <MudTd DataLabel="Activities"><MudChip Color="@(context.ShowDetails ? Color.Secondary : Color.Info)" OnClick="@(() => context.ShowDetails = !context.ShowDetails)">@context.Entries.Count</MudChip></MudTd>
+            <MudTd DataLabel="Activity">@context.Entries.Max(x => x.Started)</MudTd>
+        </RowTemplate>
+        <ChildRowContent>
+            @if (context.ShowDetails)
+                {
+                <MudTr>
+                    <td colspan="3">
+                        <MudTable Dense="true" Items="@context.Entries" Context="entry">
+                            <HeaderContent>
+                                <MudTh>Started on</MudTh>
+                                <MudTh>Type</MudTh>
+                                <MudTh>Finished</MudTh>
+                                <MudTh>Outcome</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Started">@entry.Started</MudTd>
+                                <MudTd DataLabel="Type"><MudChip Color="@(entry.ShowDetails ? Color.Secondary : Color.Info)" OnClick="@(() => entry.ShowDetails = !entry.ShowDetails)">@entry.Type</MudChip></MudTd>
+                                <MudTd DataLabel="Finished">@entry.Finished</MudTd>
+                                <MudTd DataLabel="Success">@entry.Success.ToWords("Success", "Failed")</MudTd>
+                            </RowTemplate>
+                            <ChildRowContent>
+                                @if (entry.ShowDetails)
+                                    {
+                                    <MudTr>
+                                        <MudTd></MudTd>
+                                        <MudTd>
+                                            @if (entry.ProcessingHistory != null)
+                                                {
+                                                <MudTreeView Items="@entry.ProcessingHistory.TreeViewItems" Context="history">
+                                                    <ItemTemplate>
+                                                        <MudTreeViewItem @bind-Expanded="@history.IsExpanded" Items="@history.TreeItems" Text="@($"{history.Title}{history.Value.Wrap(": {0}")}")" />
+                                                    </ItemTemplate>
+                                                </MudTreeView>
+                                                }
+                                        </MudTd>
+                                    </MudTr>
+                                    }
+                            </ChildRowContent>
+                        </MudTable>
+                    </td>
+                </MudTr>
+                }
+        </ChildRowContent>
+    </MudTable>
+}

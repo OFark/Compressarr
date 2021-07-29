@@ -202,21 +202,21 @@ namespace Compressarr.Filtering
         {
             List<string> columns = new()
             {
-                "title",
-                "movieFile.mediaInfo.width",
-                "movieFile.mediaInfo.height",
-                "movieFile.mediaInfo.videoCodec",
-                "movieFile.mediaInfo.videoFormat",
-                "movieFile.mediaInfo.containerFormat",
-                "movieFile.mediaInfo.videoBitDepth",
-                "movieFile.mediaInfo.videoColourPrimaries",
-                "movieFile.mediaInfo.videoBitrateNice",
-                "movieFile.mediaInfo.videoFps",
-                "movieFile.mediaInfo.audioFormat",
-                "movieFile.mediaInfo.audioCodecID",
-                "movieFile.mediaInfo.runTimeNice",
-                "movieFile.mediaInfo.videoDataRate",
-                "movieFile.sizeNice"
+                "Title",
+                "MovieFile.MediaInfo.Width",
+                "MovieFile.MediaInfo.Height",
+                "MovieFile.MediaInfo.VideoCodec",
+                "MovieFile.MediaInfo.VideoFormat",
+                "MovieFile.MediaInfo.ContainerFormat",
+                "MovieFile.MediaInfo.VideoBitDepth",
+                "MovieFile.MediaInfo.VideoColourPrimaries",
+                "MovieFile.MediaInfo.VideoBitrateNice",
+                "MovieFile.MediaInfo.VideoFps",
+                "MovieFile.MediaInfo.AudioFormat",
+                "MovieFile.MediaInfo.AudioCodecID",
+                "MovieFile.MediaInfo.RunTimeNice",
+                "MovieFile.MediaInfo.VideoDataRate",
+                "MovieFile.SizeNice"
             };
 
             //The join here ensures the order

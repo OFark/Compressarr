@@ -2,6 +2,7 @@
 using Compressarr.FFmpeg;
 using Compressarr.FFmpeg.Events;
 using Compressarr.Helpers;
+using Compressarr.History;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Presets;
 using Compressarr.Presets.Models;

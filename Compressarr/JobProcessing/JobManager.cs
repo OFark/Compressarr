@@ -3,16 +3,15 @@ using Compressarr.FFmpeg;
 using Compressarr.Filtering;
 using Compressarr.Filtering.Models;
 using Compressarr.Helpers;
+using Compressarr.History;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Presets;
 using Compressarr.Presets.Models;
 using Compressarr.Services;
-using Compressarr.Services.Base;
 using Compressarr.Services.Models;
 using Humanizer;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -104,15 +103,15 @@ namespace Compressarr.JobProcessing
 
         public async Task CheckHistory(WorkItem wi)
         {
-            var history = await historyService.GetProcessHistoryAsync(wi.Media.UniqueID);
+            var history = await historyService.GetProcessHistoryAsync(wi.SourceFile);
 
             if (history != null && history.Any())
             {
                 var lastEntry = history.Last();
-                if ((lastEntry?.Success ?? false) && (lastEntry?.Arguments?.SequenceEqual(wi.Arguments) ?? wi.Arguments == null) && File.Exists(wi.DestinationFile))
+                if ((lastEntry?.ProcessingHistory.Success ?? false) && (lastEntry?.ProcessingHistory.Arguments?.SequenceEqual(wi.Arguments) ?? wi.Arguments == null) && File.Exists(wi.DestinationFile))
                 {
-                    wi.SSIM = lastEntry.SSIM;
-                    wi.Compression = lastEntry.Compression;
+                    wi.SSIM = lastEntry.ProcessingHistory.SSIM;
+                    wi.Compression = lastEntry.ProcessingHistory.Compression;
 
                     using (var je = new JobWorker(wi.Condition.Encode, wi.Update))
                     {
@@ -475,7 +474,7 @@ namespace Compressarr.JobProcessing
                 }
             }
 
-            var historyID = historyService.StartProcessing(wi.Media.UniqueID, wi.SourceFile, wi.Job.FilterID, wi.Job.PresetName, wi.Arguments);
+            var historyID = historyService.StartProcessing(wi);
 
             if (!wi.Condition.Encode.Processing && !wi.Condition.Encode.Finished)
             {

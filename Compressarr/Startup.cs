@@ -18,6 +18,7 @@ using MudBlazor;
 using MudBlazor.Services;
 using System.Collections.Generic;
 using Compressarr.FFmpeg;
+using Compressarr.History;
 
 namespace Compressarr
 {

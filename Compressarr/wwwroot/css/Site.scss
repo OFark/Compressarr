@@ -108,6 +108,14 @@ body {
                         text-decoration: underline;
                         text-decoration-thickness: 3px;
                         text-underline-offset: 5px;
+
+                        svg {
+                            color: var(--mud-palette-secondary);
+                        }
+                    }
+
+                    &.icon {
+                        margin: 0 .5em;
                     }
 
                     svg {

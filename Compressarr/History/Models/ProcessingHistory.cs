@@ -5,13 +5,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Compressarr.JobProcessing.Models
+namespace Compressarr.History.Models
 {
-    public class HistoryProcessing : HistoryEntry, IHistoryEntry
+    public class ProcessingHistory
     {
         public List<string> Arguments { get; set; }
         public decimal? Compression { get; set; }
-        public string FilePath { get; set; }
+        public string DestinationFilePath { get; set; }
         public Guid FilterID { get; set; }
         public decimal? FPS { get; set; }
         public int? Percentage { get; set; }
@@ -23,22 +23,26 @@ namespace Compressarr.JobProcessing.Models
         {
             return $"{base.ToString()} Filter: {FilterID} | Preset: {Preset} | Success: {Success?.ToString() ?? "Unknown"}{SSIM.Wrap(" | SSIM: {0}")}{Compression.Wrap(" | Comp: {0}")}{Speed.Wrap(" | Speed: {0}")}{FPS.Wrap(" | FPS: {0}")}";
         }
+        
 
-        public override TreeItemData ToTreeView()
+        private HashSet<TreeItemData> treeViewitems;
+        public HashSet<TreeItemData> TreeViewItems => treeViewitems ??= ToTreeItemData();
+
+        private HashSet<TreeItemData> ToTreeItemData()
         {
-            var root = new TreeItemData(Type, Started, new()
+            var items = new HashSet<TreeItemData>()
             {
-                new("Source File", FilePath),
+                new("Destination File", DestinationFilePath),
                 new("Filter", FilterID),
                 new("Preset", Preset),
                 new("Success", Success?.ToString() ?? "Unknown")
-            });
+            };
 
-            if (SSIM.HasValue) root.TreeItems.Add(new("SSIM", SSIM.ToPercent(2).Adorn("%")));
-            if (Compression.HasValue) root.TreeItems.Add(new("Compression", Compression.ToPercent(2).Adorn("%")));
-            if (Percentage.HasValue) root.TreeItems.Add(new("Percentage", Percentage.Adorn("%")));
-            if (Speed.HasValue) root.TreeItems.Add(new("Speed", Speed));
-            if (FPS.HasValue) root.TreeItems.Add(new("FPS", FPS));
+            if (SSIM.HasValue) items.Add(new("SSIM", SSIM.ToPercent(2).Adorn("%")));
+            if (Compression.HasValue) items.Add(new("Compression", Compression.ToPercent(2).Adorn("%")));
+            if (Percentage.HasValue) items.Add(new("Percentage", Percentage.Adorn("%")));
+            if (Speed.HasValue) items.Add(new("Speed", Speed));
+            if (FPS.HasValue) items.Add(new("FPS", FPS));
             if (Arguments != null && Arguments.Any())
             {
                 var argumentsTree = new TreeItemData("Arguments")
@@ -49,10 +53,10 @@ namespace Compressarr.JobProcessing.Models
                 {
                     argumentsTree.TreeItems.Add(new($"Pass {i + 1}", Arguments[i]));
                 }
-                root.TreeItems.Add(argumentsTree);
+                items.Add(argumentsTree);
             }
 
-            return root;
+            return items;
         }
 
     }

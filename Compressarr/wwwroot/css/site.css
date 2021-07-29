@@ -76,6 +76,10 @@
         text-decoration: underline;
         text-decoration-thickness: 3px;
         text-underline-offset: 5px; }
+        body app .mud-toolbar-appbar nav a.active svg {
+          color: var(--mud-palette-secondary); }
+      body app .mud-toolbar-appbar nav a.icon {
+        margin: 0 .5em; }
       body app .mud-toolbar-appbar nav a svg {
         vertical-align: middle; }
     body app #content {

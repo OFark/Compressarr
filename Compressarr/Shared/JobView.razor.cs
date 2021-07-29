@@ -2,6 +2,7 @@
 using Compressarr.FFmpeg;
 using Compressarr.Filtering;
 using Compressarr.Helpers;
+using Compressarr.History;
 using Compressarr.JobProcessing;
 using Compressarr.JobProcessing.Models;
 using Compressarr.Pages.Services;
