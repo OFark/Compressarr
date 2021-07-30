@@ -6,19 +6,27 @@
 
 @if (appReady)
 {
-    <MudExpansionPanels>
-
-        @foreach (var preset in PresetManager.Presets)
-        {
-            <PresetView Preset="preset" />
-
-        }
-        <PresetView Preset="@newPreset" NewPreset="true" OnAdd="addPreset"></PresetView>
-    </MudExpansionPanels>
+    <MudPaper Style="overflow:hidden; position:relative; min-height: 89vh;">
+        <MudDrawerContainer Class="mud-height-full">
+            <MudDrawer Open="true" Variant="@DrawerVariant.Persistent" Color="@Color.Dark" Elevation="4">
+                <MudNavMenu>
+                    @foreach (var p in PresetManager.Presets)
+                    {
+                        <MudNavLink OnClick="@(() => preset = p)"><MudText>@p.ToString()</MudText></MudNavLink>
+                    }
+                    <MudNavLink Icon="@Icons.Outlined.Add" OnClick="@(() => preset = new())">New Preset</MudNavLink>
+                </MudNavMenu>
+            </MudDrawer>
+            @if (preset != null)
+            {
+                <PresetView Preset="preset" />
+            }
+        </MudDrawerContainer>
+    </MudPaper>
 }
 else
 {
-    
+
     <MudContainer MaxWidth="MaxWidth.Medium">
         <MudSkeleton Width="30%" Height="42px;" />
         <MudSkeleton Width="80%" />
@@ -31,11 +39,11 @@ else
 
 @code {
 
-    private FFmpegPreset newPreset = new();
+    private FFmpegPreset preset = null;
 
     private bool appReady;
 
-    
+
     protected async override Task OnInitializedAsync()
     {
         LayoutService.OnStateChanged += LayoutService_OnStateChanged;
@@ -58,6 +66,6 @@ else
 
     private void addPreset()
     {
-        newPreset = new();
+        preset = null;
     }
 }

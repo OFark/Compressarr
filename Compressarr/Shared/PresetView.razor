@@ -1,24 +1,7 @@
 ﻿
 
-<MudExpansionPanel Class="job">
-    <TitleContent>
-        <MudText>
-            @if (NewPreset)
-            {
-                <MudAvatar Color="Color.Dark" Class="mr-3" Style="vertical-align: middle;">
-                    <MudIcon Icon="@Icons.Outlined.PlaylistAdd" />
-                </MudAvatar>
-                @:New Preset
-            }
-            else
-            {
-                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/76/FFmpeg_icon.svg/1024px-FFmpeg_icon.svg.png" style="width: 40px; height: auto; vertical-align: middle; margin-right: 12px;" />
-                @*<MudAvatar Rounded="true" Image="https://upload.wikimedia.org/wikipedia/commons/thumb/7/76/FFmpeg_icon.svg/1024px-FFmpeg_icon.svg.png" Style="vertical-align: middle;" Class="mr-3" />*@
-                @:@Preset.ToString()
-            }
-        </MudText>
-    </TitleContent>
-    <ChildContent>
+<MudCard Class="job" Elevation="0">
+    <MudCardContent>
         <MudCard Class="mb-3">
             <CardHeader Title="Preset" HelpURL="https://github.com/OFark/Compressarr/wiki/FFmpeg"></CardHeader>
             <MudCardContent>
@@ -209,5 +192,5 @@
                 <MudButton OnClick="DeletePreset" Color="Color.Error" StartIcon="@Icons.Outlined.Delete" Disabled="@JobManager.PresetInUse(Preset)">Delete</MudButton>
             }
         </MudCardActions>
-    </ChildContent>
-</MudExpansionPanel>
+    </MudCardContent>
+</MudCard>

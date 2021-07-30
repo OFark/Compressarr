@@ -43,9 +43,10 @@ namespace Compressarr.History
 
             try
             {
-                var historyEntries = db.GetCollection<HistoryEntry>();
-                var entry = historyEntries.Query().Where(x => x.HistoryID == historyEntryID).FirstOrDefault();
+                var histories = db.GetCollection<MediaHistory>();
+                var history = histories.Include(x => x.Entries).Query().Where(x => x.FilePath == workItem.SourceFile).FirstOrDefault();
 
+                var entry = history.Entries.FirstOrDefault(x => x.HistoryID == historyEntryID);
                 if (entry != null)
                 {
                     entry.Finished = DateTime.Now;
@@ -56,7 +57,7 @@ namespace Compressarr.History
                     entry.ProcessingHistory.Speed = workItem.Speed;
                     entry.ProcessingHistory.SSIM = workItem.SSIM;
 
-                    historyEntries.Update(entry);
+                    histories.Update(history);
                 }
             }
             catch (InvalidCastException)
@@ -168,7 +169,6 @@ namespace Compressarr.History
             history.Entries.Add(entry);
 
             histories.EnsureIndex(x => x.Id);
-            histories.EnsureIndex(x => x.Entries);
 
             histories.Update(history);
 
