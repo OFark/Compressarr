@@ -91,6 +91,7 @@ namespace Compressarr.JobProcessing.Models
         public string MediaName { get; set; }
         public string Name => MediaName ?? SourceFileName;
         public int? Percent { get; internal set; }
+        public int? PercentSSIM { get; internal set; }
         public decimal? Q { get; internal set; }
         public bool ShowDetails { get; set; }
         public string Size { get; internal set; }
@@ -186,7 +187,7 @@ namespace Compressarr.JobProcessing.Models
         public void UpdateSSIM(FFmpegProgress progress)
         {
             Frame = progress.Frame;
-            Percent = progress.Percentage;
+            PercentSSIM = progress.Percentage;
 
             if (TotalLength.HasValue && progress.FPS > 0)
             {

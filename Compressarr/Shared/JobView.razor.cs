@@ -68,9 +68,10 @@ namespace Compressarr.Shared
         private Color ButtonColour =>
             Job.Condition.SafeToRun ? Color.Primary : Job.Condition.SafeToInitialise ? Color.Secondary : Job.State == JobState.Error ? Color.Error : Color.Warning;
 
-        private string ButtonText => (mouseOnButton ? Job.Condition.SafeToRun ? "Go!" : Job.Condition.SafeToInitialise ? "Initialise" : Job.Condition.CanCancel ? "Cancel" : null : Job.Condition.Process.Processing ? $"Running {Progress}" : null) ??  Job.State.ToString().Humanize(LetterCasing.Title);
+        private string ButtonText => (mouseOnButton ? Job.Condition.SafeToRun ? "Go!" : Job.Condition.SafeToInitialise ? "Initialise" : Job.Condition.CanCancel ? "Cancel" : null : Job.Condition.Process.Processing ? $"Running {Progress}%" : null) ??  Job.State.ToString().Humanize(LetterCasing.Title);
 
-        private string Progress => ((Job.WorkLoad.Count(x => x.Condition.HasFinished) + ((Job.CurrentWorkItem?.Percent ?? 0) / 100M)) / Job.WorkLoad.Count).ToPercent().Adorn("%");
+        //private string Progress => ((Job.WorkLoad.Count(x => x.Condition.HasFinished) + (Job.SSIMCheck ? ((Job.CurrentWorkItem?.Percent ?? 0) + (Job.CurrentWorkItem?.PercentSSIM ?? 0)) / 200M : (Job.CurrentWorkItem?.Percent ?? 0) / 100M)) / Job.WorkLoad.Count).ToPercent().Adorn("%");
+        private int Progress => (Job.SSIMCheck ? (Job.WorkLoad.Sum(x => x.Percent ?? 0) + Job.WorkLoad.Sum(x => x.PercentSSIM ?? 0)) / 2 : (Job.WorkLoad.Sum(x => x.Percent ?? 0))) / Job.WorkLoad.Count;
         [Inject] IDialogService DialogService { get; set; }
         private bool Editing => editJob || NewJob;
         [Inject] IFFmpegProcessor FFmpegProcessor { get; set; }

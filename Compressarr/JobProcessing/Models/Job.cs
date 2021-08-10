@@ -72,7 +72,7 @@ namespace Compressarr.JobProcessing.Models
         public string PresetName { get; set; }
         public bool SizeCheck => AutoImport && MaxCompression.HasValue;
         [JsonIgnore]
-        public bool SSIMCheck => AutoImport && MinSSIM.HasValue;
+        public bool SSIMCheck => (AutoImport && MinSSIM.HasValue) || (ArgumentCalculationSettings?.AlwaysCalculateSSIM ?? false);
 
         [JsonIgnore]
         public JobState State => Condition.Initialise.State switch

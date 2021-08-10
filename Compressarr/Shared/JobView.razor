@@ -230,7 +230,14 @@
                                                 </MudText>
                                             </MudTd>
                                                 }
-                                        <MudTd DataLabel="SSIM"><MudText Align="Align.Center">@context.SSIM.ToPercent(2).Adorn("%")</MudText></MudTd>
+                                        @if (context.SSIM.HasValue)
+                                                {
+                                            <MudTd DataLabel="SSIM"><MudText Align="Align.Center">@context.SSIM.ToPercent(2).Adorn("%")</MudText></MudTd>
+                                                }
+                                                else
+                                                {
+                                            <MudTd DataLabel="SSIM"><MudText Align="Align.Center">@context.PercentSSIM.Adorn("%")</MudText></MudTd>
+                                                }
                                         <MudTd DataLabel="Compression"><MudText Align="Align.Center">@context.Compression.ToPercent(2).Adorn("%")</MudText></MudTd>
                                     </RowTemplate>
                                     <ChildRowContent>

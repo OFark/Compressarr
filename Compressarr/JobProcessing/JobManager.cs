@@ -549,7 +549,7 @@ namespace Compressarr.JobProcessing
                     return;
                 }
 
-                if (wi.Job.SSIMCheck || wi.Job.ArgumentCalculationSettings.AlwaysCalculateSSIM)
+                if (wi.Job.SSIMCheck)
                 {
                     wi.Update("Calculating SSIM");
                     var hardwareDecoder = wi.Job.Preset.HardwareDecoder.Wrap("-hwaccel {0} ");
@@ -564,6 +564,7 @@ namespace Compressarr.JobProcessing
                     {
                         wi.Update(result.Exception);
                         jobAnalyser.Succeed(false);
+                        wi.SSIM = null;
                     }
                 }
                 jobAnalyser.Succeed();
