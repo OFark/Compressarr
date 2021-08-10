@@ -34,7 +34,7 @@ namespace Compressarr.JobProcessing.Models
         [JsonIgnore]
         public bool Cancelled => CancellationToken.IsCancellationRequested;
         [JsonIgnore]
-        public WorkItem CurrentWorkItem { get; set; }
+        public WorkItem CurrentWorkItem => WorkLoad?.FirstOrDefault(x => x.Condition.Processing.Processing);
 
         public string DestinationFolder { get; set; }
         [JsonIgnore]

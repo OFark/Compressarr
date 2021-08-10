@@ -68,7 +68,9 @@ namespace Compressarr.Shared
         private Color ButtonColour =>
             Job.Condition.SafeToRun ? Color.Primary : Job.Condition.SafeToInitialise ? Color.Secondary : Job.State == JobState.Error ? Color.Error : Color.Warning;
 
-        private string ButtonText => (mouseOnButton ? Job.Condition.SafeToRun ? "Go!" : Job.Condition.SafeToInitialise ? "Initialise" : Job.Condition.CanCancel ? "Cancel" : null : null) ?? Job.State.ToString().Humanize(LetterCasing.Title);
+        private string ButtonText => (mouseOnButton ? Job.Condition.SafeToRun ? "Go!" : Job.Condition.SafeToInitialise ? "Initialise" : Job.Condition.CanCancel ? "Cancel" : null : Job.Condition.Process.Processing ? $"Running {Progress}" : null) ??  Job.State.ToString().Humanize(LetterCasing.Title);
+
+        private string Progress => ((Job.WorkLoad.Count(x => x.Condition.HasFinished) + ((Job.CurrentWorkItem?.Percent ?? 0) / 100M)) / Job.WorkLoad.Count).ToPercent().Adorn("%");
         [Inject] IDialogService DialogService { get; set; }
         private bool Editing => editJob || NewJob;
         [Inject] IFFmpegProcessor FFmpegProcessor { get; set; }
