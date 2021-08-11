@@ -112,6 +112,8 @@ namespace Compressarr.JobProcessing
                 {
                     wi.SSIM = lastEntry.ProcessingHistory.SSIM;
                     wi.Compression = lastEntry.ProcessingHistory.Compression;
+                    wi.Percent = 100;
+                    if(wi.SSIM.HasValue) wi.PercentSSIM = 100;
 
                     using (var je = new JobWorker(wi.Condition.Encode, wi.Update))
                     {
