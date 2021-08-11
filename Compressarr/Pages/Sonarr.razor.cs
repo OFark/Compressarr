@@ -5,6 +5,7 @@ using Compressarr.Helpers;
 using Compressarr.JobProcessing;
 using Compressarr.Pages.Services;
 using Compressarr.Services;
+using Compressarr.Services.Base;
 using Compressarr.Services.Models;
 using Compressarr.Shared.Models;
 using Humanizer;
@@ -19,7 +20,6 @@ namespace Compressarr.Pages
 {
     public partial class Sonarr
     {
-
 
         private string AlertMessage;
         private Guid filterID;
@@ -116,25 +116,47 @@ namespace Compressarr.Pages
 
         }
 
-        private void BuildSeriesTreeView()
+        private async Task BuildSeriesTreeView()
         {
             SeriesTreeItems = new();
+            await InvokeAsync(StateHasChanged);
+            await Task.Delay(500); //this is to force the screen to redraw the Treeview to clear it's cache
 
-            foreach (var s in Series)
+            var series = Series.GroupBy(x => x.Path)
+                .Select(x => new
+                {
+                    x.First().Added,
+                    x.First().EpisodeFileCount,
+                    x.First().Genres,
+                    x.First().Id,
+                    x.First().Path,
+                    x.First().SizeOnDisk,
+                    x.First().Title,
+                    Seasons = x.GroupBy(s => s.Season.SeasonNumber)
+                        .Select(y => new
+                        {
+                            SeasonNumber = y.Key,
+                            y.First().Season.Statistics,
+                            EpisodeFiles = y.Select(g => g.Season.EpisodeFile)
+                        })
+                }
+            );
+
+            foreach (var ser in series)
             {
-                var tid = new TreeItemData(s.Title, null, new());
+                var tid = new TreeItemData(ser.Id, ser.Title, null, null, new());
 
-                tid.TreeItems.Add(new TreeItemData($"Added", s.Added.ToShortDateString()));
-                tid.TreeItems.Add(new TreeItemData($"Episode files", s.EpisodeFileCount));
-                tid.TreeItems.Add(new TreeItemData($"Size on disk", s.SizeOnDisk.Bytes().Humanize("0.00")));
-                tid.TreeItems.Add(new TreeItemData($"Path", s.Path));
+                tid.TreeItems.Add(new TreeItemData($"Added", ser.Added.ToShortDateString()));
+                tid.TreeItems.Add(new TreeItemData($"Episode files", ser.EpisodeFileCount));
+                tid.TreeItems.Add(new TreeItemData($"Size on disk", ser.SizeOnDisk.Bytes().Humanize("0.00")));
+                tid.TreeItems.Add(new TreeItemData($"Path", ser.Path));
 
-                tid.TreeItems.Add(new TreeItemData("Genres", null, new(s.Genres.Select(g => new TreeItemData(g)))));
+                tid.TreeItems.Add(new TreeItemData("Genres", null, new(ser.Genres.Select(g => new TreeItemData(g)))));
 
                 tid.TreeItems.Add(
                     new TreeItemData(
                         "Seasons", null, new(
-                            s.Seasons.Select(s =>
+                            ser.Seasons.Select(s =>
                                 new TreeItemData($"Season {s.SeasonNumber}", null, new(s.EpisodeFiles.Select(x => x.MediaInfo.VideoCodec).Distinct()), new()
                                 {
                                     new($"Size on disk", s.Statistics?.SizeOnDisk.Bytes().Humanize("0.00") ?? "Unknown"),
@@ -147,12 +169,19 @@ namespace Compressarr.Pages
                     )
                 );
 
-                tid.Badges = new(s.Seasons
+                tid.Badges = new(ser.Seasons
                     .SelectMany(x => x.EpisodeFiles?.Select(e => e.MediaInfo.VideoCodec))
                     .Distinct());
 
                 SeriesTreeItems.Add(tid);
             }
+
+            await InvokeAsync(StateHasChanged);
+        }
+
+        public async Task<HashSet<TreeItemData>> LoadServerData(TreeItemData parentNode)
+        {
+            return parentNode?.TreeItems;
         }
 
         private async void ClearFilters()
@@ -239,7 +268,7 @@ namespace Compressarr.Pages
             StateHasChanged();
         }
 
-        private DynamicLinqFilter GetCurrentFilter() => new DynamicLinqFilter(FilterProperty, FilterComparitor, FilterValue, FilterValues);
+        private DynamicLinqFilter GetCurrentFilter() => new(FilterProperty, FilterComparitor, FilterValue, FilterValues);
 
         private async void GroupFilter(DynamicLinqFilter filter)
         {
@@ -258,7 +287,7 @@ namespace Compressarr.Pages
                     var cloneFilter = filter.Clone();
                     cloneFilter.IsFirst = true;
 
-                    filter.SubFilters = new List<DynamicLinqFilter>();
+                    filter.SubFilters = new();
                     filter.SubFilters.Add(cloneFilter);
                     filter.SubFilters.Add(dlFilter);
                     filter.Comparitor = null;

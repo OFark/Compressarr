@@ -365,3 +365,4 @@ FodyWeavers.xsd
 # App config output
 Compressarr/config/*
 Compressarr/appsettings.Development.json
+/.vscode

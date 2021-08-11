@@ -146,7 +146,7 @@
             <MudButton OnClick="saveFilter" Color="Color.Primary" StartIcon="@Icons.Outlined.Save">Save</MudButton>
             <MudButton OnClick="clearFilters" Color="Color.Warning" StartIcon="@Icons.Outlined.Clear">Clear</MudButton>
             <MudButton OnClick="deleteSavedFilter" Color="Color.Error" StartIcon="@Icons.Outlined.Delete" Disabled="JobManager.FilterInUse(filterID)">Delete</MudButton>
-            <MudToolBarSpacer></MudToolBarSpacer>
+            <MudSpacer></MudSpacer>
         </MudToolBar>
     }
     <MudTable Items="movies" Dense="true" Striped="true" Hover="true" @ref="table">
@@ -441,7 +441,7 @@
 
     private void resetFilterInputs()
     {
-        filterPropertyStr = "title";
+        filterPropertyStr = "Title";
         filterComparitorStr = "==";
         filterValue = null;
     }

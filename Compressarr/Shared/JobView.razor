@@ -54,9 +54,24 @@
                                         <MudList Dense="true">
                                             <MudListItem>
                                                 <MudSelect Strict="true" Required="true" Label="Source" @bind-Value="JobFilterID" OffsetY="true">
-                                                    @foreach (var c in FilterManager.Filters)
+                                                    @foreach (var c in FilterManager.Filters.Where(x => x.MediaSource == MediaSource.Radarr))
                                                         {
-                                                        <MudSelectItem Value="@c.ID.ToString()">@c.Name - @c.MediaSource</MudSelectItem>
+                                                        <MudSelectItem Value="@c.ID.ToString()">
+                                                            <img src="https://raw.githubusercontent.com/Radarr/Radarr/develop/Logo/Radarr.svg" alt="Radarr logo" height="23" style="vertical-align: middle; margin-right: 0.5em;" />
+                                                            @c.Name
+                                                        </MudSelectItem>
+                                                        }
+                                                    @if (FilterManager.Filters.Where(x => x.MediaSource == MediaSource.Radarr).Any() &&
+                                                    FilterManager.Filters.Where(x => x.MediaSource == MediaSource.Sonarr).Any())
+                                                        {
+                                                        <MudDivider />
+                                                        }
+                                                    @foreach (var c in FilterManager.Filters.Where(x => x.MediaSource == MediaSource.Sonarr))
+                                                        {
+                                                        <MudSelectItem Value="@c.ID.ToString()">
+                                                            <img src="https://raw.githubusercontent.com/Sonarr/Sonarr/develop/Logo/Sonarr.svg" alt="Sonarr Logo" height="23" style="vertical-align: middle; margin-right: 0.5em;" />
+                                                            @c.Name
+                                                        </MudSelectItem>
                                                         }
                                                     <MudSelectItem Value="@("folder")">Folder&hellip;</MudSelectItem>
                                                 </MudSelect>
@@ -270,7 +285,7 @@
                                                                     <MudToolBar Style="width: 100%;">
                                                                         <MudButton Disabled="context.Condition.Prepare.Processing" Variant="Variant.Outlined" Class="mr-2" StartIcon="@Icons.Rounded.PlayArrow" Color="Color.Secondary" OnClick="@(() => PrepareWorkItem(context))">Get FFmpeg Arguments</MudButton>
                                                                         <MudButton Disabled="context.Condition.Prepare.Processing" Variant="Variant.Outlined" Class="mr-2" StartIcon="@Icons.Rounded.ClearAll" Color="Color.Warning" OnClick="@(() => ClearAutoCalcHistory(context))">Clear History</MudButton>
-                                                                        <MudToolBarSpacer />
+                                                                        <MudSpacer />
                                                                         <MudButton Disabled="!context.Condition.Prepare.Processing" Variant="Variant.Outlined" StartIcon="@Icons.Rounded.Cancel" Color="Color.Error" OnClick="@(() => CancelProcessing(context))">Cancel</MudButton>
                                                                     </MudToolBar>
                                                                 </MudCardActions>

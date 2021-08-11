@@ -18,11 +18,11 @@ namespace Compressarr.Filtering
     public class FilterManager : IFilterManager
     {
         private readonly ILogger<FilterManager> logger;
-        private readonly IApplicationService settingsManager;
-        public FilterManager(ILogger<FilterManager> logger, IApplicationService settingsManager)
+        private readonly IApplicationService applicationService;
+        public FilterManager(ILogger<FilterManager> logger, IApplicationService applicationService)
         {
             this.logger = logger;
-            this.settingsManager = settingsManager;
+            this.applicationService = applicationService;
 
             DateComparitors = new List<FilterComparitor>()
             {
@@ -63,7 +63,7 @@ namespace Compressarr.Filtering
 
         public List<FilterComparitor> DateComparitors { get; }
         public List<FilterComparitor> EnumComparitors { get; }
-        public HashSet<Filter> Filters => settingsManager.Filters;
+        public HashSet<Filter> Filters => applicationService.Filters;
         public List<FilterComparitor> NumberComparitors { get; }
         public List<FilterProperty> RadarrFilterProperties { get; }
         public List<FilterProperty> RadarrTableColumns { get; private set; }
@@ -89,7 +89,7 @@ namespace Compressarr.Filtering
 
                 filter.Filters = dlFilters.JsonClone();
 
-                await settingsManager.SaveAppSetting();
+                await applicationService.SaveAppSetting();
 
                 return filter.ID;
             }
@@ -120,7 +120,7 @@ namespace Compressarr.Filtering
                 logger.LogWarning($"Filter not found.");
             }
 
-            return settingsManager.SaveAppSetting();
+            return applicationService.SaveAppSetting();
         }
 
         public List<FilterComparitor> GetComparitors(FilterProperty property)
@@ -240,7 +240,7 @@ namespace Compressarr.Filtering
                     {
                         var nullPropReg = new Regex(@"\|?([\w\.]+)(?!\|)+$");
 
-                        var valStr = nullPropReg.Replace(dlFilter.Property.Value, "|np($1");
+                        var valStr = nullPropReg.Replace(dlFilter.Property.Value, "np($1");
 
                         filterStr = $" {dlFilter.LogicalOperator} {valStr}{dlFilter.Comparitor.Operator},false)";
 

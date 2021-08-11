@@ -797,7 +797,8 @@ namespace Compressarr.JobProcessing
                     }
 
                     var series = getSeriesResponse.Results;
-                    return new(true, series.SelectMany(s => s.Seasons).SelectMany(s => s.EpisodeFiles).Select(x => new WorkItem(x)).ToHashSet());
+                    //return new(true, series.SelectMany(s => s.Seasons).SelectMany(s => s.EpisodeFiles).Select(x => new WorkItem(x)).ToHashSet());
+                    return new(true, series.Select(s=> new WorkItem(s.Season.EpisodeFile)).ToHashSet());
                 }
 
                 if (job.MediaSource == MediaSource.Folder)

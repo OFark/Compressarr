@@ -388,27 +388,8 @@ namespace Compressarr.Services
         }
 
         private IEnumerable RecursiveFilter(IEnumerable collection, string filter, string[] filterValues)
-        {
-            var reg = new Regex(@"(\w+\|)");
+            => collection.AsQueryable().Where(filter, filterValues);
 
-            if (reg.IsMatch(filter))
-            {
-                var match = reg.Match(filter);
-                var prop = match.Value;
-
-                filter = filter.Replace(prop, "");
-                prop = prop.Replace("|", "");
-
-                foreach (var ent in collection)
-                {
-                    ent.GetType().GetProperty(prop).SetValue(ent, RecursiveFilter(ent.GetType().GetProperty(prop).GetValue(ent) as IEnumerable, filter, filterValues));
-                }
-
-                return collection.AsQueryable().Where($"{prop}.Any()");
-            }
-
-            return collection.AsQueryable().Where(filter, filterValues);
-        }
         private async Task<ServiceResult<IEnumerable<Movie>>> RequestMovies()
         {
             using (logger.BeginScope("Requesting Movies"))

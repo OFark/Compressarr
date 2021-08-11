@@ -1,5 +1,6 @@
 ﻿using Compressarr.Application.Models;
 using Compressarr.FFmpeg;
+using Compressarr.Filtering;
 using Compressarr.Helpers;
 using Compressarr.JobProcessing;
 using Compressarr.JobProcessing.Models;
@@ -24,6 +25,7 @@ namespace Compressarr.Application
         private readonly IApplicationService applicationService;
         private readonly IFFmpegProcessor fFmpegProcessor;
         private readonly IFileService fileService;
+        private readonly IFilterManager filterManager;
         [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0052:Remove unread private members", Justification = "This may come in handy")]
         private readonly Task InitialisationTask;
 
@@ -31,11 +33,12 @@ namespace Compressarr.Application
         private readonly ILogger<ApplicationInitialiser> logger;
 
 
-        public ApplicationInitialiser(IApplicationService applicationService, IFFmpegProcessor fFmpegProcessor, IFileService fileService, IJobManager jobManager, ILogger<ApplicationInitialiser> logger)
+        public ApplicationInitialiser(IApplicationService applicationService, IFFmpegProcessor fFmpegProcessor, IFileService fileService, IFilterManager filterManager, IJobManager jobManager, ILogger<ApplicationInitialiser> logger)
         {
             this.applicationService = applicationService;
             this.fFmpegProcessor = fFmpegProcessor;
             this.fileService = fileService;
+            this.filterManager = filterManager;
             this.jobManager = jobManager;
             this.logger = logger;
 
@@ -54,6 +57,8 @@ namespace Compressarr.Application
                 try
                 {
                     ApplyDatabaseTransforms();
+
+                    ApplyFilterTransforms();
 
                     applicationService.InitialiseFFmpeg = InitialiseFFmpeg();
 
@@ -84,6 +89,23 @@ namespace Compressarr.Application
                 catch (Exception ex)
                 {
                     logger.LogError(ex, "Initialisation Error");
+                }
+            }
+        }
+
+        private void ApplyFilterTransforms()
+        {
+            foreach(var filter in applicationService.Filters)
+            {
+                foreach(var fil in filter.Filters)
+                {
+                    fil.Property.Value = (filter.MediaSource switch
+                    {
+                        MediaSource.Radarr => filterManager.RadarrFilterProperties,
+                        MediaSource.Sonarr => filterManager.SonarrFilterProperties,
+                        _ => throw new NotImplementedException()
+                    }).FirstOrDefault(x => x.Key == fil.Property.Key).Value;
+                    
                 }
             }
         }

@@ -12,37 +12,40 @@
 
     <MudGrid>
         <MudItem sm="4">
-            <MudTreeView ExpandOnClick="true" ServerData="async (pn) => pn.TreeItems" Items="@SeriesTreeItems" Context="series">
-                <ItemTemplate>
-                    <MudTreeViewItem Value="series" Text="@series.Title" EndText="@series.Value" EndTextTypo="Typo.caption" @bind-Expanded="series.IsExpanded">
-                        <Content>
-                            <MudText>
-                                @if (series.TreeItems != null && series.TreeItems.Any())
-                                {
-                                    if (series.IsExpanded)
+            @if (SeriesTreeItems != null && SeriesTreeItems.Any())
+            {
+                <MudTreeView ExpandOnClick="true" ServerData="LoadServerData" Items="@SeriesTreeItems" Context="series">
+                    <ItemTemplate>
+                        <MudTreeViewItem Value="series" Text="@series.Title" EndText="@series.Value" EndTextTypo="Typo.caption" @bind-Expanded="series.IsExpanded">
+                            <Content>
+                                <MudText>
+                                    @if (series.TreeItems != null && series.TreeItems.Any())
                                     {
-                                        <MudIcon Icon="@Icons.Outlined.KeyboardArrowDown" Style="vertical-align:middle" />
+                                        if (series.IsExpanded)
+                                        {
+                                            <MudIcon Icon="@Icons.Outlined.KeyboardArrowDown" Style="vertical-align:middle" />
+                                        }
+                                        else
+                                        {
+                                            <MudIcon Icon="@Icons.Outlined.KeyboardArrowRight" Style="vertical-align:middle" />
+                                        }
                                     }
-                                    else
+                                    @series.Title
+                                    @if (!string.IsNullOrWhiteSpace(series.Value))
                                     {
-                                        <MudIcon Icon="@Icons.Outlined.KeyboardArrowRight" Style="vertical-align:middle" />
+                                        <MudText Typo="Typo.caption"> - @series.Value</MudText>
                                     }
-                                }
-                                @series.Title
-                                @if (!string.IsNullOrWhiteSpace(series.Value))
-                                {
-                                    <MudText Typo="Typo.caption"> - @series.Value</MudText>
-                                }
 
-                                @foreach (var b in series.Badges ?? new())
-                                {
-                                    <MudChip Label="true" Size="Size.Small">@b</MudChip>
-                                }
-                            </MudText>
-                        </Content>
-                    </MudTreeViewItem>
-                </ItemTemplate>
-            </MudTreeView>
+                                    @foreach (var b in series.Badges ?? new())
+                                    {
+                                        <MudChip Label="true" Size="Size.Small">@b</MudChip>
+                                    }
+                                </MudText>
+                            </Content>
+                        </MudTreeViewItem>
+                    </ItemTemplate>
+                </MudTreeView>
+            }
         </MudItem>
         <MudItem sm="8">
             <MudCardActions Class="px-4">
@@ -177,7 +180,7 @@
                     <MudButton OnClick="SaveFilter" Color="Color.Primary" StartIcon="@Icons.Outlined.Save">Save</MudButton>
                     <MudButton OnClick="ClearFilters" Color="Color.Warning" StartIcon="@Icons.Outlined.Clear">Clear</MudButton>
                     <MudButton OnClick="DeleteSavedFilter" Color="Color.Error" StartIcon="@Icons.Outlined.Delete" Disabled="JobManager.FilterInUse(FilterID)">Delete</MudButton>
-                    <MudToolBarSpacer></MudToolBarSpacer>
+                    <MudSpacer></MudSpacer>
                 </MudToolBar>
             }
         </MudItem>

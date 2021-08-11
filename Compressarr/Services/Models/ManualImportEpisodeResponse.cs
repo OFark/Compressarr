@@ -67,7 +67,7 @@ namespace Compressarr.Services.Models
         public object Size { get; set; }
 
         [JsonProperty("series")]
-        public Series Series { get; set; }
+        public SeriesJSON Series { get; set; }
 
         [JsonProperty("seasonNumber")]
         public int SeasonNumber { get; set; }

@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -254,7 +255,7 @@ namespace Compressarr.Services
 
                 logger.LogDebug("Get FileInfo");
 
-                var encodedFile = new FileInfo(workItem.DestinationFile);
+                //var encodedFile = new FileInfo(workItem.DestinationFile);
 
                 var file = new ImportEpisodePayload.File()
                 {
@@ -451,27 +452,8 @@ namespace Compressarr.Services
         }
 
         private IEnumerable RecursiveFilter(IEnumerable collection, string filter, string[] filterValues)
-        {
-            var reg = new Regex(@"(\w+\|)");
+            => collection.AsQueryable().Where(filter, filterValues).ToDynamicList<Series>();
 
-            if (reg.IsMatch(filter))
-            {
-                var match = reg.Match(filter);
-                var prop = match.Value;
-
-                filter = filter.Replace(prop, "");
-                prop = prop.Replace("|", "");
-
-                foreach (var ent in collection)
-                {
-                    ent.GetType().GetProperty(prop).SetValue(ent, RecursiveFilter(ent.GetType().GetProperty(prop).GetValue(ent) as IEnumerable, filter, filterValues));
-                }
-
-                return collection.AsQueryable().Where($"{prop}.Any()");
-            }
-
-            return collection.AsQueryable().Where(filter, filterValues);
-        }
         private async Task<ServiceResult<IEnumerable<Series>>> RequestSeries()
         {
             using (logger.BeginScope("Requesting Series"))
@@ -515,25 +497,29 @@ namespace Compressarr.Services
                         _ = fileService.DumpDebugFile("series.json", seriesJSON);
                     }
 
+                    var series = new ConcurrentBag<Series>();
 
-                    var seriesArr = JsonConvert.DeserializeObject<Series[]>(seriesJSON);
+                    var seriesArr = JsonConvert.DeserializeObject<SeriesJSON[]>(seriesJSON);
 
-                    var series = seriesArr.Where(s => s.EpisodeFileCount > 0).OrderBy(s => s.SortTitle).ToHashSet();
+                    var seriesWithFiles = seriesArr.Where(s => s.EpisodeFileCount > 0).OrderBy(s => s.SortTitle).ToHashSet();
 
                     SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
 
-                    await series.AsyncParallelForEach(async s =>
+                    await seriesWithFiles.AsyncParallelForEach(async s =>
                     {
                         await foreach (var ef in GetEpisodeFiles(s.Id))
                         {
-                            (s.Seasons.FirstOrDefault(x => x.SeasonNumber == ef.SeasonNumber).EpisodeFiles as HashSet<EpisodeFile>).Add(ef);
+                            //(s.Seasons.FirstOrDefault(x => x.SeasonNumber == ef.SeasonNumber).EpisodeFiles as HashSet<EpisodeFile>).Add(ef);
+
+                            var ser = new Series(s, new Season(s.Seasons.FirstOrDefault(x => x.SeasonNumber == ef.SeasonNumber), ef));
+                            series.Add(ser);
                         }
                     }, 20, TaskScheduler.FromCurrentSynchronizationContext());
 
 
                     logger.LogDebug($"Success.");
 
-                    return new(true, series);
+                    return new(true, series.OrderBy(x => x.Title).ThenBy(x => x.Season.SeasonNumber).ThenBy(x => x.Season.EpisodeFile.Path));
                 }
                 catch (Exception ex)
                 {
