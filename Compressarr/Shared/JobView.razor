@@ -62,7 +62,7 @@
                                                         </MudSelectItem>
                                                         }
                                                     @if (FilterManager.Filters.Where(x => x.MediaSource == MediaSource.Radarr).Any() &&
-                                                    FilterManager.Filters.Where(x => x.MediaSource == MediaSource.Sonarr).Any())
+                                                   FilterManager.Filters.Where(x => x.MediaSource == MediaSource.Sonarr).Any())
                                                         {
                                                         <MudDivider />
                                                         }
@@ -414,6 +414,15 @@
                                                                                 </MudTr>
                                                                             </tbody>
                                                                         </MudSimpleTable>
+                                                                            }
+                                                                    @if (context.Arguments != null)
+                                                                            {
+                                                                        <MudList Dense="true" Class="my-3">
+                                                                            @foreach (var arg in context.Arguments)
+                                                                                    {
+                                                                                <MudListItem>@arg</MudListItem>
+                                                                                    }
+                                                                        </MudList>
                                                                             }
                                                                 </MudCardContent>
                                                             </MudCard>

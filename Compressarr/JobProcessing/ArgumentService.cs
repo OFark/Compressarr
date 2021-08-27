@@ -127,7 +127,9 @@ namespace Compressarr.JobProcessing
 
             if (!firstPass)
             {
-                var audioStreamIndex = 0; //for stream output tracking
+                
+
+                var audioMap = new List<AudioStreamMap>();
 
                 foreach (var stream in argCalc.AudioStreams)
                 {
@@ -146,19 +148,28 @@ namespace Compressarr.JobProcessing
 
                         if (match)
                         {
-                            var audioStreamMap = $" -map 0:{stream.index} -c:a:{audioStreamIndex++}";
-                            audioArguments += audioPreset.Action switch
+                            if (audioPreset.Action != AudioStreamAction.Delete)
                             {
-                                AudioStreamAction.Copy => $"{audioStreamMap} copy",
-                                AudioStreamAction.Delete => "",
-                                AudioStreamAction.DeleteUnlessOnly => preset.AudioStreamPresets.Last() == audioPreset && audioStreamIndex == 0 ? $"{audioStreamMap} copy" : "",
-                                AudioStreamAction.Clone => $"{audioStreamMap} copy  -map 0:{stream.index} -c:a:{audioStreamIndex++} {audioPreset.Encoder.Name}{(string.IsNullOrWhiteSpace(audioPreset.BitRate) ? "" : $" -b:a:{audioStreamIndex} ")}{audioPreset.BitRate}",
-                                AudioStreamAction.Encode => $"{audioStreamMap} {audioPreset.Encoder.Name}{(string.IsNullOrWhiteSpace(audioPreset.BitRate) ? "" : $" -b:a:{audioStreamIndex} ")}{audioPreset.BitRate}",
-                                _ => throw new System.NotImplementedException()
-                            };
-                            break;
+                                audioMap.Add(new(audioPreset, stream.index));
+                            }
                         }
                     }
+                }
+
+                var audioStreamIndex = 0; //for stream output tracking
+
+                foreach (var map in audioMap)
+                {
+                    var audioStreamMap = $" -map 0:{map.StreamIndex} -c:a:{audioStreamIndex++}";
+                    audioArguments += map.Preset.Action switch
+                    {
+                        AudioStreamAction.Copy => $"{audioStreamMap} copy",
+                        AudioStreamAction.DeleteUnlessOnly => audioMap.Count == 1 ? $"{audioStreamMap} copy" : "",
+                        AudioStreamAction.Clone => $"{audioStreamMap} copy  -map 0:{map.StreamIndex} -c:a:{audioStreamIndex++} {map.Preset.Encoder.Name}{(string.IsNullOrWhiteSpace(map.Preset.BitRate) ? "" : $" -b:a:{audioStreamIndex} ")}{map.Preset.BitRate}",
+                        AudioStreamAction.Encode => $"{audioStreamMap} {map.Preset.Encoder.Name}{(string.IsNullOrWhiteSpace(map.Preset.BitRate) ? "" : $" -b:a:{audioStreamIndex} ")}{map.Preset.BitRate}",
+                        _ => throw new System.NotImplementedException()
+                    };
+                    break;
                 }
             }
 

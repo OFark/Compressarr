@@ -1,0 +1,1 @@
+ffmpeg  -i "S01E10 - Despite Yourself.mkv" -c:v copy -map 0:v -map 0:a:0? -c:a:0 aac -map 0:a:0? -c:a:1 copy -metadata:s:a:0 title="AAC" -metadata:s:a:1 title="DD+" -metadata:s:a:0 language=eng -metadata:s:a:1 language=eng "S01E10 - Despite Yourself AAC.mkv"

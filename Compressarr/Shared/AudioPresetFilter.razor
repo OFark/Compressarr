@@ -1,80 +1,84 @@
 ﻿@inject IPresetManager PresetManager
 @inject ILayoutService LayoutService
 
-<MudGrid>
-    <MudItem sm="1">
+<div class="gridLayout">
+    <div>
         <MudText Style="padding-top: 1.65em">
             When
         </MudText>
-    </MudItem>
-    <MudItem sm="3">
-        <MudSelect T="AudioStreamRule?" OffsetY="true" @bind-Value="AudioStreamPresetFilter.Rule" Strict="true" TextChanged="resetValues" SelectedValuesChanged="@(() => OnUpdate.InvokeAsync())" Immediate="true" Label="Audio Stream">
+    </div>
+    <div>
+        <MudSelect T="AudioStreamRule?" OffsetY="true" @bind-Value="Rule" Strict="true" Immediate="true" TextChanged="resetValues" Label="Audio Stream">
             @foreach (var r in GetRules)
             {
                 <MudSelectItem Value="r"></MudSelectItem>
             }
         </MudSelect>
-    </MudItem>
+    </div>
     @switch (AudioStreamPresetFilter.Rule)
     {
         case AudioStreamRule.Channels:
             {
 
-                <MudItem sm="3">
+                <div>
                     <MudSelect OffsetY="true" T="FilterComparitor" @bind-Value="AudioStreamPresetFilter.NumberComparitor" Converter="fcConverter">
                         @foreach (var nc in PresetManager.NumberComparitors)
                         {
                             <MudSelectItem Value="nc" />
                         }
                     </MudSelect>
-                </MudItem>
-                <MudItem sm="GetSize(5)">
+                </div>
+                <div>
                     <MudNumericField T="int" @bind-Value="AudioStreamPresetFilter.ChannelValue" />
 
-                </MudItem>
+                </div>
 
             }
             break;
         case AudioStreamRule.Codec:
             {
-                <MudItem sm="2">
+                <div>
                     <MudSwitch @bind-Checked="AudioStreamPresetFilter.Matches" Color="Color.Secondary" Style="padding-top: 1.2em;">@(AudioStreamPresetFilter.Matches ? "is" : "is not")</MudSwitch>
-                </MudItem>
+                </div>
 
-                <MudItem sm="GetSize(6)">
+                <div>
                     <MudSelect OffsetY="true" T="string" MultiSelection="true" @bind-SelectedValues="AudioStreamPresetFilter.Values" Label="Codec">
                         @foreach (var codec in PresetManager.AudioCodecs.Decoders())
                         {
                             <MudSelectItem Value="@codec.Name"></MudSelectItem>
                         }
                     </MudSelect>
-                </MudItem>
+                </div>
             }
             break;
         case AudioStreamRule.Language:
             {
-                <MudItem sm="2">
+                <div>
                     <MudSwitch @bind-Checked="AudioStreamPresetFilter.Matches" Color="Color.Secondary" Style="padding-top: 1.2em;">@(AudioStreamPresetFilter.Matches ? "is" : "is not")</MudSwitch>
-                </MudItem>
+                </div>
 
-                <MudItem sm="GetSize(6)">
+                <div>
                     <MudSelect T="string" MultiSelection="true" @bind-SelectedValues="AudioStreamPresetFilter.Values">
                         @foreach (var language in PresetManager.LanguageCodes.OrderByDescending(l => l.Key == "eng").ThenBy(l => l.Value))
                         {
                             <MudSelectItem Value="@language.Key">@language.Value</MudSelectItem>
                         }
                     </MudSelect>
-                </MudItem>
+                </div>
             }
+            break;
+        default:
+            <div></div>
+            <div></div>
             break;
     }
     @if (Filters.Count > 1)
     {
-        <MudItem sm="1">
+        <div>
             <MudIconButton Icon="@Icons.Outlined.Delete" OnClick="OnDelete" />
-        </MudItem>
+        </div>
     }
-</MudGrid>
+</div>
 @code {
 
     [Parameter]
@@ -91,6 +95,16 @@
 
     [Parameter]
     public EventCallback OnUpdate { get; set; }
+
+    private AudioStreamRule? Rule
+    {
+        get => AudioStreamPresetFilter.Rule;
+        set
+        {
+            AudioStreamPresetFilter.Rule = value;
+            OnUpdate.InvokeAsync();
+        }
+    }
 
     private IEnumerable<AudioStreamRule?> GetRules
     {

@@ -98,6 +98,13 @@ body {
             }
         }*/
 
+        .gridLayout {
+            display: grid;
+            grid-template-columns: min-content auto max-content auto min-content;
+            grid-gap: 1em;
+            justify-content: stretch;
+        }
+
         .mud-toolbar-appbar {
             nav {
                 a {

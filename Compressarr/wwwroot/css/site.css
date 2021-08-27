@@ -69,6 +69,11 @@
         display: grid;
         grid-template-columns: 1fr 1fr;
         grid-gap: 1em; }
+    body app .gridLayout {
+      display: grid;
+      grid-template-columns: min-content auto max-content auto min-content;
+      grid-gap: 1em;
+      justify-content: stretch; }
     body app .mud-toolbar-appbar nav a {
       color: var(--mud-palette-primary-text);
       margin: 0 2em; }

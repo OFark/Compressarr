@@ -46,6 +46,7 @@ namespace Compressarr.Shared
             if (firstCoverAny == null)
             {
                 Preset.AudioStreamPresets.Add(new());
+
             }
             else
             {
