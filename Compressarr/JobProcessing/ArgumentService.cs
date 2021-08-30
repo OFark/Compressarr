@@ -127,7 +127,7 @@ namespace Compressarr.JobProcessing
 
             if (!firstPass)
             {
-                
+
 
                 var audioMap = new List<AudioStreamMap>();
 
@@ -152,6 +152,7 @@ namespace Compressarr.JobProcessing
                             {
                                 audioMap.Add(new(audioPreset, stream.index));
                             }
+                            break;
                         }
                     }
                 }
@@ -167,9 +168,8 @@ namespace Compressarr.JobProcessing
                         AudioStreamAction.DeleteUnlessOnly => audioMap.Count == 1 ? $"{audioStreamMap} copy" : "",
                         AudioStreamAction.Clone => $"{audioStreamMap} copy  -map 0:{map.StreamIndex} -c:a:{audioStreamIndex++} {map.Preset.Encoder.Name}{(string.IsNullOrWhiteSpace(map.Preset.BitRate) ? "" : $" -b:a:{audioStreamIndex} ")}{map.Preset.BitRate}",
                         AudioStreamAction.Encode => $"{audioStreamMap} {map.Preset.Encoder.Name}{(string.IsNullOrWhiteSpace(map.Preset.BitRate) ? "" : $" -b:a:{audioStreamIndex} ")}{map.Preset.BitRate}",
-                        _ => throw new System.NotImplementedException()
+                        _ => throw new NotImplementedException()
                     };
-                    break;
                 }
             }
 
@@ -586,7 +586,7 @@ namespace Compressarr.JobProcessing
                                 test.Speed = tSpeed = progress.Speed;
                                 test.EncodingProgress = (progress.Percentage / sampleFiles.Count) + (100D / sampleFiles.Count * sampleFileIndex);
                                 wi.Update();
-                            }, 
+                            },
                             wi.ProcessStdOut, token);
 
                             if (!result.Success)
