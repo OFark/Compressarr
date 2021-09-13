@@ -16,24 +16,21 @@ namespace Compressarr.JobProcessing.Models
             if (wi?.Media?.FFProbeMediaInfo == null) throw new ArgumentException("MediaInfo is not available");
 
             AudioStreams = wi.Media.FFProbeMediaInfo.AudioStreams ?? new HashSet<Stream>();
-            VideoStreams = wi.Media.FFProbeMediaInfo.VideoStreams ?? new HashSet<Stream> ();
+            VideoStreams = wi.Media.FFProbeMediaInfo.VideoStreams ?? new HashSet<Stream>();
 
             Preset = preset;
 
             ColorPrimaries = wi.Media.FFProbeMediaInfo.VideoStreams?.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.color_primaries))?.color_primaries;
             ColorTransfer = wi.Media.FFProbeMediaInfo.VideoStreams?.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.color_transfer))?.color_transfer;
 
-            VideoEncoderOptions = new();
-            foreach(var veo in preset.VideoEncoderOptions)
+            
+            VideoEncoderOptions = preset.VideoEncoderOptions?.Select(x => new EncoderOptionValue(x.Name)
             {
-                var eov = new EncoderOptionValue(veo.Name)
-                {
-                    AutoCalculate = veo.AutoCalculate,
-                    EncoderOption = veo.EncoderOption,
-                    Value = veo.Value
-                };
-                VideoEncoderOptions.Add(eov);
-            }
+                AutoCalculate = x.AutoCalculate,
+                EncoderOption = x.EncoderOption,
+                Value = x.Value
+            }).ToHashSet() ?? new();
+
         }
 
         public IEnumerable<Stream> AudioStreams { get; set; }
