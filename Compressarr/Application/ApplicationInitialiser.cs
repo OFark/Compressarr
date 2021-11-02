@@ -43,8 +43,6 @@ namespace Compressarr.Application
             this.logger = logger;
 
             applicationService.InitialisationSteps = new();
-
-            InitialisationTask = Task.Run(() => InitialiseAsync());
         }
 
         public event EventHandler<Update> OnUpdate;

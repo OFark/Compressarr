@@ -19,6 +19,7 @@ using MudBlazor.Services;
 using System.Collections.Generic;
 using Compressarr.FFmpeg;
 using Compressarr.History;
+using Compressarr.Initialisation;
 
 namespace Compressarr
 {
@@ -43,6 +44,8 @@ namespace Compressarr
             services.Configure<HashSet<Filter>>(options => Configuration.GetSection("Filters").Bind(options));
             services.Configure<HashSet<FFmpegPresetBase>>(options => Configuration.GetSection("Presets").Bind(options));
             services.Configure<HashSet<Job>>(options => Configuration.GetSection("Jobs").Bind(options));
+
+            services.AddHostedService<StartupBackgroundService>();
 
             services.AddSingleton<IApplicationInitialiser, ApplicationInitialiser>();
             services.AddSingleton<IApplicationService, ApplicationService>();
