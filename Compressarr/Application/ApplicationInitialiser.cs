@@ -12,7 +12,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Threading;
 using System.Threading.Tasks;
 using Xabe.FFmpeg;
 using Xabe.FFmpeg.Downloader;
@@ -26,8 +25,6 @@ namespace Compressarr.Application
         private readonly IFFmpegProcessor fFmpegProcessor;
         private readonly IFileService fileService;
         private readonly IFilterManager filterManager;
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0052:Remove unread private members", Justification = "This may come in handy")]
-        private readonly Task InitialisationTask;
 
         private readonly IJobManager jobManager;
         private readonly ILogger<ApplicationInitialiser> logger;
