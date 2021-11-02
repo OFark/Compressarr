@@ -118,6 +118,12 @@ namespace Compressarr.Services
             {
                 logger.LogDebug($"Property name: {property}");
 
+                if (string.IsNullOrWhiteSpace(property))
+                {
+                    logger.LogWarning("Property cannot be empty");
+                    return new(false, null, "Property cannot be empty");
+                }
+
                 if (Series.Any())
                 {
                     var selectManySplit = property.Split("|");
@@ -128,7 +134,23 @@ namespace Compressarr.Services
                         series = series.SelectMany(selectManySplit[i]);
                     }
 
-                    return new ServiceResult<List<string>>(true, series.GroupBy(selectManySplit.Last()).OrderBy("Count() desc").ThenBy("Key").Select("Key").ToDynamicArray<string>().Where(x => !string.IsNullOrEmpty(x)).ToList());
+                    if(series != null && series.Any())
+                    {
+                        var groupBy = selectManySplit.Last();
+                        if(string.IsNullOrWhiteSpace(groupBy))
+                        {
+                            logger.LogWarning("Cannot group by null");
+                            return new(false, null, "Cannot group by null");
+                        }
+                        return new ServiceResult<List<string>>(true, series.GroupBy(groupBy).OrderBy("Count() desc").ThenBy("Key").Select("Key").ToDynamicArray<string>().Where(x => !string.IsNullOrEmpty(x)).ToList());
+
+                    }
+                    else
+                    {
+                        logger.LogWarning("Filtering resulted in zero results");
+                        return new(false, null, "Filtering resulted in zero results");
+                    }
+
                 }
 
                 var seriesResult = await RequestSeries();
