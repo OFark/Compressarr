@@ -142,6 +142,9 @@ namespace Compressarr.Services
                             logger.LogWarning("Cannot group by null");
                             return new(false, null, "Cannot group by null");
                         }
+
+                        groupBy = $"np({groupBy})";
+
                         return new ServiceResult<List<string>>(true, series.GroupBy(groupBy)?.OrderBy("Count() desc").ThenBy("Key").Select("Key")?.ToDynamicArray<string>()?.Where(x => !string.IsNullOrEmpty(x)).ToList());
 
                     }
