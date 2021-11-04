@@ -254,9 +254,9 @@ namespace Compressarr.Filtering
                         {
                             var x when
                             x == FilterPropertyType.DateTime ||
-                            x == FilterPropertyType.String => $" {dlFilter.LogicalOperator} {dlFilter.Property.Value}{dlFilter.Comparitor.Operator}\"{dlFilter.Value}\"",
-                            FilterPropertyType.Enum => $" {dlFilter.LogicalOperator} ( {string.Join(dlFilter.Comparitor.Operator == " == " ? " or " : " and ", (dlFilter.Values ?? new HashSet<string> { dlFilter.Value }).Select(x => $"{dlFilter.Property.Value}{dlFilter.Comparitor.Operator}\"{x}\""))} )",
-                            _ => filterStr = $" {dlFilter.LogicalOperator} {dlFilter.Property.Value}{dlFilter.Comparitor.Operator}{dlFilter.Value}"
+                            x == FilterPropertyType.String => $" {dlFilter.LogicalOperator} np({dlFilter.Property.Value}){dlFilter.Comparitor.Operator}\"{dlFilter.Value}\"",
+                            FilterPropertyType.Enum => $" {dlFilter.LogicalOperator} ( {string.Join(dlFilter.Comparitor.Operator == " == " ? " or " : " and ", (dlFilter.Values ?? new HashSet<string> { dlFilter.Value }).Select(x => $"np({dlFilter.Property.Value}){dlFilter.Comparitor.Operator}\"{x}\""))} )",
+                            _ => filterStr = $" {dlFilter.LogicalOperator} np({dlFilter.Property.Value}){dlFilter.Comparitor.Operator}{dlFilter.Value}"
                         };
                     }
 

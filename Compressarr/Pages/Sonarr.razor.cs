@@ -324,7 +324,7 @@ namespace Compressarr.Pages
                 AlertMessage = _result.ErrorString;
             }
 
-            BuildSeriesTreeView();
+            await BuildSeriesTreeView();
 
             _ = InvokeAsync(StateHasChanged);
         }
