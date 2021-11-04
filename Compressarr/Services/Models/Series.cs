@@ -24,6 +24,8 @@ namespace Compressarr.Services.Models
             Statistics = seasonJSON.Statistics;
 
             EpisodeFile = ef;
+
+            ef.MediaInfo ??= new();
         }
 
         [Filter("Episode Files", true)]
