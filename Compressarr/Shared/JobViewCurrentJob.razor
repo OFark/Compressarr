@@ -1,0 +1,263 @@
+﻿<MudText Typo="Typo.h4">@(CurrentWorkItem?.SourceFileName ?? "Waiting")</MudText>
+
+@if (CurrentWorkItem?.Percent.HasValue ?? false)
+{
+    <MudText Typo="Typo.h5">@CurrentWorkItem?.Percent.Adorn("%") - ETA @CurrentWorkItem?.ETA?.Humanize(minUnit: Humanizer.Localisation.TimeUnit.Second)</MudText>
+}
+
+<MudTabs Elevation="2" Class="mt-6" PanelClass="pa-6" ApplyEffectsToContainer="true">
+    <MudTabPanel Text="Analysis">
+        @if (CurrentWorkItem.Media.FFProbeMediaInfo != null)
+        {
+            <MudTreeView Dense="true" ExpandOnClick="true" Items="@CurrentWorkItem.Media.FFProbeTreeView" Context="mediaInfo">
+                <ItemTemplate>
+                    <MudTreeViewItem @bind-Expanded="@mediaInfo.IsExpanded" Items="@mediaInfo.TreeItems" Text="@($"{mediaInfo.Title.Humanize(LetterCasing.Title)}{mediaInfo.Value.Wrap(": {0}")}")" />
+                </ItemTemplate>
+            </MudTreeView>
+        }
+    </MudTabPanel>
+    <MudTabPanel Text="Arguments" Disabled="CurrentWorkItem.Media.FFProbeMediaInfo == null">
+        <MudButton Disabled="CurrentWorkItem.Condition.Prepare.Processing" Variant="Variant.Outlined" Class="mr-2" StartIcon="@Icons.Rounded.ClearAll" Color="Color.Warning" OnClick="@(() => ClearAutoCalcHistory(CurrentWorkItem))">Clear History</MudButton>
+
+        @if (CurrentWorkItem.ArgumentCalculator?.AutoCalcVideoEncoderOptions != null && ((CurrentWorkItem.ArgumentCalculator?.AutoCalcVideoEncoderOptions.Any() ?? false) || (CurrentWorkItem.ArgumentCalculator?.VideoBitRateCalculator?.SampleResults.Any() ?? false)))
+        {
+            <MudText>Calculating the best settings from a sample. Actual results may vary.</MudText>
+            <MudSimpleTable Dense="true">
+                <thead>
+                    @if (CurrentWorkItem.ArgumentCalculator.Preset.VideoBitRateAutoCalc)
+                    {
+                        <MudTd>BitRate</MudTd>
+                    }
+                    @foreach (var arg in CurrentWorkItem.ArgumentCalculator.AutoCalcVideoEncoderOptions)
+                    {
+                        <MudTd>@arg.EncoderOption.Arg</MudTd>
+                    }
+                </thead>
+                <tbody>
+                    <MudTr>
+                        @if (CurrentWorkItem.ArgumentCalculator.Preset.VideoBitRateAutoCalc)
+                        {
+                            <MudTd valign="top">
+                                @if (CurrentWorkItem.ArgumentCalculator?.VideoBitRateCalculator?.SampleResults.Any() ?? false)
+                                {
+                                    <MudTable Dense="true" Items="CurrentWorkItem.ArgumentCalculator?.VideoBitRateCalculator?.SampleResults" Style="vertical-align: auto">
+                                        <HeaderContent>
+                                            <MudTh>Bitrate</MudTh>
+                                            <MudTh>Compression</MudTh>
+                                            <MudTh>SSIM</MudTh>
+                                            <MudTh>Speed</MudTh>
+                                        </HeaderContent>
+                                        <RowTemplate Context="TestContext">
+                                            @if (TestContext != null)
+                                            {
+                                    <MudTd Class="@(TestContext.Best ? "mud-theme-secondary" : "")">@(((int)TestContext.ArgumentValue).ToBitRate() ?? "Default")</MudTd>
+                                    <MudTd Class="@(TestContext.Best ? "mud-theme-secondary" : "")">
+                                        @if (TestContext.Compression > 0)
+                                                    {
+                                            @:@TestContext.Compression.ToPercent(2).Adorn("%")
+                                                    }
+                                                    else
+                                                    {
+                                            <MudProgressLinear Color="Color.Dark" Value="@TestContext.EncodingProgress" />
+                                                    }
+                                    </MudTd>
+                                    <MudTd Class="@(TestContext.Best ? "mud-theme-secondary" : "")">
+                                        @if (@TestContext.SSIM > 0)
+                                                    {
+                                            @TestContext.SSIM.ToPercent(2).Adorn("%")
+                                                        ;
+                                                    }
+                                                    else
+                                                    {
+                                            <MudProgressLinear Color="Color.Dark" Value="@TestContext.SSIMProgress" />
+                                                    }
+                                    </MudTd>
+                                    <MudTd Class="@(TestContext.Best ? "mud-theme-secondary" : "")">
+                                        @if (@TestContext.Speed > 0)
+                                                    {
+                                            @TestContext.Speed.Adorn("x")
+                                                        ;
+                                                    }
+                                    </MudTd>
+                                            }
+                                            else
+                                            {
+                                    <MudTd>@TestContext.ArgumentValue</MudTd>
+                                    <MudTd>&nbsp;</MudTd>
+                                    <MudTd>&nbsp;</MudTd>
+                                            }
+                            </RowTemplate>
+                        </MudTable>
+                                }
+                            </MudTd>
+                        }
+                        @foreach (var arg in CurrentWorkItem.ArgumentCalculator.AutoCalcVideoEncoderOptions)
+                        {
+                            <MudTd valign="top">
+                                <MudTable Dense="true" Items="arg.AutoPresetTests" Class="@(arg.HasSettled ? "mud-alert-outlined-secondary" : "")" Style="vertical-align: auto">
+                                    <HeaderContent>
+                                        <MudTh>val</MudTh>
+                                        <MudTh>Compression</MudTh>
+                                        <MudTh>SSIM</MudTh>
+                                        <MudTh>Speed</MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate Context="TestContext">
+                                        @if (TestContext != null)
+                                        {
+                                    <MudTd Class="@(TestContext.Best ? "mud-theme-secondary" : "")">@(TestContext.ArgumentValue ?? "Default")</MudTd>
+                                    <MudTd Class="@(TestContext.Best ? "mud-theme-secondary" : "")">
+                                        @if (TestContext.Compression > 0)
+                                                {
+                                            @:@TestContext.Compression.ToPercent(2).Adorn("%")
+                                                }
+                                                else
+                                                {
+                                            <MudProgressLinear Color="Color.Dark" Value="@TestContext.EncodingProgress" />
+                                                }
+                                    </MudTd>
+                                    <MudTd Class="@(TestContext.Best ? "mud-theme-secondary" : "")">
+                                        @if (@TestContext.SSIM > 0)
+                                                {
+                                            @TestContext.SSIM.ToPercent(2).Adorn("%")
+                                                    ;
+                                                }
+                                                else
+                                                {
+                                            <MudProgressLinear Color="Color.Dark" Value="@TestContext.SSIMProgress" />
+                                                }
+                                    </MudTd>
+                                    <MudTd Class="@(TestContext.Best ? "mud-theme-secondary" : "")">
+                                        @if (@TestContext.Speed > 0)
+                                                {
+                                            @TestContext.Speed.Adorn("x")
+                                                    ;
+                                                }
+                                    </MudTd>
+                                        }
+                                        else
+                                        {
+                                    <MudTd>@TestContext.ArgumentValue</MudTd>
+                                    <MudTd>&nbsp;</MudTd>
+                                    <MudTd>&nbsp;</MudTd>
+                                        }
+                            </RowTemplate>
+                        </MudTable>
+                    </MudTd>
+                        }
+                    </MudTr>
+                </tbody>
+            </MudSimpleTable>
+        }
+        @if (CurrentWorkItem.Arguments != null)
+        {
+            <MudList Dense="true" Class="my-3">
+                @foreach (var arg in CurrentWorkItem.Arguments)
+                {
+                    <MudListItem>@arg</MudListItem>
+                }
+            </MudList>
+        }
+    </MudTabPanel>
+    <MudTabPanel Text="Encode" Disabled="@(!CurrentWorkItem.Arguments?.Any() ?? true)">
+
+        <MudList Dense="true" Class="my-3">
+            @foreach (var arg in CurrentWorkItem.Arguments)
+            {
+                <MudListItem>@arg</MudListItem>
+            }
+        </MudList>
+
+        <MudSimpleTable Items="Job.WorkLoad" Dense="true">
+            <thead>
+                <tr>
+                    <MudTh><MudText Align="Align.Center">Frame</MudText></MudTh>
+                    <MudTh><MudText Align="Align.Center">FPS</MudText></MudTh>
+                    <MudTh><MudText Align="Align.Center">Q</MudText></MudTh>
+                    <MudTh><MudText Align="Align.Center">Size</MudText></MudTh>
+                    <MudTh><MudText Align="Align.Center">Time</MudText></MudTh>
+                    <MudTh><MudText Align="Align.Center">Length</MudText></MudTh>
+                    <MudTh><MudText Align="Align.Center">Bitrate</MudText></MudTh>
+                    <MudTh><MudText Align="Align.Center">Speed</MudText></MudTh>
+                    <MudTh><MudText Align="Align.Center">Finished</MudText></MudTh>
+                    <MudTh><MudText Align="Align.Center">SSIM</MudText></MudTh>
+                    <MudTh><MudText Align="Align.Center">Compression</MudText></MudTh>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <MudTd DataLabel="Frame"><MudText Align="Align.Center">@CurrentWorkItem?.Frame</MudText></MudTd>
+                    <MudTd DataLabel="FPS"><MudText Align="Align.Center">@CurrentWorkItem?.FPS</MudText></MudTd>
+                    <MudTd DataLabel="Q"><MudText Align="Align.Center">@CurrentWorkItem?.Q</MudText></MudTd>
+                    <MudTd DataLabel="Size"><MudText Align="Align.Center">@CurrentWorkItem?.Size</MudText></MudTd>
+                    <MudTd DataLabel="Time"><MudText Align="Align.Center">@CurrentWorkItem?.EncodingDuration?.ToStringTimeSeconds()</MudText></MudTd>
+                    <MudTd DataLabel="Length"><MudText Align="Align.Center">@CurrentWorkItem?.TotalLength?.ToStringTimeSeconds()</MudText></MudTd>
+                    <MudTd DataLabel="Bitrate"><MudText Align="Align.Center">@CurrentWorkItem?.Bitrate</MudText></MudTd>
+                    <MudTd DataLabel="Speed"><MudText Align="Align.Center">@CurrentWorkItem?.Speed</MudText></MudTd>
+                    <MudTd DataLabel="Finished">
+                        <MudText Align="Align.Center">
+                            @if (CurrentWorkItem?.Condition.HasFinished ?? false)
+                            {
+                                if (CurrentWorkItem.Condition.OutputCheck.Succeeded)
+                                {
+                                    <MudIcon Color="Color.Success" Icon="@Icons.Material.Outlined.Check" />
+                                }
+                                else
+                                {
+                                    <MudIcon Color="Color.Error" Icon="@Icons.Material.Outlined.Error" />
+                                }
+                            }
+                        </MudText>
+                    </MudTd>
+                    @if (CurrentWorkItem?.SSIM.HasValue ?? false)
+                    {
+                        <MudTd DataLabel="SSIM"><MudText Align="Align.Center">@CurrentWorkItem?.SSIM.ToPercent(2).Adorn("%")</MudText></MudTd>
+                    }
+                    else
+                    {
+                        <MudTd DataLabel="SSIM"><MudText Align="Align.Center">@CurrentWorkItem?.PercentSSIM.Adorn("%")</MudText></MudTd>
+                    }
+                    <MudTd DataLabel="Compression"><MudText Align="Align.Center">@CurrentWorkItem?.Compression.ToPercent(2).Adorn("%")</MudText></MudTd>
+                </tr>
+            </tbody>
+        </MudSimpleTable>
+    </MudTabPanel>
+    <MudTabPanel Text="Import" Disabled="!CurrentWorkItem.Condition.HappyEncode">
+        <MudButton Disabled="!CurrentWorkItem.Condition.HappyEncode" Variant="Variant.Outlined" Class="mr-2" Color="Color.Tertiary" OnClick="@(() => ImportVideo(CurrentWorkItem))" StartIcon="@Icons.Rounded.CloudUpload">Import to @CurrentWorkItem.Job.Filter?.MediaSource.ToString()</MudButton>
+        <MudButton Disabled="!CurrentWorkItem.Condition.Import.Processing" Variant="Variant.Outlined" StartIcon="@Icons.Rounded.Cancel" Color="Color.Error" OnClick="@(() => CancelProcessing(CurrentWorkItem))">Cancel</MudButton>
+
+        <MudText Align="Align.Center">
+            @if (CurrentWorkItem.Condition.Import.Finished)
+            {
+                if (CurrentWorkItem.Condition.Import.Succeeded)
+                {
+                    <MudIcon Color="Color.Success" Icon="@Icons.Material.Outlined.Check" />
+                    <MudText>
+                        Video was imported into @CurrentWorkItem.Job.Filter?.MediaSource.ToString()
+                    </MudText>
+                }
+                else
+                {
+                    <MudIcon Color="Color.Error" Icon="@Icons.Material.Outlined.Error" />
+                    <MudText>
+                        Video was NOT imported into @CurrentWorkItem.Job.Filter?.MediaSource.ToString(), check the log.
+                    </MudText>
+                }
+            }
+        </MudText>
+
+    </MudTabPanel>
+</MudTabs>
+
+@if (CurrentWorkItem.Console != null)
+{
+    <MudPaper Outlined="false" Square="true" class="jobEventsScrollWrapper">
+        <MudPaper Square="true" Class="mud-theme-dark pa-2 jobEvents">
+            <pre>
+                @foreach (var e in CurrentWorkItem.Console)
+                {
+                <MudText Class="event" Color="e.Color" Typo="Typo.body2">@e.Message</MudText>
+                }
+                </pre>
+        </MudPaper>
+    </MudPaper>
+}

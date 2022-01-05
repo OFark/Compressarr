@@ -20,8 +20,8 @@ namespace Compressarr.Shared
 {
     public partial class JobView : IDisposable
     {
-        private bool canReload, editJob, mouseOnButton;
         private readonly CancellationTokenSource cts = new();
+        private bool canReload, editJob, mouseOnButton;
         private bool DisableCancelMediaInfoButton = true;
         private bool disposedValue;
         private double initialisationProgress;
@@ -70,17 +70,24 @@ namespace Compressarr.Shared
 
         private string ButtonText => (mouseOnButton ? Job.Condition.SafeToRun ? "Go!" : Job.Condition.SafeToInitialise ? "Initialise" : Job.Condition.CanCancel ? "Cancel" : null : Job.Condition.Process.Processing ? $"Running {Progress}%" : null) ?? Job.State.ToString().Humanize(LetterCasing.Title);
 
-        //private string Progress => ((Job.WorkLoad.Count(x => x.Condition.HasFinished) + (Job.SSIMCheck ? ((Job.CurrentWorkItem?.Percent ?? 0) + (Job.CurrentWorkItem?.PercentSSIM ?? 0)) / 200M : (Job.CurrentWorkItem?.Percent ?? 0) / 100M)) / Job.WorkLoad.Count).ToPercent().Adorn("%");
-        private int Progress => (Job.SSIMCheck ? (Job.WorkLoad.Sum(x => x.Percent ?? 0) + Job.WorkLoad.Sum(x => x.PercentSSIM ?? 0)) / 2 : (Job.WorkLoad.Sum(x => x.Percent ?? 0))) / Job.WorkLoad.Count;
         [Inject] IDialogService DialogService { get; set; }
+
         private bool Editing => editJob || NewJob;
+
         [Inject] IFFmpegProcessor FFmpegProcessor { get; set; }
+
         private string FilterImageSrc => $"https://raw.githubusercontent.com/{FilterType.Capitalise()}/{FilterType.Capitalise()}/develop/Logo/{FilterType.Capitalise()}.svg";
+
         [Inject] IFilterManager FilterManager { get; set; }
+
         private string FilterType => Job?.MediaSource.ToString().ToLower();
+
         [Inject] IHistoryService HistoryService { get; set; }
+
         [Inject] IJobManager JobManager { get; set; }
+
         [Inject] ILayoutService LayoutService { get; set; }
+
         private int? MaxComp
         {
             get
@@ -99,6 +106,7 @@ namespace Compressarr.Shared
                 }
             }
         }
+
         private decimal? MaxCompPost
         {
             get
@@ -136,6 +144,7 @@ namespace Compressarr.Shared
                 }
             }
         }
+
         private decimal? MinSSIMPost
         {
             get
@@ -157,6 +166,8 @@ namespace Compressarr.Shared
 
         [Inject] IPresetManager PresetManager { get; set; }
 
+        //private string Progress => ((Job.WorkLoad.Count(x => x.Condition.HasFinished) + (Job.SSIMCheck ? ((Job.CurrentWorkItem?.Percent ?? 0) + (Job.CurrentWorkItem?.PercentSSIM ?? 0)) / 200M : (Job.CurrentWorkItem?.Percent ?? 0) / 100M)) / Job.WorkLoad.Count).ToPercent().Adorn("%");
+        private int Progress => (Job.SSIMCheck ? (Job.WorkLoad.Sum(x => x.Percent ?? 0) + Job.WorkLoad.Sum(x => x.PercentSSIM ?? 0)) / 2 : (Job.WorkLoad.Sum(x => x.Percent ?? 0))) / Job.WorkLoad.Count;
         private bool SaveEnabled => (Editing || NewJob) && Job?.FilterID != null && Job?.Preset != null && Job?.DestinationFolder != null;
 
         private decimal? VideoBitRateTarget

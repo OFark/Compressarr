@@ -26,9 +26,9 @@ namespace Compressarr.FFmpeg
         private readonly static Regex RegexAvailableEncoders = new(@"^\s([VAS])[F\.][S\.][X\.][B\.][D\.]\s(?!=)([^\s]*)\s*(.*)$", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
         private readonly static Regex RegexAvailableFormats = new(@"^ ?([D ])([E ]) (?!=)([^ ]*) *(.*)$", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
         private readonly static Regex RegexAvailableHardwareAccels = new(@"^(?!Hardware).*", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
-        private readonly static Regex RegexMultipleExtensions = new (@"^ *Common extensions: ((\w+)[,\.])*", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
+        private readonly static Regex RegexMultipleExtensions = new(@"^ *Common extensions: ((\w+)[,\.])*", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
         private readonly static Regex RegexSingleExtension = new(@"^ *Common extensions: (\w*)(?:,\w*)*\.", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
-        private readonly static Regex RegexVersion = new (@"(?<=version\s)(.*)(?=\sCopy)", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
+        private readonly static Regex RegexVersion = new(@"(?<=version\s)(.*)(?=\sCopy)", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
         private static SemaphoreSlim semLock = new(1, 10);
         private readonly IApplicationService applicationService;
         private readonly IFileService fileService;
@@ -471,7 +471,10 @@ namespace Compressarr.FFmpeg
                         // The output stream has been closed i.e. the process has terminated
                         if (e.Data == null)
                         {
-                            outputCloseEvent.SetResult(true);
+                            if(!outputCloseEvent.Task.IsCompleted)
+                            {
+                                outputCloseEvent.SetResult(true);
+                            }
                         }
                         else
                         {
@@ -501,7 +504,10 @@ namespace Compressarr.FFmpeg
                         // The error stream has been closed i.e. the process has terminated
                         if (e.Data == null)
                         {
-                            errorCloseEvent.SetResult(true);
+                            if (!errorCloseEvent.Task.IsCompleted)
+                            {
+                                errorCloseEvent.SetResult(true);
+                            }
                         }
                         else
                         {
@@ -528,6 +534,7 @@ namespace Compressarr.FFmpeg
                     {
                         outputCloseEvent.TrySetCanceled(token);
                         errorCloseEvent.TrySetCanceled(token);
+                        process.Kill();
                     }))
                     {
 
@@ -557,7 +564,6 @@ namespace Compressarr.FFmpeg
                             process.BeginErrorReadLine();
 
 
-
                             // Creates task to wait for process exit using timeout
                             var waitForExit = process.WaitForExitAsync(token);
 
@@ -566,6 +572,7 @@ namespace Compressarr.FFmpeg
                             var processTask = Task.WhenAll(waitForExit, outputCloseEvent.Task, errorCloseEvent.Task);
 
                             await processTask;
+
 
                             if (!token.IsCancellationRequested)
                             {
