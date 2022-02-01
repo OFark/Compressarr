@@ -50,10 +50,6 @@ namespace Compressarr.Services.Models
         [Filter("Clean Title")]
         public string CleanTitle { get; set; }
 
-        [JsonProperty("downloaded")]
-        [Filter("Downloaded", FilterPropertyType.Boolean)]
-        public bool Downloaded { get; set; }
-
         [JsonIgnore]
         public new string FilePath => $"{BasePath}{System.IO.Path.Combine(Path, MovieFile?.RelativePath)}";
 

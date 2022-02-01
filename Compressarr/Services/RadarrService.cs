@@ -181,7 +181,7 @@ namespace Compressarr.Services
 
                 var destinationFolder = Path.GetDirectoryName(workItem.DestinationFile);
 
-                var link = $"{applicationService.RadarrSettings?.APIURL}/api/manualimport?folder={HttpUtility.UrlEncode(destinationFolder)}&filterExistingFiles=true&apikey={applicationService.RadarrSettings?.APIKey}";
+                var link = $"{applicationService.RadarrSettings?.APIURL}/api/v3/manualimport?folder={HttpUtility.UrlEncode(destinationFolder)}&filterExistingFiles=true&apikey={applicationService.RadarrSettings?.APIKey}";
                 logger.LogDebug($"Link: {link}");
 
                 ManualImportMovieResponse mir = null;
@@ -263,7 +263,7 @@ namespace Compressarr.Services
 
                 payload.files = new() { file };
 
-                link = $"{applicationService.RadarrSettings?.APIURL}/api/command?apikey={applicationService.RadarrSettings?.APIKey}";
+                link = $"{applicationService.RadarrSettings?.APIURL}/api/v3/command?apikey={applicationService.RadarrSettings?.APIKey}";
                 logger.LogDebug($"Link: {link}");
 
 
@@ -331,7 +331,7 @@ namespace Compressarr.Services
                 logger.LogInformation($"Test Radarr Connection.");
                 SystemStatus ss = new();
 
-                var link = $"{settings.APIURL}/api/system/status?apikey={settings.APIKey}";
+                var link = $"{settings.APIURL}/api/v3/system/status?apikey={settings.APIKey}";
 
                 logger.LogDebug($"LinkURL: {link}");
                 var hc = new HttpClient();
@@ -403,7 +403,7 @@ namespace Compressarr.Services
                 var radarrURL = applicationService.RadarrSettings?.APIURL;// settingsManager.Settings[SettingType.RadarrURL];
                 var radarrAPIKey = applicationService.RadarrSettings?.APIKey; // settingsManager.Settings[SettingType.RadarrAPIKey];
 
-                var link = $"{radarrURL}/api/movie?apikey={radarrAPIKey}";
+                var link = $"{radarrURL}/api/v3/movie?apikey={radarrAPIKey}";
                 logger.LogDebug($"Link: {link}");
 
                 if (string.IsNullOrWhiteSpace(radarrURL))
@@ -450,7 +450,7 @@ namespace Compressarr.Services
 
                     var moviesArr = JsonConvert.DeserializeObject<Movie[]>(movieJSON);
 
-                    var movies = moviesArr.Where(m => m.Downloaded && m.MovieFile != null && m.MovieFile.MediaInfo != null).OrderBy(m => m.Title).ToHashSet();
+                    var movies = moviesArr.Where(m => m.HasFile && m.MovieFile != null && m.MovieFile.MediaInfo != null).OrderBy(m => m.Title).ToHashSet();
 
                     foreach (var m in movies)
                     {
