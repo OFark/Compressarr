@@ -99,9 +99,11 @@ namespace Compressarr.Application
                         MediaSource.Radarr => filterManager.RadarrFilterProperties,
                         MediaSource.Sonarr => filterManager.SonarrFilterProperties,
                         _ => throw new NotImplementedException()
-                    }).FirstOrDefault(x => x.Key == fil.Property.Key).Value;
+                    })?.FirstOrDefault(x => x.Key == fil.Property.Key)?.Value;
                     
                 }
+
+                filter.Filters = filter.Filters.Where(f => f.Property?.Value != null).ToList();
             }
         }
 
@@ -436,7 +438,7 @@ namespace Compressarr.Application
         private void SetState(InitialisationTask task, string state)
         {
             task.State = state;
-            logger.LogInformation(state);
+            logger.LogInformation("{0}", state);
         }
     }
 }

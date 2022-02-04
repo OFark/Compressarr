@@ -1,6 +1,7 @@
 ﻿using Compressarr.Filtering;
 using Compressarr.Helpers;
 using Compressarr.Services.Interfaces;
+using Microsoft.AspNetCore.DataProtection.KeyManagement.Internal;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -264,61 +265,36 @@ namespace Compressarr.Services.Models
 
     public class MovieMediaInfo
     {
-        [JsonProperty("audioAdditionalFeatures")]
-        [Filter("Audio - Additional Features")]
-        public string AudioAdditionalFeatures { get; set; }
-
         [JsonProperty("audioBitrate")]
         [Filter("Audio - Bitrate", FilterPropertyType.Number)]
         public int AudioBitrate { get; set; }
 
-        [JsonProperty("audioChannelPositions")]
-        [Filter("Audio - Channel Positions")]
-        public string AudioChannelPositions { get; set; }
-
-        [JsonProperty("audioChannelPositionsText")]
-        [Filter("Audio - Channel Positions Text")]
-        public string AudioChannelPositionsText { get; set; }
-
-        [JsonProperty("audioChannelsContainer")]
+        [JsonProperty("audioChannels")]
         [Filter("Audio - Channels", FilterPropertyType.Number)]
-        public int AudioChannelsContainer { get; set; }
+        public decimal AudioChannels { get; set; }
 
-        [JsonProperty("audioCodecID")]
-        [Filter("Audio - Codec ID", FilterPropertyType.Enum)]
-        public string AudioCodecID { get; set; }
-
-        [JsonProperty("audioCodecLibrary")]
-        [Filter("Audio - Codec Library", FilterPropertyType.Enum)]
-        public string AudioCodecLibrary { get; set; }
-
-        [JsonProperty("audioFormat")]
-        [Filter("Audio - Format", FilterPropertyType.Enum)]
-        public string AudioFormat { get; set; }
+        [JsonProperty("audioCodec")]
+        [Filter("Audio - Codec", FilterPropertyType.Enum)]
+        public string AudioCodec { get; set; }
 
         [JsonProperty("audioLanguages")]
         [Filter("Audio - Languages", FilterPropertyType.Enum)]
         public string AudioLanguages { get; set; }
 
-        [JsonProperty("audioProfile")]
-        [Filter("Audio - Profile", FilterPropertyType.Enum)]
-        public string AudioProfile { get; set; }
-
         [JsonProperty("audioStreamCount")]
         [Filter("Audio - Stream Count", FilterPropertyType.Number)]
         public int AudioStreamCount { get; set; }
 
-        [JsonProperty("containerFormat")]
-        [Filter("Container", FilterPropertyType.Enum)]
-        public string ContainerFormat { get; set; }
-
-        [JsonProperty("height")]
         [Filter("Height", FilterPropertyType.Number)]
-        public int Height { get; set; }
+        public int Height => string.IsNullOrWhiteSpace(Resolution) ? 0 : Resolution.Split("x").Length == 2 ? int.Parse(Resolution.Split("x")[1]) : 0;
 
         [JsonProperty("runTime")]
         [Filter("Run Time")]
         public string RunTime { get; set; }
+
+        [JsonProperty("resolution")]
+        [Filter("Resolution")]
+        public string Resolution { get; set; }
 
         [Filter("Run Time(F)", FilterOn = "runTime")]
         public string RunTimeNice
@@ -339,10 +315,6 @@ namespace Compressarr.Services.Models
         [Filter("Scan Type", FilterPropertyType.Enum)]
         public string ScanType { get; set; }
 
-        [JsonProperty("schemaRevision")]
-        [Filter("Schema Revision", FilterPropertyType.Number)]
-        public int SchemaRevision { get; set; }
-
         [JsonProperty("subtitles")]
         [Filter("Subtitles")]
         public string Subtitles { get; set; }
@@ -358,20 +330,13 @@ namespace Compressarr.Services.Models
         [Filter("Video - Bitrate(F)", FilterOn = "videoBitrate")]
         public string VideoBitrateNice => VideoBitrate.ToBitRate();
 
+        [JsonProperty("videoCodec")]
         [Filter("Video - Codec", FilterPropertyType.Enum)]
-        public string VideoCodec => string.IsNullOrWhiteSpace(VideoCodecLibrary) ? "Unknown" : VideoCodecLibrary.Split(" ")[0];
+        public string VideoCodec { get; set; }
 
-        [JsonProperty("videoCodecID")]
-        [Filter("Video - Codec ID", FilterPropertyType.Enum)]
-        public string VideoCodecID { get; set; }
-
-        [JsonProperty("videoCodecLibrary")]
-        [Filter("Video - Codec Library", FilterPropertyType.Enum)]
-        public string VideoCodecLibrary { get; set; }
-
-        [JsonProperty("videoColourPrimaries")]
-        [Filter("Video - Codec Primaries", FilterPropertyType.Enum)]
-        public string VideoColourPrimaries { get; set; }
+        [JsonProperty("videoDynamicRangeType")]
+        [Filter("Video - Dynamic Range Type", FilterPropertyType.Enum)]
+        public string VideoDynamicRangeType { get; set; }
 
         [Filter("Video - Data Rate", FilterPropertyType.Number, Suffix = "bpp")]
         public decimal VideoDataRate
@@ -387,28 +352,12 @@ namespace Compressarr.Services.Models
             }
         }
 
-        [JsonProperty("videoFormat")]
-        [Filter("Video - Format", FilterPropertyType.Enum)]
-        public string VideoFormat { get; set; }
-
         [JsonProperty("videoFps")]
         [Filter("Video - FPS", FilterPropertyType.Number)]
         public decimal VideoFps { get; set; }
-
-        [JsonProperty("videoMultiViewCount")]
-        [Filter("Video - Multi View Count", FilterPropertyType.Number)]
-        public int VideoMultiViewCount { get; set; }
-
-        [JsonProperty("videoProfile")]
-        [Filter("Video - Profile", FilterPropertyType.Enum)]
-        public string VideoProfile { get; set; }
-
-        [JsonProperty("videoTransferCharacteristics")]
-        [Filter("Video - Transfer Characteristics", FilterPropertyType.Enum)]
-        public string VideoTransferCharacteristics { get; set; }
-
+        
         [JsonProperty("width")]
         [Filter("Width", FilterPropertyType.Number)]
-        public int Width { get; set; }
+        public int Width => string.IsNullOrWhiteSpace(Resolution) ? 0 : Resolution.Split("x").Length == 2 ? int.Parse(Resolution.Split("x")[0]) : 0;
     }
 }

@@ -12,7 +12,7 @@ namespace Compressarr.Filtering.Models
 
         }
 
-        public DynamicLinqFilter(FilterProperty property, FilterComparitor comparitor, string value, HashSet<string> values = null)
+        public DynamicLinqFilter(FilterProperty property, FilterComparitor comparitor, string value, IEnumerable<string> values = null)
         {
             Property = property;
             Comparitor = comparitor;
@@ -43,7 +43,7 @@ namespace Compressarr.Filtering.Models
         public FilterProperty Property { get; set; }
         public FilterComparitor Comparitor { get; set; }
         public string Value { get; set; }
-        public HashSet<string> Values { get; set; }
+        public IEnumerable<string> Values { get; set; }
 
         public List<DynamicLinqFilter> SubFilters { get; set; }
 

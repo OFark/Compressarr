@@ -24,6 +24,6 @@ namespace Compressarr.Settings.FFmpegFactory
 
         public FilterComparitorBase NumberComparitor { get;  set; }
         public AudioStreamRule? Rule { get; set; }
-        public HashSet<string> Values { get; set; }
+        public IEnumerable<string> Values { get; set; }
     }
 }

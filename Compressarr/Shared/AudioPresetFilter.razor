@@ -129,7 +129,7 @@
     {
         if (AudioStreamPresetFilter.Rule.ToString() != text)
         {
-            AudioStreamPresetFilter.Values = new();
+            AudioStreamPresetFilter.Values = new HashSet<string>();
             AudioStreamPresetFilter.NumberComparitor = null;
         }
 
