@@ -77,9 +77,9 @@ namespace Compressarr.Pages
         [Inject] IFilterManager FilterManager { get; set; }
         private string FilterName { get; set; }
         private FilterProperty FilterProperty => FilterManager.SonarrFilterProperties.FirstOrDefault(x => x.Value == FilterPropertyStr);
-        private string FilterPropertyStr { get => filterPropertyStr; set { FilterValues = new(); filterPropertyStr = value; } }
+        private string FilterPropertyStr { get => filterPropertyStr; set { FilterValues = new HashSet<string>(); filterPropertyStr = value; } }
         private string FilterValue { get; set; }
-        private HashSet<string> FilterValues { get; set; }
+        private IEnumerable<string> FilterValues { get; set; }
         [Inject] IJobManager JobManager { get; set; }
         [Inject] ILayoutService LayoutService { get; set; }
         [Inject] ISonarrService SonarrService { get; set; }
@@ -109,7 +109,7 @@ namespace Compressarr.Pages
                 }
 
                 DlFilters.Add(dlFilter);
-                resetFilterInputs();
+                ResetFilterInputs();
 
                 await FilterUpdate();
             }
@@ -296,7 +296,7 @@ namespace Compressarr.Pages
                     filter.Values = null;
                 }
 
-                resetFilterInputs();
+                ResetFilterInputs();
                 await FilterUpdate();
             }
         }
@@ -328,12 +328,12 @@ namespace Compressarr.Pages
 
             _ = InvokeAsync(StateHasChanged);
         }
-        private void resetFilterInputs()
+        private void ResetFilterInputs()
         {
             FilterPropertyStr = "Title";
             FilterComparitorStr = "==";
             FilterValue = null;
-            FilterValues = new();
+            FilterValues = new HashSet<string>();
         }
 
         private async void SaveFilter()
