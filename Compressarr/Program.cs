@@ -14,6 +14,7 @@ using Compressarr.Settings.FFmpegFactory;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http.Json;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using MudBlazor;
@@ -44,6 +45,10 @@ builder.Services.Configure<JsonOptions>(options =>
     //options.SerializerOptions.Converters.Add(new JsonStringEnumConverter().CreateConverter(typeof(CodecType), new JsonSerializerOptions(JsonSerializerDefaults.Web)));
 
 });
+
+//Add Docker AppSettings
+var fs = new FileService(null, null);
+builder.Configuration.AddJsonFile(fs.GetAppFilePath(AppFile.appsettings), true, true);
 
 // Configure settings
 builder.Services.Configure<AppSettings>(builder.Configuration.GetSection("Settings"));
