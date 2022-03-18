@@ -59,6 +59,9 @@
                 <MudListItem>
                     <DirectoryLookup @bind-Folder="radarrBasePath" Label="Base Folder" Required="false" />
                 </MudListItem>
+                <MudListItem>
+                    <MudNumericField @bind-Value="radarrMaxParallelism" Label="Maximum simultaneous API calls" Required="false" />
+                </MudListItem>
             </MudList>
 
         </MudCardContent>
@@ -115,6 +118,9 @@
                 <MudListItem>
                     <DirectoryLookup @bind-Folder="sonarrBasePath" Label="Base Folder" />
                 </MudListItem>
+                <MudListItem>
+                    <MudNumericField @bind-Value="sonarrMaxParallelism" Label="Maximum simultaneous API calls" Required="false" />
+                </MudListItem>
             </MudList>
         </MudCardContent>
         <MudCardActions>
@@ -170,6 +176,7 @@
     private string radarrAPIKey { get; set; }
     private string radarrTestResponse { get; set; }
     private string radarrBasePath { get; set; }
+    private int? radarrMaxParallelism { get; set; }
     private bool radarrConnected { get; set; }
     private bool showRadarrStatus { get; set; }
 
@@ -177,6 +184,7 @@
     private string sonarrAPIKey { get; set; }
     private string sonarrTestResponse { get; set; }
     private string sonarrBasePath { get; set; }
+    private int? sonarrMaxParallelism { get; set; }
     private bool sonarrConnected { get; set; }
     private bool showSonarrStatus { get; set; }
 
@@ -191,6 +199,7 @@
             radarrAPIKey = applicationService.RadarrSettings.APIKey;
             radarrURL = applicationService.RadarrSettings.APIURL;
             radarrBasePath = applicationService.RadarrSettings.BasePath;
+            radarrMaxParallelism = applicationService.RadarrSettings.MaxDegreeOfParallelism;
             var ss = await radarrService.TestConnectionAsync(applicationService.RadarrSettings);
 
             radarrConnected = ss.Success;
@@ -204,6 +213,7 @@
             sonarrAPIKey = applicationService.SonarrSettings.APIKey;
             sonarrURL = applicationService.SonarrSettings.APIURL;
             sonarrBasePath = applicationService.SonarrSettings.BasePath;
+            sonarrMaxParallelism = applicationService.SonarrSettings.MaxDegreeOfParallelism;
 
             var ss = await sonarrService.TestConnectionAsync(applicationService.SonarrSettings);
 
@@ -242,7 +252,7 @@
         {
             radarrURL = radarrURL.TrimEnd('/');
             radarrTestResponse = null;
-            var radarrServiceSettings = new APISettings() { APIURL = radarrURL, APIKey = radarrAPIKey, BasePath = radarrBasePath };
+            var radarrServiceSettings = new APISettings() { APIURL = radarrURL, APIKey = radarrAPIKey, BasePath = radarrBasePath, MaxDegreeOfParallelism = radarrMaxParallelism };
             var ss = await radarrService.TestConnectionAsync(radarrServiceSettings);
 
             if (ss.Success)
@@ -276,7 +286,7 @@
         {
             sonarrURL = sonarrURL.TrimEnd('/');
             sonarrTestResponse = null;
-            var sonarrServiceSettings = new APISettings() { APIURL = sonarrURL, APIKey = sonarrAPIKey, BasePath = sonarrBasePath };
+            var sonarrServiceSettings = new APISettings() { APIURL = sonarrURL, APIKey = sonarrAPIKey, BasePath = sonarrBasePath, MaxDegreeOfParallelism = sonarrMaxParallelism };
             var ss = await sonarrService.TestConnectionAsync(sonarrServiceSettings);
 
             if (ss.Success)

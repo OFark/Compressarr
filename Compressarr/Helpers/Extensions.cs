@@ -24,11 +24,11 @@ namespace Compressarr.Helpers
             return string.IsNullOrWhiteSpace(text?.ToString()) ? string.Empty : $"{text}{adornment}";
         }        
 
-        public static Task AsyncParallelForEach<T>(this IEnumerable<T> source, Func<T, Task> body, int maxDegreeOfParallelism = DataflowBlockOptions.Unbounded, TaskScheduler scheduler = null)
+        public static Task AsyncParallelForEach<T>(this IEnumerable<T> source, Func<T, Task> body, int? maxDegreeOfParallelism = DataflowBlockOptions.Unbounded, TaskScheduler scheduler = null)
         {
             var options = new ExecutionDataflowBlockOptions
             {
-                MaxDegreeOfParallelism = maxDegreeOfParallelism
+                MaxDegreeOfParallelism = maxDegreeOfParallelism ?? DataflowBlockOptions.Unbounded
             };
             if (scheduler != null)
                 options.TaskScheduler = scheduler;

@@ -541,7 +541,7 @@ namespace Compressarr.Services
                             var ser = new Series(s, new Season(s.Seasons.FirstOrDefault(x => x.SeasonNumber == ef.SeasonNumber), ef));
                             series.Add(ser);
                         }
-                    }, 20, TaskScheduler.FromCurrentSynchronizationContext());
+                    }, applicationService.SonarrSettings.MaxDegreeOfParallelism, TaskScheduler.FromCurrentSynchronizationContext());
 
 
                     logger.LogDebug($"Success.");
@@ -552,7 +552,7 @@ namespace Compressarr.Services
                 {
                     try
                     {
-                        logger.LogError($"{ex}");
+                        logger.LogError(ex, "Error understanding output from Sonarr");
 
                         logger.LogWarning($"Error understanding output from Sonarr. Dumping output to: series.json");
 
@@ -560,8 +560,7 @@ namespace Compressarr.Services
                     }
                     catch (Exception)
                     {
-                        logger.LogCritical("Cannot dump debug file, permissions?");
-                        logger.LogCritical(ex.ToString());
+                        logger.LogCritical(ex, "Cannot dump debug file, permissions?");
                     }
 
                     return new(false, null, ex.Message);
