@@ -528,7 +528,7 @@ namespace Compressarr.Services
 
                     var seriesArr = JsonConvert.DeserializeObject<SeriesJSON[]>(seriesJSON);
 
-                    var seriesWithFiles = seriesArr.Where(s => s.EpisodeFileCount > 0).OrderBy(s => s.SortTitle).ToHashSet();
+                    var seriesWithFiles = seriesArr.Where(s => s.EpisodeFileCount > 0 && s.Seasons.Any()).OrderBy(s => s.SortTitle).ToHashSet();
 
                     SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
 
