@@ -240,9 +240,9 @@ namespace Compressarr.Filtering
                     {
                         var nullPropReg = new Regex(@"\|?([\w\.]+)(?!\|)+$");
 
-                        var valStr = nullPropReg.Replace(dlFilter.Property.Value, "np($1");
+                        var valStr = nullPropReg.Replace(dlFilter.Property.FilterOn ?? dlFilter.Property.Value, "np($1");
 
-                        filterStr = $" {dlFilter.LogicalOperator} {valStr}{dlFilter.Comparitor.Operator},false)";
+                        filterStr = $" {dlFilter.LogicalOperator} {(dlFilter.Comparitor.Not ? "!" : "")}{valStr}{dlFilter.Comparitor.Operator},false)";
 
                         vals.Add(dlFilter.Value);
                         var reg = new Regex(@"\(@\)");
@@ -254,9 +254,9 @@ namespace Compressarr.Filtering
                         {
                             var x when
                             x == FilterPropertyType.DateTime ||
-                            x == FilterPropertyType.String => $" {dlFilter.LogicalOperator} np({dlFilter.Property.Value}){dlFilter.Comparitor.Operator}\"{dlFilter.Value}\"",
-                            FilterPropertyType.Enum => $" {dlFilter.LogicalOperator} ( {string.Join(dlFilter.Comparitor.Operator == " == " ? " or " : " and ", (dlFilter.Values ?? new HashSet<string> { dlFilter.Value }).Select(x => $"np({dlFilter.Property.Value}){dlFilter.Comparitor.Operator}\"{x}\""))} )",
-                            _ => filterStr = $" {dlFilter.LogicalOperator} np({dlFilter.Property.Value}){dlFilter.Comparitor.Operator}{dlFilter.Value}"
+                            x == FilterPropertyType.String => $" {dlFilter.LogicalOperator} np({dlFilter.Property.FilterOn ?? dlFilter.Property.Value}){dlFilter.Comparitor.Operator}\"{dlFilter.Value}\"",
+                            FilterPropertyType.Enum => $" {dlFilter.LogicalOperator} ( {string.Join(dlFilter.Comparitor.Operator == " == " ? " or " : " and ", (dlFilter.Values ?? new HashSet<string> { dlFilter.Value }).Select(x => $"np({dlFilter.Property.FilterOn ?? dlFilter.Property.Value}){dlFilter.Comparitor.Operator}\"{x}\""))} )",
+                            _ => filterStr = $" {dlFilter.LogicalOperator} np({dlFilter.Property.FilterOn ?? dlFilter.Property.Value}){dlFilter.Comparitor.Operator}{dlFilter.Value}"
                         };
                     }
 

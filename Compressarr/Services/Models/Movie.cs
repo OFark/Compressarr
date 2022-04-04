@@ -223,7 +223,7 @@ namespace Compressarr.Services.Models
         [Filter("Size", FilterPropertyType.Number)]
         public long Size { get; set; }
 
-        [Filter("Size(F)", FilterPropertyType.Number, FilterOn = "size")]
+        [Filter("Size(F)", FilterPropertyType.Number, FilterOn = "Size")]
         public string SizeNice => Size.ToFileSize();
 
         public class FileQuality
@@ -296,7 +296,7 @@ namespace Compressarr.Services.Models
         [Filter("Resolution")]
         public string Resolution { get; set; }
 
-        [Filter("Run Time(F)", FilterOn = "runTime")]
+        [Filter("Run Time(F)", FilterOn = "RunTime")]
         public string RunTimeNice
         {
             get
@@ -327,7 +327,7 @@ namespace Compressarr.Services.Models
         [Filter("Video - Bitrate", FilterPropertyType.Number)]
         public int VideoBitrate { get; set; }
 
-        [Filter("Video - Bitrate(F)", FilterOn = "videoBitrate")]
+        [Filter("Video - Bitrate(F)", FilterOn = "VideoBitrate")]
         public string VideoBitrateNice => VideoBitrate.ToBitRate();
 
         [JsonProperty("videoCodec")]

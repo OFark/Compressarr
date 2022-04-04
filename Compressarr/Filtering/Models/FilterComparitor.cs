@@ -56,7 +56,7 @@ namespace Compressarr.Filtering.Models
         public bool Not => Value.StartsWith("!");
 
         [JsonIgnore]
-        public string Operator => $"{(IsParamMethod ? "." : " ")}{Value}{(IsParamMethod ? "(@)" : " ")}";
+        public string Operator => $"{(IsParamMethod ? "." : " ")}{Value.TrimStart('!')}{(IsParamMethod ? "(@)" : " ")}";
 
         public FilterComparitor Clone()
         {
