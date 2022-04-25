@@ -6,7 +6,8 @@
         DateTime,
         String,
         Number,
-        Enum
+        Enum,
+        FileSize
     }
 
     public enum MediaSource

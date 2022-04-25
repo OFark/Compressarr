@@ -136,6 +136,7 @@ namespace Compressarr.Filtering
                         return EnumComparitors;
 
                     case FilterPropertyType.Number:
+                    case FilterPropertyType.FileSize:
                         return NumberComparitors;
 
                     case FilterPropertyType.DateTime:
@@ -235,6 +236,16 @@ namespace Compressarr.Filtering
                 }
                 else
                 {
+                    if (dlFilter.Property.PropertyType == FilterPropertyType.FileSize)
+                    {
+                        var parseBytes = ByteSizeLib.ByteSize.TryParse(dlFilter.Value, out var bytes) ? bytes.Bytes : -1;
+                        
+                        if(parseBytes >= 0)
+                        {
+                            dlFilter.Value = parseBytes.ToString();
+                        }
+                    }
+
                     string filterStr;
                     if (dlFilter.Comparitor.IsParamMethod)
                     {

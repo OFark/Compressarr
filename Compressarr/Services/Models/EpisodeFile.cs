@@ -47,6 +47,9 @@ namespace Compressarr.Services.Models
         [JsonProperty("size")]
         public long Size { get; set; }
 
+        [Filter("Size(F)", FilterPropertyType.FileSize, FilterOn = "Size")]
+        public string SizeNice => Size.ToFileSize();
+
         [Filter("Date Added", FilterPropertyType.DateTime)]
         [JsonProperty("dateAdded")]
         public DateTime DateAdded { get; set; }

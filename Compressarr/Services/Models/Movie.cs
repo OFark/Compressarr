@@ -223,7 +223,7 @@ namespace Compressarr.Services.Models
         [Filter("Size", FilterPropertyType.Number)]
         public long Size { get; set; }
 
-        [Filter("Size(F)", FilterPropertyType.Number, FilterOn = "Size")]
+        [Filter("Size(F)", FilterPropertyType.FileSize, FilterOn = "Size")]
         public string SizeNice => Size.ToFileSize();
 
         public class FileQuality

@@ -14,6 +14,7 @@ using MudBlazor;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace Compressarr.Pages
@@ -28,6 +29,9 @@ namespace Compressarr.Pages
         private IEnumerable<Series> Series = new HashSet<Series>();
         private HashSet<TreeItemData> SeriesTreeItems = new();
         private bool showSaveDialog = false;
+
+        private readonly string numberRexeg = @"^[. 0-9]+(KB|MB|GB|KiB|MiB|GiB)$";
+
         [Inject] IApplicationService ApplicationService { get; set; }
         [Inject] IDialogService DialogService { get; set; }
         private List<DynamicLinqFilter> DlFilters { get; set; } = new();
@@ -91,8 +95,19 @@ namespace Compressarr.Pages
             }
         }
 
+        private MudTextField<string> fileSizeInput;
+
         private async void AddFilter()
         {
+            if (fileSizeInput != null)
+            {
+                if (!Regex.IsMatch(fileSizeInput.Value, numberRexeg, RegexOptions.IgnoreCase))
+                {
+                    AlertMessage = "File size must be a number with a unit (KB, MB, GB, Kib, Mib, Gib)";
+                    return;
+                }
+                AlertMessage = null;
+            }
 
             if (FilterProperty != null && FilterComparitor != null && !string.IsNullOrWhiteSpace(FilterValue))
             {

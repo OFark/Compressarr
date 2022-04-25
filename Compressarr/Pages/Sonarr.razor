@@ -20,31 +20,31 @@
                             <Content>
                                 <MudText>
                                     @if (series.TreeItems != null && series.TreeItems.Any())
+                                {
+                                    if (series.IsExpanded)
                                     {
-                                        if (series.IsExpanded)
-                                        {
-                                            <MudIcon Icon="@Icons.Outlined.KeyboardArrowDown" Style="vertical-align:middle" />
-                                        }
-                                        else
-                                        {
-                                            <MudIcon Icon="@Icons.Outlined.KeyboardArrowRight" Style="vertical-align:middle" />
-                                        }
+                                        <MudIcon Icon="@Icons.Outlined.KeyboardArrowDown" Style="vertical-align:middle" />
                                     }
-                                    @series.Title
-                                    @if (!string.IsNullOrWhiteSpace(series.Value))
+                                    else
                                     {
-                                        <MudText Typo="Typo.caption"> - @series.Value</MudText>
+                                        <MudIcon Icon="@Icons.Outlined.KeyboardArrowRight" Style="vertical-align:middle" />
                                     }
+                                }
+                                @series.Title
+                                @if (!string.IsNullOrWhiteSpace(series.Value))
+                                {
+                                    <MudText Typo="Typo.caption"> - @series.Value</MudText>
+                                }
 
-                                    @foreach (var b in series.Badges ?? new())
-                                    {
-                                        <MudChip Label="true" Size="Size.Small">@b</MudChip>
-                                    }
-                                </MudText>
-                            </Content>
-                        </MudTreeViewItem>
-                    </ItemTemplate>
-                </MudTreeView>
+                                @foreach (var b in series.Badges ?? new())
+                                {
+                                    <MudChip Label="true" Size="Size.Small">@b</MudChip>
+                                }
+                            </MudText>
+                        </Content>
+                    </MudTreeViewItem>
+                </ItemTemplate>
+            </MudTreeView>
             }
         </MudItem>
         <MudItem sm="8">
@@ -129,6 +129,11 @@
                                             <MudNumericField T="decimal" @bind-Value="FilterIntValue" Placeholder="something" />
                                         }
                                         break;
+                                    case FilterPropertyType.FileSize:
+                                        {
+                                            <MudTextField T="string" @bind-Value="FilterValue" @ref=fileSizeInput Pattern=@numberRexeg Placeholder="something" />
+                                        }
+                                        break;
                                     case FilterPropertyType.Enum:
                                         {
                                             var filterValueResults = SonarrService.GetValuesForPropertyAsync(FilterPropertyStr).Result;
@@ -137,10 +142,10 @@
                                             {
                                                 <MudSelect @bind-Value="FilterValue" MultiSelection="true" Required="true" OffsetY="true" @bind-SelectedValues="FilterValues">
                                                     @foreach (var key in filterValueResults.Results)
-                                                                    {
-                                                        <MudSelectItem Value="@key" />
-                                                                    }
-                                                </MudSelect>
+                                                    {
+                                        <MudSelectItem Value="@key" />
+                                                    }
+                                </MudSelect>
                                             }
                                             else
                                             {

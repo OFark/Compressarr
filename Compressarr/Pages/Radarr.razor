@@ -92,7 +92,12 @@
                                 break;
                             case FilterPropertyType.Number:
                                 {
-                                    <MudNumericField T="decimal" @bind-Value="FilterIntValue" Placeholder="something" />
+                                    <MudNumericField T="decimal" @bind-Value="FilterIntValue" Pattern=@numberRexeg Placeholder="something" />
+                                }
+                                break;
+                            case FilterPropertyType.FileSize:
+                                {
+                                    <MudTextField T="string" @bind-Value="filterValue" @ref=fileSizeInput Pattern=@numberRexeg Placeholder="something" />
                                 }
                                 break;
                             case FilterPropertyType.Enum:
